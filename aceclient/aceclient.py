@@ -181,7 +181,6 @@ class AceClient(object):
         '''
         Start video method
         '''
-        #if self._engine_version_code >= 3010500: # and AceConfig.vlcuse:
         if stream_type == 'hls':
            stream_type = 'output_format=hls' + ' transcode_audio=' + str(AceConfig.transcode_audio) \
                                              + ' transcode_mp3=' + str(AceConfig.transcode_mp3) \
@@ -257,6 +256,11 @@ class AceClient(object):
                                 "stdout" : PIPE,
                                 "stderr" : None,
                                 "shell"  : False }
+               if AceConfig.osplatform == 'Windows':                                                                   
+                   CREATE_NO_WINDOW = 0x08000000                                                                       
+                   CREATE_NEW_PROCESS_GROUP = 0x00000200                                                               
+                   DETACHED_PROCESS = 0x00000008                                                                       
+                   popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)  
                transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
                out = transcoder.stdout
                logger.warning("HLS stream detected. Ffmpeg transcoding started")
