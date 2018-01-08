@@ -60,10 +60,9 @@ class AceConfig(acedefconfig.AceDefConfig):
     # ----------------------------------------------------
     # Seek back feature.
     # Seeks stream back for specified amount of seconds.
-    # Greatly helps fighing AceSteam lags, but introduces
-    # video stream delay.
-    # Set it to 30 or so.
-    # Works only with the newest versions of AceEngine!
+    # Greatly helps fighing AceSteam lags, but introduce video stream delay.
+    # Set it to 30 or so. Works only with the newest versions of AceEngine!
+    # !!!!! Don't use with streamtype = 'hls' !!!!!
     videoseekback = 0
     # Waiting time response from AceEngine server for playable url. In seconds.
     videotimeout = 30
@@ -133,7 +132,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Logging configuration
     #
     # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    loglevel = logging.CRITICAL
+    loglevel = logging.DEBUG
     # Log message forma
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'
     # Log date forma
