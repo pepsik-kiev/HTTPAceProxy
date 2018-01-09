@@ -393,11 +393,6 @@ class Client:
 
         # Sending client headers to videostream
         if self.handler.connected:
-          # if url.endswith('.m3u8'):
-          #  self.handler.send_response(200)
-          #  self.handler.send_header("Content-Type", "video/mpeg")
-          #  self.handler.end_headers()
-          # else:
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
             FORWARD_HEADERS = ['Connection',
                                'Keep-Alive',
