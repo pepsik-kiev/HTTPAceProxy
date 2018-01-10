@@ -250,17 +250,21 @@ class AceClient(object):
 
            if url.endswith('.m3u8'):
                self._streamReaderConnection.headers = {'Content-Type':'video/mpeg','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
-
-               ffmpeg_cmd = 'ffmpeg -hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+               if AceConfig.osplatform == 'Windows':
+                   ffmpeg_cmd = 'ffmpeg.exe '
+               else:
+                   ffmpeg_cmd = 'ffmpeg '
+               ffmpeg_cmd += '-hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
                popen_params = { "bufsize": AceConfig.readchunksize,
                                 "stdout" : PIPE,
                                 "stderr" : None,
                                 "shell"  : False }
-               if AceConfig.osplatform == 'Windows':                                                                   
-                   CREATE_NO_WINDOW = 0x08000000                                                                       
-                   CREATE_NEW_PROCESS_GROUP = 0x00000200                                                               
-                   DETACHED_PROCESS = 0x00000008                                                                       
-                   popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)  
+               if AceConfig.osplatform == 'Windows':
+                   CREATE_NO_WINDOW = 0x08000000
+                   CREATE_NEW_PROCESS_GROUP = 0x00000200
+                   DETACHED_PROCESS = 0x00000008
+                   popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+
                transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
                out = transcoder.stdout
                logger.warning("HLS stream detected. Ffmpeg transcoding started")
