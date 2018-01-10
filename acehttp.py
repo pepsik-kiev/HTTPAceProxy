@@ -264,7 +264,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 elif self.reqtype == 'efile':
                     self.client.ace.START(self.reqtype, {'efile_url': self.path_unquoted}, AceConfig.streamtype)
 
-                logger.debug("START %s done" % (self.reqtype))
+                logger.debug("START %s done %s" % (self.reqtype, self.path_unquoted))
 
                 # Getting URL from engine
                 if self.reqtype == 'infohash' or self.reqtype == 'torrent':

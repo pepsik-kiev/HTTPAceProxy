@@ -42,7 +42,7 @@ class P2pproxy(AceProxyPlugin):
     def __init__(self, AceConfig, AceStuff):
         super(P2pproxy, self).__init__(AceConfig, AceStuff)
         self.params = None
-        self.api = TorrentTvApi(config.email, config.password, config.sessiontimeout, config.zoneid)
+        self.api = TorrentTvApi(config.email, config.password, config.sessiontimeout)
 
     def handle(self, connection, headers_only=False):
         P2pproxy.logger.debug('Handling request')
@@ -90,9 +90,13 @@ class P2pproxy(AceProxyPlugin):
                             logo = P2pproxy.TTVU + logo
                         break
 
-                if stream_type == 'torrent':
+                if stream_type == 'torrent' and stream.endswith('.acelive'):
                     stream_url = re.sub('^(http.+)$',
                                         lambda match: '/torrent/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
+                                        stream)
+                elif stream_type == 'torrent' and stream.endswith('.acestream'):
+                    stream_url = re.sub('^(http.+)$',
+                                        lambda match: '/efile/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
                                         stream)
                 elif stream_type == 'contentid':
                     stream_url = re.sub('^([0-9a-f]{40})',
@@ -285,9 +289,13 @@ class P2pproxy(AceProxyPlugin):
 
                 stream_type, stream = self.api.archive_stream_source(record_id)
 
-                if stream_type == 'torrent':
+                if stream_type == 'torrent' and stream.endswith('.torrent'):
                     stream_url = re.sub('^(http.+)$',
                                         lambda match: '/torrent/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
+                                        stream)
+                elif stream_type == 'torrent' and stream.endswith('.acestream'):
+                    stream_url = re.sub('^(http.+)$',
+                                        lambda match: '/efile/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
                                         stream)
                 elif stream_type == 'contentid':
                     stream_url = re.sub('^([0-9a-f]{40})',

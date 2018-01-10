@@ -71,8 +71,7 @@ class Torrenttv(AceProxyPlugin):
                     itemdict['logo'] = logo
 
                 if url.startswith('acestream://') or url.startswith('infohash://') \
-                                                  or (url.startswith('http://') and url.endswith('.acelive')) \
-                                                  or (url.startswith('http://') and url.endswith('.torrent')):
+                                                  or (url.startswith('http://') and url.endswith('.acelive')):
                     self.channels[name] = url
                     itemdict['url'] = requests.utils.quote(encname, '') + '.mp4'
                 self.playlist.addItem(itemdict)
@@ -143,6 +142,10 @@ class Torrenttv(AceProxyPlugin):
                     connection.path = '/torrent/' + requests.utils.quote(url, '') + '/stream.mp4'
                     connection.splittedpath = connection.path.split('/')
                     connection.reqtype = 'torrent'
+                elif url.startswith('http://') and url.endswith('.acestream'):
+                    connection.path = '/efile/' + requests.utils.quote(url, '') + '/stream.mp4'
+                    connection.splittedpath = connection.path.split('/')
+                    connection.reqtype = 'efile'
                 play = True
             elif self.etag == connection.headers.get('If-None-Match'):
                 self.logger.debug('ETag matches - returning 304')

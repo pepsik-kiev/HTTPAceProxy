@@ -36,11 +36,10 @@ class TorrentTvApi(object):
 
     API_URL = 'http://api.torrent-tv.ru/v3/'
 
-    def __init__(self, email, password, maxIdle, zoneid='1'):
+    def __init__(self, email, password, maxIdle):
         self.email = email
         self.password = password
         self.maxIdle = maxIdle
-        self.zoneid = zoneid
         self.session = None
         self.allTranslations = None
         self.lastActive = 0.0
@@ -74,10 +73,6 @@ class TorrentTvApi(object):
             params={'session': self.session,'typeresult': 'json'}
             result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'userinfo.php', params=params, timeout=10).json())
             self.log.debug("Session details : VipStatus - " + ("Yes" if str(result['vip_status'])=='1' else "No") + "; Balance - " + str(result['balance']))
-
-            params = {'session': self.session,'zone': self.zoneid}
-            result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'set_zone.php', params=params, timeout=10).json())
-            self.log.debug("HTTP streaming ZoneID set to : " + self.zoneid)
 
             return self.session
 

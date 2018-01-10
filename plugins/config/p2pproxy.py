@@ -37,7 +37,3 @@ tvgshift = 0
 
 # Format of the tvg-id tag or empty string
 tvgid='ttv%(id)s'
-
-# Zone id - AUTO (1), MSK (2), SPB (3), SAM (4), AMS (5), ISR (6)  etc.
-# For more details see http://api.torrent-tv.ru/v3/api_v3.html#toc-35-
-zoneid = "1"
