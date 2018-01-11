@@ -61,9 +61,9 @@ class Stat(AceProxyPlugin):
         response = None
         if mac_address != None:
            mac_address = mac_address.groups()[0]
-           lookup_url = "http://api.macvendors.com/" + mac_address
+           lookup_url = "https://macvendors.co/api/vendorname/" + mac_address
            try:
-              response = requests.get(lookup_url, headers={'User-Agent':'Magic Browser','Connection':'close'}, timeout=10).text
+              response = requests.get(lookup_url, headers={'User-Agent':'Magic Browser','Connection':'close'}, timeout=5).text
            except:
               Stat.logger.error("Can't obtain vendor for MAC address " + mac_address)
         else:
