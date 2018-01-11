@@ -85,7 +85,7 @@ class Torrenttv(AceProxyPlugin):
 
         if self.updatelogos:
             try:
-                api = TorrentTvApi(p2pconfig.email, p2pconfig.password, p2pconfig.sessiontimeout, p2pconfig.zoneid)
+                api = TorrentTvApi(p2pconfig.email, p2pconfig.password, p2pconfig.sessiontimeout)
                 translations = api.translations('all')
                 logos = dict()
 

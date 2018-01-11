@@ -322,7 +322,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def getCid(self, reqtype, url):
         cid =''
-        if url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent')): # or url.endswith('.acestream')):
+        if url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
                 f = b64encode(requests.get(url, headers=headers, stream = True, timeout=5).raw.read())
