@@ -322,24 +322,23 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def getCid(self, reqtype, url):
         cid =''
-        if url.startswith('http'):
-            if url.endswith('.acelive') or url.endswith('.torrent'):
+        if url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent')): # or url.endswith('.acestream')):
+            try:
+                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
+                f = b64encode(requests.get(url, headers=headers, stream = True, timeout=5).raw.read())
+                headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+                cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
+            except:
+                pass
+            if cid == '':
+                logging.debug("Failed to get ContentID from WEB API")
                 try:
-                    headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
-                    f = b64encode(requests.get(url, headers=headers, stream = True, timeout=5).raw.read())
-                    headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
-                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
+                   with AceStuff.clientcounter.lock:
+                        if not AceStuff.clientcounter.idleace:
+                           AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+                        cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
                 except:
-                    pass
-                if cid == '':
-                    logging.debug("Failed to get ContentID from WEB API")
-                    try:
-                        with AceStuff.clientcounter.lock:
-                            if not AceStuff.clientcounter.idleace:
-                                AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                            cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                    except:
-                        logging.debug("Failed to get ContentID from engine")
+                   logging.debug("Failed to get ContentID from engine")
 
         return None if not cid or cid == '' else cid
 

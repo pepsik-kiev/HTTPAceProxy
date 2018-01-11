@@ -142,10 +142,6 @@ class Torrenttv(AceProxyPlugin):
                     connection.path = '/torrent/' + requests.utils.quote(url, '') + '/stream.mp4'
                     connection.splittedpath = connection.path.split('/')
                     connection.reqtype = 'torrent'
-                elif url.startswith('http://') and url.endswith('.acestream'):
-                    connection.path = '/efile/' + requests.utils.quote(url, '') + '/stream.mp4'
-                    connection.splittedpath = connection.path.split('/')
-                    connection.reqtype = 'efile'
                 play = True
             elif self.etag == connection.headers.get('If-None-Match'):
                 self.logger.debug('ETag matches - returning 304')

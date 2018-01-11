@@ -90,13 +90,9 @@ class P2pproxy(AceProxyPlugin):
                             logo = P2pproxy.TTVU + logo
                         break
 
-                if stream_type == 'torrent' and stream.endswith('.acelive'):
+                if stream_type == 'torrent':
                     stream_url = re.sub('^(http.+)$',
                                         lambda match: '/torrent/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
-                                        stream)
-                elif stream_type == 'torrent' and stream.endswith('.acestream'):
-                    stream_url = re.sub('^(http.+)$',
-                                        lambda match: '/efile/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
                                         stream)
                 elif stream_type == 'contentid':
                     stream_url = re.sub('^([0-9a-f]{40})',
@@ -286,16 +282,11 @@ class P2pproxy(AceProxyPlugin):
                     return
 
                 stream_url = None
-
                 stream_type, stream = self.api.archive_stream_source(record_id)
 
-                if stream_type == 'torrent' and stream.endswith('.torrent'):
+                if stream_type == 'torrent':
                     stream_url = re.sub('^(http.+)$',
                                         lambda match: '/torrent/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
-                                        stream)
-                elif stream_type == 'torrent' and stream.endswith('.acestream'):
-                    stream_url = re.sub('^(http.+)$',
-                                        lambda match: '/efile/' + requests.utils.quote(match.group(0), '') + '/stream.mp4',
                                         stream)
                 elif stream_type == 'contentid':
                     stream_url = re.sub('^([0-9a-f]{40})',
