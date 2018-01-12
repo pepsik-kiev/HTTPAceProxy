@@ -109,9 +109,9 @@ class AceConfig(acedefconfig.AceDefConfig):
     transcodecmd = dict()
     # transcodecmd['100k'] = 'ffmpeg -i - -c:a copy -b 100k -f mpegts -'
     # transcodecmd['mp2'] = 'ffmpeg -i - -c:a mp2 -c:v mpeg2video -f mpegts -qscale:v 2 -'.split()
-    transcodecmd['mkv'] = 'ffmpeg -cpuflags neon -hwaccel auto -hide_banner -nostats -loglevel info -i - -map 0 -c:v copy -c:a copy -f matroska -'.split()
-    transcodecmd['hls'] = 'ffmpeg -cpuflags neon -hwaccel auto -nostats -loglevel info -i - -map 0 -c copy -force_key_frames "expr:gte(t,n_forced*2)" -f hls -start_number 0 -hls_time 6 -hls_playlist_type event -hls_allow_cache 1 -hls_flags single_file+split_by_time+delete_segments+omit_endlist+append_list -'.split()
-    transcodecmd['default'] = 'ffmpeg -cpuflags neon -hwaccel auto -i - -map 0 -c:a copy -c:v copy -f mpegts -'.split()
+    transcodecmd['mkv'] = 'ffmpeg -hide_banner -nostats -loglevel info -i - -map 0 -c:v copy -c:a copy -f matroska -'.split()
+    transcodecmd['hls'] = 'ffmpeg -nostats -loglevel info -i - -map 0 -c copy -force_key_frames "expr:gte(t,n_forced*2)" -f hls -start_number 0 -hls_time 6 -hls_playlist_type event -hls_allow_cache 1 -hls_flags single_file+split_by_time+delete_segments+omit_endlist+append_list -'.split()
+    transcodecmd['default'] = 'ffmpeg -i - -map 0 -c:a copy -c:v copy -f mpegts -'.split()
     #
     # ----------------------------------------------------
     # Other settings
