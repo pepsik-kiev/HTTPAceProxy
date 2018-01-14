@@ -138,6 +138,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Log date forma
     logdatefmt='%d.%m %H:%M:%S'
     # Full path to a log file
+    # For Windows OS something like this logfile = "c:\\Python27\\log_AceHttp.txt"
     logfile = None
 
     # This method is used to detect fake requests. Some players send such
