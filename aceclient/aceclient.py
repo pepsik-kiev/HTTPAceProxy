@@ -264,7 +264,7 @@ class AceClient(object):
                else:
                    ffmpeg_cmd = 'ffmpeg '
 
-               ffmpeg_cmd += '-cpuflags neon -hwaccel auto -hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+               ffmpeg_cmd += '-hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
                transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
                out = transcoder.stdout
                logger.warning("HLS stream detected. Ffmpeg transcoding started")
