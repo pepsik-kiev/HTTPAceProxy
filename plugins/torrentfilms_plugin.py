@@ -11,7 +11,12 @@ import logging
 import requests
 import bencode, hashlib
 import time
-import urlparse
+try:
+  # Python 2
+  from urlparse import urlparse, parse_qs
+except ImportError:
+  # Python 3
+  from urllib.parse import urlparse, parse_qs
 import gevent
 import threading
 from modules.PluginInterface import AceProxyPlugin
@@ -107,8 +112,8 @@ class Torrentfilms(AceProxyPlugin):
                connection.send_header('Connection', 'close')
                connection.end_headers()
                return
-            url = urlparse.urlparse(connection.path)
-            params = urlparse.parse_qs(url.query)
+            url = urlparse(connection.path)
+            params = parse_qs(url.query)
             fmt = params['fmt'][0] if params.has_key('fmt') else None
 
             exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, fmt).encode('utf-8')

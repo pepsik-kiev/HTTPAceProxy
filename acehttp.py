@@ -28,8 +28,13 @@ from base64 import b64encode
 import time
 import threading
 import requests
-import urlparse
 import Queue
+try:
+  # Python 2
+  from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
+except ImportError:
+  # Python 3
+  from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qs
 import aceclient
 import aceconfig
 from aceconfig import AceConfig
@@ -179,8 +184,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
         #logger.debug("Accept connected client headers :\n" + str(self.headers))
-        self.requrl = urlparse.urlparse(self.path)
-        self.reqparams = urlparse.parse_qs(self.requrl.query)
+        self.requrl = urlparse(self.path)
+        self.reqparams = parse_qs(self.requrl.query)
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
                                  '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
@@ -262,7 +267,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     paramsdict['data'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'efile':
-                    self.client.ace.START(self.reqtype, {'efile_url': self.path_unquoted}, AceConfig.streamtype)
+                    self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
 
                 logger.debug("START %s done %s" % (self.reqtype, self.path_unquoted))
 
@@ -272,9 +277,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 else:
                      self.url = self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
-                p = urlparse.urlsplit(self.url)
+                p = urlsplit(self.url)
                 p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
-                self.url = urlparse.urlunsplit(p)
+                self.url = urlunsplit(p)
 
                 logger.debug("Successfully get url %s from AceEngine!" % (self.url))
                 self.errorhappened = False
@@ -322,7 +327,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def getCid(self, reqtype, url):
         cid =''
-        if url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent') or url.endswith('.acestream')):
+        if  url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent') or url.endswith('.acestream')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
                 f = b64encode(requests.get(url, headers=headers, stream = True, timeout=5).raw.read())
@@ -663,11 +668,10 @@ def _reloadconfig(signum=None, frame=None):
     from aceconfig import AceConfig
     logger.info('Config reloaded')
 
-logging.basicConfig(
-    level=AceConfig.loglevel,
-    filename=AceConfig.logfile,
-    format=AceConfig.logfmt,
-    datefmt=AceConfig.logdatefmt)
+logging.basicConfig(level=AceConfig.loglevel,
+                    filename=AceConfig.logfile,
+                    format=AceConfig.logfmt,
+                    datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('INIT')
 
 #### Initial settings for AceEngine
@@ -677,7 +681,7 @@ AceConfig.aceHTTPport = AceConfig.acehostslist[0][2]
 
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode:
-    DEVNULL = open(os.devnull, 'wb')
+   DEVNULL = open(os.devnull, 'wb')
 
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':

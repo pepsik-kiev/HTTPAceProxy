@@ -21,12 +21,16 @@ __author__ = 'miltador'
 import logging
 import re
 import requests
-import urlparse
+try:
+  # Python 2
+  from urlparse import urlparse, parse_qs
+except ImportError:
+  # Python 3
+  from urllib.parse import urlparse, parse_qs
 import base64
 from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
-from datetime import date, timedelta
-import time
+from datetime import date, timedelta, datetime
 
 from modules.PluginInterface import AceProxyPlugin
 from modules.PlaylistGenerator import PlaylistGenerator
@@ -49,8 +53,8 @@ class P2pproxy(AceProxyPlugin):
 
         hostport = connection.headers['Host']
 
-        query = urlparse.urlparse(connection.path).query
-        self.params = urlparse.parse_qs(query)
+        query = urlparse(connection.path).query
+        self.params = parse_qs(query)
 
         if connection.reqtype == 'channels' or connection.reqtype == 'channels.m3u':  # /channels/ branch
             if len(connection.splittedpath) == 3 and connection.splittedpath[2].split('?')[
@@ -338,8 +342,8 @@ class P2pproxy(AceProxyPlugin):
                         record_id = record.getAttribute('record_id')
                         channel_id = record.getAttribute('epg_id')
                         name = record.getAttribute('name')
-                        d = time.localtime(float(record.getAttribute('time')))
-                        n = '%.2d:%.2d %s' % (d.tm_hour, d.tm_min, name)
+                        d = datetime.fromtimestamp(float(record.getAttribute('time'))).strftime('%H:%M')
+                        n = '%s %s' % (d, name)
                         logo = ''
                         for channel in channels_list:
                             if channel.getAttribute('epg_id') == channel_id:

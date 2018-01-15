@@ -5,7 +5,12 @@ http://ip:port/allfon
 '''
 import re
 import logging
-import urlparse
+try:
+  # Python 2
+  from urlparse import urlparse, parse_qs
+except ImportError:
+  # Python 3
+  from urllib.parse import urlparse, parse_qs
 import requests
 import time
 from modules.PluginInterface import AceProxyPlugin
@@ -70,8 +75,8 @@ class Allfon(AceProxyPlugin):
         for match in matches:
             playlistgen.addItem(match.groupdict())
         Allfon.logger.info('AllFon playlist created')
-        url = urlparse.urlparse(connection.path)
-        params = urlparse.parse_qs(url.query)
+        url = urlparse(connection.path)
+        params = parse_qs(url.query)
         fmt = params['fmt'][0] if params.has_key('fmt') else None
         header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)
 

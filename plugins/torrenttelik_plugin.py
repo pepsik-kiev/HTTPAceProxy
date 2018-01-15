@@ -9,7 +9,12 @@ http://ip:port/torrent-telik/?type=allfon = allfon playlist
 '''
 
 import logging
-import urlparse
+try:
+  # Python 2
+  from urlparse import urlparse, parse_qs
+except ImportError:
+  # Python 3
+  from urllib.parse import urlparse, parse_qs
 import requests
 import time
 from modules.PluginInterface import AceProxyPlugin
@@ -52,8 +57,8 @@ class Torrenttelik(AceProxyPlugin):
             connection.end_headers()
             return
 
-        query = urlparse.urlparse(connection.path).query
-        self.params = urlparse.parse_qs(query)
+        query = urlparse(connection.path).query
+        self.params = parse_qs(query)
 
         url = None
         list_type = self.getparam('type')

@@ -38,7 +38,7 @@ class TorrentTvApi(object):
 
     API_URL = 'http://api.torrent-tv.ru/v3/'
 
-    def __init__(self, email, password, maxIdle):
+    def __init__(self, email, password, maxIdle, zoneid = '1'):
         self.email = email
         self.password = password
         self.maxIdle = maxIdle
@@ -67,7 +67,7 @@ class TorrentTvApi(object):
             self.log.debug("Creating new session")
             self.session = None
             headers = {'User-Agent':'Magic Browser','Connection':'close'}
-            params = {'typeresult':'json','username':self.email,'password':self.password,'application':'tsproxy','guid':str(random.randint(100000000,199999999))}
+            params = {'typeresult':'json','username':self.email,'password':self.password,'application':'samsung','guid':str(random.randint(100000000,199999999))}
             result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'auth.php', params=params, headers=headers, timeout=10).json())
             self.session = result['session']
             self.lastActive = time.time()

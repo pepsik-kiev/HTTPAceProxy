@@ -8,7 +8,12 @@ import logging
 import time
 import gevent
 import threading
-import urlparse
+try:
+  # Python 2
+  from urlparse import urlparse, parse_qs
+except ImportError:
+  # Python 3
+  from urllib.parse import urlparse, parse_qs
 import md5
 import traceback
 import requests
@@ -115,9 +120,9 @@ class Torrenttv(AceProxyPlugin):
                     connection.dieWithError()
                     return
 
-            url = urlparse.urlparse(connection.path)
+            url = urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
-            params = urlparse.parse_qs(url.query)
+            params = parse_qs(url.query)
             fmt = params['fmt'][0] if params.has_key('fmt') else None
 
             if path.startswith('/torrenttv/channel/'):
