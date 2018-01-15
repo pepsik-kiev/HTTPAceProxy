@@ -5,16 +5,15 @@ To use it, go to http://127.0.0.1:8000/stat
 '''
 from __future__ import division
 from modules.PluginInterface import AceProxyPlugin
+from aceconfig import AceConfig
 from subprocess import PIPE
 import re
 import time
 import logging
 import requests
 import plugins.modules.ipaddr as ipaddr
-import platform
 import psutil
 
-osplatform = platform.system()
 localnetranges = (
         '192.168.0.0/16',
         '10.0.0.0/8',
@@ -43,7 +42,7 @@ class Stat(AceProxyPlugin):
 
     def mac_lookup(self,ip_address):
 
-        if osplatform != 'Windows':
+        if AceConfig.osplatform != 'Windows':
            psutil.Popen(["ping", "-c 1", ip_address], stdout = PIPE, shell=False)
            pid = psutil.Popen(["arp", "-n", ip_address], stdout = PIPE, shell=False)
         else:
