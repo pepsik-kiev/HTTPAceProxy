@@ -36,6 +36,7 @@ from base64 import b64encode
 import time
 import threading
 import requests
+from bencode import __version__ as bencode_version__
 import Queue
 import ipaddr
 try:
@@ -712,7 +713,7 @@ logger.info("Using python %s" % sys.version.split(' ')[0])
 logger.info("Using gevent %s" % gevent.__version__)
 logger.info("Using psutil %s" % psutil.__version__)
 logger.info("Using requests %s" % requests.__version__)
-
+logger.info("Using bencode %s" % bencode_version__)
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
     if drop_privileges(AceConfig.aceproxyuser):
