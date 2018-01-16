@@ -9,10 +9,10 @@ Website: https://github.com/ValdikSS/AceProxy
 import os, sys
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
-eggs_dir = os.path.join(base_dir, 'plugins/modules/eggs')
-eggs_list = filter(lambda x: x.endswith('.egg'), os.listdir(eggs_dir))
-for filename in eggs_list:
-  sys.path.insert(0, eggs_dir + '/' + filename)
+wheels_dir = os.path.join(base_dir, 'plugins/modules/wheels')
+wheels_list = filter(lambda x: x.endswith('.whl'), os.listdir(wheels_dir))
+for filename in wheels_list:
+  sys.path.insert(0, wheels_dir + '/' + filename)
 
 modules_dir = os.path.join(base_dir, 'plugins/modules')
 sys.path.insert(0, modules_dir)
