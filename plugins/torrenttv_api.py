@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 """
 Torrent-TV API communication class
 Forms requests to API, checks result for errors and returns in desired form (lists or raw data)

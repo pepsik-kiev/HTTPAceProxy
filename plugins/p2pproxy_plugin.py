@@ -32,10 +32,9 @@ from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
 from datetime import date, timedelta, datetime
 
-from modules.PluginInterface import AceProxyPlugin
-from modules.PlaylistGenerator import PlaylistGenerator
+from PluginInterface import AceProxyPlugin
+from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
-
 
 class P2pproxy(AceProxyPlugin):
     TTV = 'http://1ttv.org/'

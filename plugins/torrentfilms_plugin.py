@@ -19,7 +19,7 @@ except ImportError:
   from urllib.parse import urlparse, parse_qs
 import gevent
 import threading
-from modules.PluginInterface import AceProxyPlugin
+from PluginInterface import AceProxyPlugin
 import config.torrentfilms as config
 from aceconfig import AceConfig
 

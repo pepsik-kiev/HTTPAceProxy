@@ -13,6 +13,9 @@ class PlaylistConfig():
     # m3uchannelnames['Canal+ HD (France)'] = 'Canal+ HD'
     # m3uchannelnames['Sky Sport 1 HD (Italy)'] = 'Sky Sport 1 HD'
     m3uchannelnames = dict()
+    # m3uchannelnames['UA:Перший (Украина)'] = 'UA Перший (Украина)'
+    # m3uchannelnames['100% News'] = '100 News'
+    # m3uchannelnames['РЕН ТВ [16:9]'] = 'РЕН ТВ (16-9)'
 
     # Similar to m3uchannelnames but for groups
     m3ugroupnames = dict()

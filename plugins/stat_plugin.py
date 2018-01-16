@@ -4,14 +4,14 @@ Simple statistics plugin
 To use it, go to http://127.0.0.1:8000/stat
 '''
 from __future__ import division
-from modules.PluginInterface import AceProxyPlugin
+from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from subprocess import PIPE
 import re
 import time
 import logging
 import requests
-import plugins.modules.ipaddr as ipaddr
+import ipaddr
 import psutil
 
 localnetranges = (
@@ -127,7 +127,8 @@ class Stat(AceProxyPlugin):
         connection.wfile.write('</table></div>')
 
         connection.wfile.write('<h5>SYSTEM INFO :</h5>')
-        connection.wfile.write('<p><font size="-3">CPU cores: %s' % cpu_nums + ' used : %s' % cpu_percent + '%</br>')
+        connection.wfile.write('<p><font size="-3">OS '+ AceConfig.osplatform + '&nbsp;')
+        connection.wfile.write('CPU cores: %s' % cpu_nums + ' used: %s' % cpu_percent + '%</br>')
         connection.wfile.write('RAM MiB &nbsp;' )
         connection.wfile.write('total: %s ' % str(round(max_mem.total/2**20,2)) + '&nbsp;used: %s' % str(round(max_mem.used/2**20,2)) + '&nbsp;free: %s </br>' % str(round(max_mem.available/2**20,2)))
         connection.wfile.write('DISK GiB &nbsp;')

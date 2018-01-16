@@ -6,7 +6,7 @@ and groups
 '''
 import re
 import requests
-from plugins.config.playlist import PlaylistConfig as config
+from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
 

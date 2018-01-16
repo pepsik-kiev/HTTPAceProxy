@@ -13,8 +13,8 @@ except ImportError:
   from urllib.parse import urlparse, parse_qs
 import requests
 import time
-from modules.PluginInterface import AceProxyPlugin
-from modules.PlaylistGenerator import PlaylistGenerator
+from PluginInterface import AceProxyPlugin
+from PlaylistGenerator import PlaylistGenerator
 import config.allfon as config
 
 

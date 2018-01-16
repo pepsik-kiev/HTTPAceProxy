@@ -17,8 +17,8 @@ except ImportError:
 import md5
 import traceback
 import requests
-from modules.PluginInterface import AceProxyPlugin
-from modules.PlaylistGenerator import PlaylistGenerator
+from PluginInterface import AceProxyPlugin
+from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
 import config.p2pproxy as p2pconfig
 from torrenttv_api import TorrentTvApi

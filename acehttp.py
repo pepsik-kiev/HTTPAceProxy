@@ -5,22 +5,30 @@ AceProxy: Ace Stream to HTTP Proxy
 
 Website: https://github.com/ValdikSS/AceProxy
 '''
+
+import os, sys
+# Uppend the directory for custom modules at the front of the path.
+base_dir = os.path.dirname(os.path.realpath(__file__))
+eggs_dir = os.path.join(base_dir, 'plugins/modules/eggs')
+eggs_list = filter(lambda x: x.endswith('.egg'), os.listdir(eggs_dir))
+for filename in eggs_list:
+  sys.path.insert(0, eggs_dir + '/' + filename)
+
+modules_dir = os.path.join(base_dir, 'plugins/modules')
+sys.path.insert(0, modules_dir)
+
 import traceback
-import gevent
-import gevent.monkey
+import gevent, gevent.monkey
 from gevent.queue import Full
 # Monkeypatching and all the stuff
-
 gevent.monkey.patch_all()
+
 import glob
-import os
 import signal
-import sys
 import logging
 import psutil
 from subprocess import PIPE
-import BaseHTTPServer
-import SocketServer
+import BaseHTTPServer, SocketServer
 from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
 from collections import deque
@@ -29,16 +37,15 @@ import time
 import threading
 import requests
 import Queue
+import ipaddr
 try:
   # Python 2
   from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
 except ImportError:
   # Python 3
   from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qs
-import aceclient
-import aceconfig
+import aceclient, aceconfig
 from aceconfig import AceConfig
-import plugins.modules.ipaddr as ipaddr
 from aceclient.clientcounter import ClientCounter
 from plugins.modules.PluginInterface import AceProxyPlugin
 try:
