@@ -136,7 +136,7 @@ class P2pproxy(AceProxyPlugin):
                         continue
 
                     name = channel.getAttribute('name')
-                    group = TorrentTvApi.CATEGORIES[int(group_id)].decode('utf-8')
+                    group = TorrentTvApi.CATEGORIES[int(group_id)].decode('UTF-8')
                     cid = channel.getAttribute('id')
                     logo = channel.getAttribute('logo')
                     if config.fullpathlogo:
@@ -199,8 +199,8 @@ class P2pproxy(AceProxyPlugin):
                 delta = timedelta(days=1)
                 playlistgen = PlaylistGenerator()
                 hostport = connection.headers['Host']
-                days = int(self.get_param('days')) if self.params.has_key('days') else 7
-                suffix = '&suffix=' + self.get_param('suffix') if self.params.has_key('suffix') else ''
+                days = int(self.get_param('days')) if 'days' in self.params else 7
+                suffix = '&suffix=' + self.get_param('suffix') if 'suffix' in self.params else ''
                 for i in range(days):
                     dfmt = d.strftime('%d-%m-%Y')
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix) 
@@ -216,13 +216,13 @@ class P2pproxy(AceProxyPlugin):
             elif len(connection.splittedpath) >= 3 and (connection.splittedpath[2] == 'playlist' or connection.splittedpath[2] == 'playlist.m3u'):  # /archive/playlist.m3u
                 dates = list()
 
-                if self.params.has_key('date'):
+                if 'date' in self.params:
                     for d in self.params['date']:
                         dates.append(self.parse_date(d).strftime('%d-%m-%Y').replace('-0', '-'))
                 else:
                     d = date.today()
                     delta = timedelta(days=1)
-                    days = int(self.get_param('days')) if self.params.has_key('days') else 7
+                    days = int(self.get_param('days')) if 'days' in self.params else 7
                     for i in range(days):
                         dates.append(d.strftime('%d-%m-%Y').replace('-0', '-'))
                         d = d - delta
@@ -237,7 +237,7 @@ class P2pproxy(AceProxyPlugin):
                 channels_list = self.api.archive_channels()
                 hostport = connection.headers['Host']
                 playlistgen = PlaylistGenerator()
-                suffix = '&suffix=' + self.get_param('suffix') if self.params.has_key('suffix') else ''
+                suffix = '&suffix=' + self.get_param('suffix') if 'suffix' in self.params else ''
 
                 for channel in channels_list:
                         epg_id = channel.getAttribute('epg_id')

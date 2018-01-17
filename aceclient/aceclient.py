@@ -8,12 +8,17 @@ import json
 import time
 import threading
 import traceback
-import Queue
 import random
 import psutil
+try:
+  # Python 2
+  import Queue
+except ImportError:
+  # Python 3
+  import queue as Queue
 from subprocess import PIPE
 from collections import deque
-from acemessages import *
+from . acemessages import *
 import aceconfig
 from aceconfig import AceConfig
 
@@ -238,7 +243,7 @@ class AceClient(object):
         self._streamReaderState = 1
 
         try:
-           if req_headers.has_key('range'):
+           if 'range' in req_headers:
                del req_headers['range']
 
            connection = self._streamReaderConnection = requests.get(url, headers=req_headers, stream = True)

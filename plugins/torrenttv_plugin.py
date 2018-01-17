@@ -3,26 +3,23 @@
 Torrent-tv.ru Playlist Downloader Plugin
 http://ip:port/ttvplaylist
 '''
-import re
 import logging
 import time
 import gevent
-import threading
 try:
   # Python 2
   from urlparse import urlparse, parse_qs
 except ImportError:
   # Python 3
   from urllib.parse import urlparse, parse_qs
-import md5
-import traceback
+import hashlib, re
+import traceback, threading
 import requests
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
 import config.p2pproxy as p2pconfig
 from torrenttv_api import TorrentTvApi
-
 
 class Torrenttv(AceProxyPlugin):
 
@@ -54,19 +51,18 @@ class Torrenttv(AceProxyPlugin):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
         try:
             if config.useproxy:
-                 origin = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text.encode('UTF-8')
+                 origin = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text
             else:
-                 origin = requests.get(config.url, headers=headers, timeout=10).text.encode('UTF-8')
+                 origin = requests.get(config.url, headers=headers, timeout=10).text
 
             self.logger.info('TTV playlist ' + config.url + ' downloaded')
-
-            matches = re.finditer(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?', origin, re.MULTILINE)
             self.playlisttime = int(time.time())
             self.playlist = PlaylistGenerator()
             self.channels = dict()
-            m = md5.new()
+            m = hashlib.md5()
+            pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
 
-            for match in matches:
+            for match in pattern.finditer(origin.encode('UTF-8'), re.MULTILINE):
                 itemdict = match.groupdict()
                 encname = itemdict.get('name')
                 name = encname.decode('UTF-8')
@@ -123,7 +119,7 @@ class Torrenttv(AceProxyPlugin):
             url = urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
             params = parse_qs(url.query)
-            fmt = params['fmt'][0] if params.has_key('fmt') else None
+            fmt = params['fmt'][0] if 'fmt' in params else None
 
             if path.startswith('/torrenttv/channel/'):
                 if not path.endswith('.mp4'):
@@ -157,7 +153,7 @@ class Torrenttv(AceProxyPlugin):
             else:
                 hostport = connection.headers['Host']
                 path = '' if len(self.channels) == 0 else '/torrenttv/channel'
-                add_ts = True if path.endswith('/ts')  else False
+                add_ts = True if path.endswith('/ts') else False
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
                 exported = self.playlist.exportm3u(hostport, path, add_ts=add_ts, header=header, fmt=fmt)
 

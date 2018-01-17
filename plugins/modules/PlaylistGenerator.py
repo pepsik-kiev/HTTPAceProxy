@@ -45,13 +45,13 @@ class PlaylistGenerator(object):
     def _changeItems(self):
         for item in self.itemlist:
             self.changeItem(item)
-            if not item.has_key('tvg'):
+            if not 'tvg' in item:
                 item['tvg'] = item.get('name').replace(' ', '_')
-            if not item.has_key('tvgid'):
+            if not 'tvgid' in item:
                 item['tvgid'] = ''
-            if not item.has_key('group'):
+            if not 'group' in item:
                 item['group'] = ''
-            if not item.has_key('logo'):
+            if not 'logo' in item:
                 item['logo'] = ''
 
     def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False, process_url=True, header=None, fmt=None):

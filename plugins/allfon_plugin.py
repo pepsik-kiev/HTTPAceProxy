@@ -77,7 +77,7 @@ class Allfon(AceProxyPlugin):
         Allfon.logger.info('AllFon playlist created')
         url = urlparse(connection.path)
         params = parse_qs(url.query)
-        fmt = params['fmt'][0] if params.has_key('fmt') else None
+        fmt = params['fmt'][0] if 'fmt' in params else None
         header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)
 
         exported = playlistgen.exportm3u(hostport, header=header, add_ts=add_ts, fmt=fmt)

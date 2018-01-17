@@ -114,7 +114,7 @@ class Torrentfilms(AceProxyPlugin):
                return
             url = urlparse(connection.path)
             params = parse_qs(url.query)
-            fmt = params['fmt'][0] if params.has_key('fmt') else None
+            fmt = params['fmt'][0] if 'fmt' in params else None
 
             exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, fmt).encode('utf-8')
 

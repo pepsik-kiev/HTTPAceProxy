@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 '''
 Simple Client Counter for VLC VLM
 '''
@@ -54,7 +54,7 @@ class ClientCounter(object):
 
     def delete(self, cid, client):
         with self.lock:
-            if not self.clients.has_key(cid):
+            if not cid in self.clients:
                 return 0
 
             clients = self.clients[cid]
@@ -89,7 +89,7 @@ class ClientCounter(object):
 
         try:
             with self.lock:
-                if not self.clients.has_key(cid):
+                if not cid in self.clients:
                     return
 
                 clients = self.clients[cid]

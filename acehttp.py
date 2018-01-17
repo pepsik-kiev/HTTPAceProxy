@@ -28,7 +28,6 @@ import signal
 import logging
 import psutil
 from subprocess import PIPE
-import BaseHTTPServer, SocketServer
 from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
 from collections import deque
@@ -37,14 +36,19 @@ import time
 import threading
 import requests
 from bencode import __version__ as bencode_version__
-import Queue
 import ipaddr
 try:
   # Python 2
   from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
+  import BaseHTTPServer, SocketServer
+  import Queue
 except ImportError:
   # Python 3
   from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qs
+  import http.server as BaseHTTPServer
+  import queue as Queue
+  import socketserver as SocketServer
+
 import aceclient, aceconfig
 from aceconfig import AceConfig
 from aceclient.clientcounter import ClientCounter
@@ -146,8 +150,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Don't wait videodestroydelay if error happened
         self.errorhappened = True
         # Connected client IP address
-        self.clientip = self.headers['X-Forwarded-For'] \
-            if self.headers.has_key('X-Forwarded-For') else self.request.getpeername()[0]
+        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
 
         if AceConfig.firewall:
             # If firewall enabled
@@ -299,7 +302,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             gevent.sleep()
 
             if not fmt:
-                fmt = self.reqparams.get('fmt')[0] if self.reqparams.has_key('fmt') else None
+                fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
                 # Start translation
             self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
 
@@ -429,10 +432,10 @@ class Client:
 
         if AceConfig.transcode:
 
-            if not fmt or not AceConfig.transcodecmd.has_key(fmt):
+            if not fmt or not fmt in AceConfig.transcodecmd:
                 fmt = 'default'
 
-            if AceConfig.transcodecmd.has_key(fmt):
+            if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
                 popen_params = { "bufsize": AceConfig.readchunksize,
                                  "stdin"  : PIPE,
