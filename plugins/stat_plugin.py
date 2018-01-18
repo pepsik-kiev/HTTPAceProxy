@@ -93,7 +93,7 @@ class Stat(AceProxyPlugin):
         connection.wfile.write('<html><head>')
         connection.wfile.write('<meta charset="UTF-8" http-equiv="Refresh" content="60"/>')
         connection.wfile.write('<title>AceProxy stat info</title>')
-        connection.wfile.write('<link rel="stylesheet" type="text/css" href="http://cloud.github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>')
+        connection.wfile.write('<link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>')
         connection.wfile.write('<link rel="shortcut icon" href="http://i.piccy.info/i9/5777461ca749986f6fb4c4b06a70bfbe/1504856430/10417/1177931/SHesterenka_150x150.png" type="image/png">')
         connection.wfile.write('<style>h5 {margin-bottom: -15px;}</style>')
         connection.wfile.write('</head>')
