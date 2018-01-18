@@ -18,15 +18,9 @@ What is this plugin for?
 """
 __author__ = 'miltador'
 
-import logging
-import re
+import logging, re
 import requests
-try:
-  # Python 2
-  from urlparse import urlparse, parse_qs
-except ImportError:
-  # Python 3
-  from urllib.parse import urlparse, parse_qs
+from urlparse import urlparse, parse_qs
 import base64
 from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi

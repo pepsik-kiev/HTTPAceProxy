@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 '''
 Minimal Ace Stream client library to use with HTTP Proxy
 '''

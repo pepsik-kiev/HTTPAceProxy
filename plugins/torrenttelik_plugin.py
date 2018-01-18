@@ -9,12 +9,7 @@ http://ip:port/torrent-telik/?type=allfon = allfon playlist
 '''
 
 import logging
-try:
-  # Python 2
-  from urlparse import urlparse, parse_qs
-except ImportError:
-  # Python 3
-  from urllib.parse import urlparse, parse_qs
+from urlparse import urlparse, parse_qs
 import requests
 import time
 from PluginInterface import AceProxyPlugin

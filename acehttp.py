@@ -40,17 +40,9 @@ import threading
 import requests
 from bencode import __version__ as bencode_version__
 import ipaddr
-try:
-  # Python 2
-  from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
-  import BaseHTTPServer, SocketServer
-  import Queue
-except ImportError:
-  # Python 3
-  from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qs
-  import http.server as BaseHTTPServer
-  import queue as Queue
-  import socketserver as SocketServer
+from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
+import BaseHTTPServer, SocketServer
+import Queue
 from plugins.modules.PluginInterface import AceProxyPlugin
 try:
     import pwd
@@ -537,7 +529,7 @@ def drop_privileges(uid_name, gid_name='nogroup'):
     os.setuid(running_uid)
 
     # Ensure a very conservative umask
-    old_umask = os.umask(077)
+    old_umask = os.umask('077',8)
 
     if os.getuid() == running_uid and os.getgid() == running_gid:
         # could be useful

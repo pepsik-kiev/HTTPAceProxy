@@ -3,16 +3,11 @@
 Torrent-tv.ru Playlist Downloader Plugin
 http://ip:port/ttvplaylist
 '''
-import logging
+import logging, re
 import time
 import gevent
-try:
-  # Python 2
-  from urlparse import urlparse, parse_qs
-except ImportError:
-  # Python 3
-  from urllib.parse import urlparse, parse_qs
-import hashlib, re
+from urlparse import urlparse, parse_qs
+import hashlib
 import traceback, threading
 import requests
 from PluginInterface import AceProxyPlugin

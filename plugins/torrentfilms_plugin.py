@@ -11,12 +11,7 @@ import logging
 import requests
 import bencode, hashlib
 import time
-try:
-  # Python 2
-  from urlparse import urlparse, parse_qs
-except ImportError:
-  # Python 3
-  from urllib.parse import urlparse, parse_qs
+from urlparse import urlparse, parse_qs
 import gevent
 import threading
 from PluginInterface import AceProxyPlugin

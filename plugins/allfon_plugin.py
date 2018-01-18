@@ -3,14 +3,8 @@
 Allfon.tv Playlist Downloader Plugin
 http://ip:port/allfon
 '''
-import re
-import logging
-try:
-  # Python 2
-  from urlparse import urlparse, parse_qs
-except ImportError:
-  # Python 3
-  from urllib.parse import urlparse, parse_qs
+import logging, re
+from urlparse import urlparse, parse_qs
 import requests
 import time
 from PluginInterface import AceProxyPlugin

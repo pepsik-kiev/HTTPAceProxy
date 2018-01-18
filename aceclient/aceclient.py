@@ -10,12 +10,7 @@ import threading
 import traceback
 import random
 import psutil
-try:
-  # Python 2
-  import Queue
-except ImportError:
-  # Python 3
-  import queue as Queue
+import Queue
 from subprocess import PIPE
 from collections import deque
 from . acemessages import *

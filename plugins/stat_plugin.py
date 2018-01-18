@@ -7,9 +7,8 @@ from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from subprocess import PIPE
-import re
 import time
-import logging
+import logging, re
 import requests
 import ipaddr
 import psutil

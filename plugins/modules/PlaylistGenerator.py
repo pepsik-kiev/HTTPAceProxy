@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 '''
 Playlist Generator
 This module can generate .m3u playlists with tv guide
