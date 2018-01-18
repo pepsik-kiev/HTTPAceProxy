@@ -23,6 +23,9 @@ from gevent.queue import Full
 # Monkeypatching and all the stuff
 gevent.monkey.patch_all()
 
+import aceclient
+from aceconfig import AceConfig
+from aceclient.clientcounter import ClientCounter
 import glob
 import signal
 import logging
@@ -48,10 +51,6 @@ except ImportError:
   import http.server as BaseHTTPServer
   import queue as Queue
   import socketserver as SocketServer
-
-import aceclient, aceconfig
-from aceconfig import AceConfig
-from aceclient.clientcounter import ClientCounter
 from plugins.modules.PluginInterface import AceProxyPlugin
 try:
     import pwd
@@ -538,7 +537,7 @@ def drop_privileges(uid_name, gid_name='nogroup'):
     os.setuid(running_uid)
 
     # Ensure a very conservative umask
-    old_umask = os.umask('077')
+    old_umask = os.umask(077)
 
     if os.getuid() == running_uid and os.getgid() == running_gid:
         # could be useful

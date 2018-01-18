@@ -19,7 +19,6 @@ except ImportError:
 from subprocess import PIPE
 from collections import deque
 from . acemessages import *
-import aceconfig
 from aceconfig import AceConfig
 
 class AceException(Exception):
