@@ -61,7 +61,7 @@ class AceDefConfig(object):
             return False
         elif useragent in AceConfig.fakeuas:
             return True
-        elif useragent == 'Lavf/55.33.100' and not headers.has_key('Range'):
+        elif useragent == 'Lavf/55.33.100' and not 'Range' in headers:
             return True
         elif useragent == 'GStreamer souphttpsrc (compatible; LG NetCast.TV-2013) libsoup/2.34.2' and headers.get('icy-metadata') != '1':
             return True

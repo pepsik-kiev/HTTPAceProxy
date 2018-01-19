@@ -124,7 +124,7 @@ class ClientCounter(object):
         ace = aceclient.AceClient(AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport, AceConfig.acehostslist,
                                   connect_timeout=AceConfig.aceconntimeout,result_timeout=AceConfig.aceresulttimeout)
         logger.debug("AceClient created")
-        ace.aceInit(gender=AceConfig.acesex, age=AceConfig.aceage,product_key=AceConfig.acekey, seekback=AceConfig.videoseekback)
+        ace.aceInit(gender=AceConfig.acesex, age=AceConfig.aceage,product_key=AceConfig.acekey)
         logger.debug("AceClient inited")
         return ace
 
