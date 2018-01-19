@@ -529,7 +529,7 @@ def drop_privileges(uid_name, gid_name='nogroup'):
     os.setuid(running_uid)
 
     # Ensure a very conservative umask
-    old_umask = os.umask('077',8)
+    old_umask = os.umask(077)
 
     if os.getuid() == running_uid and os.getgid() == running_gid:
         # could be useful
