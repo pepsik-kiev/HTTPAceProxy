@@ -61,7 +61,7 @@ class AceClient(object):
         # Event for resuming from PAUSE
         self._resumeevent = Event()
         # Seekback seconds.
-        self._seekback = AceConfig.videoseekback
+        self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = False
 
@@ -138,10 +138,12 @@ class AceClient(object):
         except EOFError as e:
             raise AceException("Write error! " + repr(e))
 
-    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_18_24, product_key=None):
+    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_18_24, product_key=None, seekback=0 ):
         self._product_key = product_key
         self._gender = gender
         self._age = age
+        # Seekback seconds
+        self._seekback = seekback
 
         # Logger
         logger = logging.getLogger("AceClient_aceInit")
@@ -231,12 +233,12 @@ class AceClient(object):
     def startStreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger("StreamReader")
         logger.debug("Opening video stream: %s" % url)
-        logger.debug("Get headers from client: %s" % req_headers)
         self._streamReaderState = 1
 
         try:
            if 'range' in req_headers:
                del req_headers['range']
+           logger.debug("Get headers from client: %s" % req_headers)
 
            connection = self._streamReaderConnection = requests.get(url, headers=req_headers, stream = True)
            transcoder = None
@@ -351,7 +353,7 @@ class AceClient(object):
         logger = logging.getLogger('AceClient_recvdata')
 
         while True:
-            gevent.sleep()
+            gevent.sleep(random.randint(0,2)*0.001)
             try:
                 self._recvbuffer = self._socket.read_until("\r\n")
                 self._recvbuffer = self._recvbuffer.strip()
@@ -373,16 +375,8 @@ class AceClient(object):
 
                     if 'key=' in self._recvbuffer:
                         self._request_key_begin = self._recvbuffer.find('key=')
-                        self._request_key = \
-                            self._recvbuffer[self._request_key_begin + 4:self._request_key_begin + 14]
-                        try:
-                            self._write(AceMessage.request.READY_key(
-                                self._request_key, self._product_key))
-                        except requests.exceptions.ConnectionError as e:
-                            logger.error("Can't connect to keygen server! " + \
-                                repr(e))
-                            self._auth = False
-                            self._authevent.set()
+                        self._request_key = self._recvbuffer[self._request_key_begin + 4:self._request_key_begin + 14]
+                        self._write(AceMessage.request.READY_key(self._request_key, self._product_key))
                         self._request_key = None
                     else:
                         self._write(AceMessage.request.READY_nokey)
@@ -485,7 +479,7 @@ class AceClient(object):
                 # RESUME
                 elif self._recvbuffer.startswith(AceMessage.response.RESUME):
                     logger.debug("RESUME event")
-                    gevent.sleep()    # PAUSE/RESUME delay
+                    #gevent.sleep()    # PAUSE/RESUME delay
                     self._resumeevent.set()
                 # CID
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:

@@ -156,7 +156,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     return
 
         logger.info("Accepted connection from " + self.clientip + " path " + requests.utils.unquote(self.path).decode('UTF-8'))
-        logger.debug("Headers:\n" + str(self.headers))
+        logger.debug("Headers: %s" % self.headers.dict)
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
