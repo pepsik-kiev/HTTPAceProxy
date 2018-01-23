@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from aceconfig import AceConfig
+from . acemessages import *
 import gevent
 from gevent.event import AsyncResult
 from gevent.event import Event
@@ -14,8 +16,6 @@ import psutil
 import Queue
 from subprocess import PIPE
 from collections import deque
-from . acemessages import *
-from aceconfig import AceConfig
 
 class AceException(Exception):
     '''
@@ -62,7 +62,7 @@ class AceClient(object):
         # Event for resuming from PAUSE
         self._resumeevent = Event()
         # Seekback seconds.
-        self._seekback = None
+        self._seekback = 0
         # Did we get START command again? For seekback.
         self._started_again = False
 

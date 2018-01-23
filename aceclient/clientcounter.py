@@ -2,12 +2,12 @@
 '''
 Simple Client Counter for VLC VLM
 '''
+from aceconfig import AceConfig
+from . aceclient import AceClient
 import threading
 import logging
 import time
-import aceclient
 import gevent
-from aceconfig import AceConfig
 
 class ClientCounter(object):
 
@@ -17,6 +17,15 @@ class ClientCounter(object):
         self.idleace = None
         self.total = 0
         gevent.spawn(self.checkIdle)
+
+    def createAce(self):
+        logger = logging.getLogger('CreateAce')
+        ace = AceClient(AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport, AceConfig.acehostslist,
+                                  connect_timeout=AceConfig.aceconntimeout,result_timeout=AceConfig.aceresulttimeout)
+        logger.debug("AceClient created")
+        ace.aceInit(gender=AceConfig.acesex, age=AceConfig.aceage, product_key=AceConfig.acekey, seekback=AceConfig.videoseekback)
+        logger.debug("AceClient inited")
+        return ace
 
     def count(self, cid):
         with self.lock:
@@ -118,15 +127,6 @@ class ClientCounter(object):
                     self.idleace.destroy()
             finally:
                 self.idleace = None
-
-    def createAce(self):
-        logger = logging.getLogger('CreateAce')
-        ace = aceclient.AceClient(AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport, AceConfig.acehostslist,
-                                  connect_timeout=AceConfig.aceconntimeout,result_timeout=AceConfig.aceresulttimeout)
-        logger.debug("AceClient created")
-        ace.aceInit(gender=AceConfig.acesex, age=AceConfig.aceage, product_key=AceConfig.acekey, seekback=AceConfig.videoseekback)
-        logger.debug("AceClient inited")
-        return ace
 
     def checkIdle(self):
         while(True):

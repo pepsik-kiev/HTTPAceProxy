@@ -17,15 +17,15 @@ for filename in wheels_list:
 modules_dir = os.path.join(base_dir, 'plugins/modules')
 sys.path.insert(0, modules_dir)
 
-import traceback
 import gevent, gevent.monkey
 from gevent.queue import Full
 # Monkeypatching and all the stuff
 gevent.monkey.patch_all()
 
-import aceclient
 from aceconfig import AceConfig
+from aceclient.aceclient import AceClient, AceException
 from aceclient.clientcounter import ClientCounter
+import traceback
 import glob
 import signal
 import logging
@@ -253,19 +253,19 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 elif self.reqtype == 'pid':
                     self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
                 elif self.reqtype == 'torrent':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = dict(zip(AceClient.START_PARAMS, self.params))
                     paramsdict['url'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'infohash':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = dict(zip(AceClient.START_PARAMS, self.params))
                     paramsdict['infohash'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'url':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = dict(zip(AceClient.START_PARAMS, self.params))
                     paramsdict['direct_url'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'raw':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = dict(zip(AceClient.START_PARAMS, self.params))
                     paramsdict['data'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'efile':
@@ -297,7 +297,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Start translation
             self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
 
-        except (aceclient.AceException, requests.exceptions.RequestException) as e:
+        except (AceException, requests.exceptions.RequestException) as e:
             logger.error("Exception: " + repr(e))
             self.errorhappened = True
             self.dieWithError()
