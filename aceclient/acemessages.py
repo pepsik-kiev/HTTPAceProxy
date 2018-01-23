@@ -4,8 +4,6 @@ Minimal Ace Stream client library to use with HTTP Proxy
 '''
 
 import hashlib
-import platform
-import requests
 
 class AceConst(object):
     APIVERSION = 3

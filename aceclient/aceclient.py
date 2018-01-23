@@ -4,6 +4,7 @@ from gevent.event import AsyncResult
 from gevent.event import Event
 import telnetlib
 import logging
+import requests
 import json
 import time
 import threading
@@ -395,8 +396,7 @@ class AceClient(object):
                     _contentinfo_raw = ' '.join(_contentinfo_raw)
                     _contentinfo = json.loads(_contentinfo_raw)
                     if _contentinfo.get('status') == 100:
-                        logger.error("LOADASYNC returned error with message: %s"
-                            % _contentinfo.get('message'))
+                        logger.error("LOADASYNC returned error with message: %s" % _contentinfo.get('message'))
                         self._result.set(False)
                     else:
                         logger.debug("Content info: %s", _contentinfo)
@@ -464,8 +464,7 @@ class AceClient(object):
                         logger.debug("STATUS changed to " + self._status)
 
                     if self._status == 'main:err':
-                        logger.error(
-                            self._status + ' with message ' + self._recvbuffer.split(';')[2])
+                        logger.error(self._status + ' with message ' + self._recvbuffer.split(';')[2])
                         self._result.set_exception(
                             AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
                         self._urlresult.set_exception(
