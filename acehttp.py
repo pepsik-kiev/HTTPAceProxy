@@ -332,7 +332,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if  url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent') or url.endswith('.acestream')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
-                f = b64encode(requests.get(url, headers=headers, stream = True, timeout=5).raw.read())
+                with requests.get(url, headers=headers, stream = True, timeout=5) as r: f = b64encode(r.raw.read())
                 headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
                 cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
             except:
