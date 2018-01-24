@@ -61,7 +61,7 @@ class TorrentTvApi(object):
         with self.lock:
             if self.session and (time.time() - self.lastActive) < self.maxIdle:
                 self.lastActive = time.time()
-                self.log.debug("Reusing previous session: " + self.session)
+                self.log.debug("Reusing previous session: %s" % self.session)
                 return self.session
 
             self.log.debug("Creating new session")
@@ -71,7 +71,7 @@ class TorrentTvApi(object):
             result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'auth.php', params=params, headers=headers, timeout=10).json())
             self.session = result['session']
             self.lastActive = time.time()
-            self.log.debug("New session created: " + self.session)
+            self.log.debug("New session created: %s" % self.session)
 
             return self.session
 
@@ -191,7 +191,7 @@ class TorrentTvApi(object):
         success = jsonresult['success']
         if success == '0' or not success:
             error = jsonresult['error']
-            raise TorrentTvApiException('API returned error: ' + error)
+            raise TorrentTvApiException('API returned error: %s' % error)
         return jsonresult
 
     def _checkxml(self, xmlresult):
@@ -207,7 +207,7 @@ class TorrentTvApi(object):
         success = res.getElementsByTagName('success')[0].firstChild.data
         if success == '0' or not success:
             error = res.getElementsByTagName('error')[0].firstChild.data
-            raise TorrentTvApiException('API returned error: ' + error)
+            raise TorrentTvApiException('API returned error: %s' % error)
         return res
 
     def _checkedjsonresult(self, request, params):
@@ -237,7 +237,7 @@ class TorrentTvApi(object):
             self.log.debug(url)
             return requests.get(url, headers={'User-Agent':'Magic Browser','Connection':'close'}, timeout=10).json()
         except requests.exceptions.ConnectionError as e:
-            raise TorrentTvApiException('Error happened while trying to access API: ' + repr(e))
+            raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
     def _xmlresult(self, request, params):
         """
@@ -252,7 +252,7 @@ class TorrentTvApi(object):
             self.log.debug(url)
             return requests.get(url, headers={'User-Agent':'Magic Browser','Connection':'close'}, timeout=10).content
         except requests.exceptions.ConnectionError as e:
-            raise TorrentTvApiException('Error happened while trying to access API: ' + repr(e))
+            raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
     def _resetSession(self):
         with self.lock:

@@ -139,12 +139,10 @@ class AceClient(object):
         except EOFError as e:
             raise AceException("Write error! " + repr(e))
 
-    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_18_24, product_key=None, seekback=0 ):
+    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_18_24, product_key=None):
         self._product_key = product_key
         self._gender = gender
         self._age = age
-        # Seekback seconds
-        self._seekback = seekback
 
         # Logger
         logger = logging.getLogger("AceClient_aceInit")
@@ -461,7 +459,7 @@ class AceClient(object):
                     self._tempstatus = self._recvbuffer.split()[1].split(';')[0]
                     if self._tempstatus != self._status:
                         self._status = self._tempstatus
-                        logger.debug("STATUS changed to " + self._status)
+                        logger.debug("STATUS changed to %s" % self._status)
 
                     if self._status == 'main:err':
                         logger.error(self._status + ' with message ' + self._recvbuffer.split(';')[2])
@@ -480,7 +478,7 @@ class AceClient(object):
                 # RESUME
                 elif self._recvbuffer.startswith(AceMessage.response.RESUME):
                     logger.debug("RESUME event")
-                    #gevent.sleep()    # PAUSE/RESUME delay
+                    gevent.sleep()    # PAUSE/RESUME delay
                     self._resumeevent.set()
                 # CID
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:

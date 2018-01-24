@@ -46,7 +46,7 @@ class Torrentfilms(AceProxyPlugin):
 
         for filename in filelist:
              infohash = self.getInfohash(config.directory+'/'+filename)
-             self.logger.debug(filename + ' : ' + infohash)
+             self.logger.debug('%s : %s' %(filename, infohash))
              if infohash != None:
                   try:
                      result = requests.get('http://'+AceConfig.acehost+':'+str(AceConfig.aceHTTPport)+'/server/api?method=get_media_files&infohash='+infohash, headers={'Connection':'close'}).json()['result']

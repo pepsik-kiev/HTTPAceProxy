@@ -32,7 +32,7 @@ class Stat(AceProxyPlugin):
 
     def geo_ip_lookup(self, ip_address):
         lookup_url = 'http://freegeoip.net/json/' + ip_address
-        Stat.logger.debug('Trying to obtain geoip info : ' + lookup_url)
+        Stat.logger.debug('Trying to obtain geoip info : %s' % lookup_url)
         response = requests.get(lookup_url, headers={'User-Agent':'Magic Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=10).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,

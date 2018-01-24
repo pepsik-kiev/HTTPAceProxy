@@ -324,7 +324,7 @@ class P2pproxy(AceProxyPlugin):
                                     playlistgen.addItem({'group': channel_name, 'tvg': '',
                                         'name': name, 'url': record_id, 'logo': logo})
                             except:
-                                P2pproxy.logger.debug('Failed to load archive for ' + channel_id)
+                                P2pproxy.logger.debug('Failed to load archive for %s' % channel_id)
 
                 else:
                     records_list = self.api.records(param_channel, d)

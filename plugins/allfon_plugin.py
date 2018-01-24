@@ -32,7 +32,7 @@ class Allfon(AceProxyPlugin):
                    Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text.encode('UTF-8')
             else:
                    Allfon.playlist = requests.get(config.url, headers=headers, timeout=10).text.encode('UTF-8')
-            Allfon.logger.debug('AllFon playlist ' + config.url + ' downloaded !')
+            Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
         except requests.exceptions.ConnectionError:
             Allfon.logger.error("Can't download AllFonTV playlist!")

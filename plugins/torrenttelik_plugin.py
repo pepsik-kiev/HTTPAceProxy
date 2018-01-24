@@ -33,7 +33,7 @@ class Torrenttelik(AceProxyPlugin):
             else:
                  Torrenttelik.playlist = requests.get(url, headers=headers, timeout=10).json()
             Torrenttelik.playlisttime = int(time.time())
-            Torrenttelik.logger.info('Torrent-telik playlist ' + url + ' downloaded')
+            Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
 
         except requests.exceptions.ConnectionError:
             Torrenttelik.logger.error("Can't download Torrent-telik playlist!")
@@ -73,7 +73,7 @@ class Torrenttelik(AceProxyPlugin):
         try:
             channels = Torrenttelik.playlist['channels']
         except Exception as e:
-            Torrenttelik.logger.error("Can't parse JSON! " + repr(e))
+            Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))
             return
 
         add_ts = False

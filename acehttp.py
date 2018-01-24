@@ -23,7 +23,7 @@ from gevent.queue import Full
 gevent.monkey.patch_all()
 
 from aceconfig import AceConfig
-import aceclient.aceclient as aceclient
+import aceclient
 from aceclient.clientcounter import ClientCounter
 import traceback
 import glob
@@ -118,12 +118,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         finally:
             logger.debug("Client disconnected")
             client = self.client
-            video = self.video
 
             if client:
                 client.destroy()
-            if video:
-                video.close()
 
     def do_HEAD(self):
         return self.do_GET(headers_only=True)
@@ -150,12 +147,11 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
             if (AceConfig.firewallblacklistmode and self.clientinrange) or \
                 (not AceConfig.firewallblacklistmode and not self.clientinrange):
-                    logger.info('Dropping connection from ' + self.clientip + ' due to ' + \
-                                'firewall rules')
+                    logger.info('Dropping connection from %s due to firewall rules' % self.clientip)
                     self.dieWithError(403)  # 403 Forbidden
                     return
 
-        logger.info("Accepted connection from " + self.clientip + " path " + requests.utils.unquote(self.path).decode('UTF-8'))
+        logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
         try:
             self.splittedpath = self.path.split('/')
@@ -185,7 +181,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
-        #logger.debug("Accept connected client headers :\n" + str(self.headers))
         self.requrl = urlparse(self.path)
         self.reqparams = parse_qs(self.requrl.query)
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
@@ -235,7 +230,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # End parameters
 
         self.url = None
-        self.video = None
 
         self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
         contentid = self.getCid(self.reqtype, self.path_unquoted)
@@ -282,12 +276,12 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 p = urlsplit(self.url)
                 p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                 self.url = urlunsplit(p)
+                logger.debug("Successfully get url %s from AceEngine!" % self.url)
 
-                logger.debug("Successfully get url %s from AceEngine!" % (self.url))
-                self.errorhappened = False
-
+            self.errorhappened = False
+            if shouldStart:
+                 self.client.ace.pause()
             self.client.ace.play()
-
             self.hanggreenlet = gevent.spawn(self.hangDetector)
             logger.debug("hangDetector spawned")
             gevent.sleep()
@@ -314,7 +308,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             if not self.errorhappened and AceStuff.clientcounter.count(cid) == 1:
                 # If no error happened and we are the only client
                 try:
-                    gevent.sleep() #VIDEO_DESTROY_DELAY
+                    gevent.sleep(0) #VIDEO_DESTROY_DELAY
                 except:
                     pass
             try:
@@ -603,7 +597,7 @@ def detectPort():
     AceStuff.acedir = os.path.dirname(engine[0])
     try:
         AceConfig.aceAPIport = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
-        logger.info("Detected ace port: " + str(AceConfig.aceAPIport))
+        logger.info("Detected ace port: %s" % AceConfig.aceAPIport)
     except IOError:
         logger.error("Couldn't detect port! acestream.port file doesn't exist?")
         clean_proc()
@@ -691,7 +685,7 @@ if AceConfig.httphost == '0.0.0.0':
    s.connect(("gmail.com",80))
    if s.getsockname()[0]:
      AceConfig.httphost = s.getsockname()[0]
-     logger.debug('Ace Stream HTTP Proxy server IP: ' + AceConfig.httphost +' autodetected')
+     logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
    s.close()
 
 # Check whether we can bind to the defined port safely
@@ -711,9 +705,9 @@ logger.info("Using bencode %s" % bencode_version__)
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
     if drop_privileges(AceConfig.aceproxyuser):
-        logger.info("Dropped privileges to user " + AceConfig.aceproxyuser)
+        logger.info("Dropped privileges to user %s" % AceConfig.aceproxyuser)
     else:
-        logger.error("Cannot drop privileges to user " + AceConfig.aceproxyuser)
+        logger.error("Cannot drop privileges to user %s" % AceConfig.aceproxyuser)
         sys.exit(1)
 
 # Creating ClientCounter
@@ -745,7 +739,7 @@ if not ace_pid:
         if spawnAce(AceStuff.aceProc, 1):
             ace_pid = AceStuff.ace.pid
             AceStuff.ace = psutil.Process(ace_pid)
-            logger.info("Ace Stream spawned with pid " + str(AceStuff.ace.pid))
+            logger.info("Ace Stream spawned with pid %s" % AceStuff.ace.pid)
 else:
     AceStuff.ace = psutil.Process(ace_pid)
 
@@ -773,16 +767,16 @@ for i in pluginslist:
     try:
         plugininstance = getattr(plugin, plugname)(AceConfig, AceStuff)
     except Exception as e:
-        logger.error("Cannot load plugin " + plugname + ": " + repr(e))
+        logger.error("Cannot load plugin %s: %s" % (plugname, repr(e)))
         continue
-    logger.debug('Plugin loaded: ' + plugname)
+    logger.debug('Plugin loaded: %s' % plugname)
     for j in plugininstance.handlers:
         AceStuff.pluginshandlers[j] = plugininstance
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
 try:
-    logger.info("Server started and waiting for requests at " + str(AceConfig.httphost) + ":" + str(AceConfig.httpport))
+    logger.info("Server started and waiting for requests at %s:%s" % (AceConfig.httphost ,AceConfig.httpport))
     while True:
         server.handle_request()
 except (KeyboardInterrupt, SystemExit):
