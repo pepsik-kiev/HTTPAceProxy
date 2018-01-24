@@ -23,7 +23,7 @@ from gevent.queue import Full
 gevent.monkey.patch_all()
 
 from aceconfig import AceConfig
-import aceclient
+import aceclient.aceclient as aceclient
 from aceclient.clientcounter import ClientCounter
 import traceback
 import glob
