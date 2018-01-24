@@ -330,7 +330,16 @@ class AceClient(object):
 
         if c:
             self._streamReaderConnection = None
-            c.close()
+            retries = 5
+            for retry in range(1, retries + 1):
+              try:
+                  c.close()
+              except Exception as err:
+                logger.debug("Failed to close video stream attempt {retry}/{retries}: {err}".format(
+                              retry=retry, retries=retries, err=repr(err)))
+                time.sleep(retry)
+              else:
+                break
             logger.debug("Video stream closed")
 
         self._streamReaderQueue.clear()

@@ -129,8 +129,8 @@ class Stat(AceProxyPlugin):
         connection.wfile.write('<p><font size="-3">OS '+ AceConfig.osplatform + '&nbsp;')
         connection.wfile.write('CPU cores: %s' % cpu_nums + ' used: %s' % cpu_percent + '%</br>')
         connection.wfile.write('RAM MiB &nbsp;' )
-        connection.wfile.write('total: %s ' % str(round(max_mem.total/2**20,2)) + '&nbsp;used: %s' % str(round(max_mem.used/2**20,2)) + '&nbsp;free: %s </br>' % str(round(max_mem.available/2**20,2)))
+        connection.wfile.write('total: %s ' % round(max_mem.total/2**20,2) + '&nbsp;used: %s' % round(max_mem.used/2**20,2) + '&nbsp;free: %s </br>' % round(max_mem.available/2**20,2))
         connection.wfile.write('DISK GiB &nbsp;')
-        connection.wfile.write('total: %s ' % str(round(disk.total/2**30,2)) + '&nbsp;used: %s' % str(round(disk.used/2**30,2)) + '&nbsp;free: %s </font></p>' % str(round(disk.free/2**30,2)))
+        connection.wfile.write('total: %s ' % round(disk.total/2**30,2) + '&nbsp;used: %s' % round(disk.used/2**30,2) + '&nbsp;free: %s </font></p>' % round(disk.free/2**30,2))
         connection.wfile.write('</body></html>')
 

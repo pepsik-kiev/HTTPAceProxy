@@ -279,8 +279,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 logger.debug("Successfully get url %s from AceEngine!" % self.url)
 
             self.errorhappened = False
-            if shouldStart:
-                 self.client.ace.pause()
             self.client.ace.play()
             self.hanggreenlet = gevent.spawn(self.hangDetector)
             logger.debug("hangDetector spawned")
