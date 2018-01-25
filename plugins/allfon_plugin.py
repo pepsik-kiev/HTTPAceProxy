@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 '''
 Allfon.tv Playlist Downloader Plugin
 http://ip:port/allfon

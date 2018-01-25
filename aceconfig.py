@@ -36,7 +36,6 @@ class AceConfig(acedefconfig.AceDefConfig):
     # On Windows Ace Engine refreshes acestream.port file only after loading GUI
     # Loading takes about ~10-15 seconds and we need to wait before taking port out of it
     # Set this to 0 if you don't use proxy at startup or don't need to wait
-    # Only applies to Windows systems
     acestartuptimeout = 10
     # Ace Stream Engine connection timeout
     aceconntimeout = 5

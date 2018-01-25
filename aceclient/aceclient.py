@@ -161,7 +161,7 @@ class AceClient(object):
             raise AceException(errmsg)
             return
 
-        logger.debug("aceInit ended")
+        logger.debug("AceInit ended")
 
     def _getResult(self):
         # Logger

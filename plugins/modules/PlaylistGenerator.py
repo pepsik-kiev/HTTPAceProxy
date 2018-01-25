@@ -112,18 +112,3 @@ class PlaylistGenerator(object):
 
         return itemlist
 
-    def exportxml(self, hostport, path='',):
-        try:
-            chans = ''
-            for i in self.itemlist:
-                i['hostport'] = 'http://' + hostport + path
-                try:
-                    if i['type'] == 'channel':
-                        chans += config.xml_channel_template % i
-                    else:
-                        chans += config.xml_stream_template % i
-                except:
-                    chans += config.xml_channel_template % i
-            return config.xml_template % {'items': chans}
-        except:
-            return ''

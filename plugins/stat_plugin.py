@@ -31,9 +31,9 @@ class Stat(AceProxyPlugin):
         self.stuff = AceStuff
 
     def geo_ip_lookup(self, ip_address):
-        lookup_url = 'http://freegeoip.net/json/' + ip_address
-        Stat.logger.debug('Trying to obtain geoip info : %s' % lookup_url)
-        response = requests.get(lookup_url, headers={'User-Agent':'Magic Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=10).json()
+        lookup_url = 'http://freegeoip.net/json/%s'
+        Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
+        response = requests.get(lookup_url % ip_address, headers={'User-Agent':'Magic Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=10).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
                 'country'      : '' if not response['country_name'] else response['country_name'] ,
@@ -63,9 +63,9 @@ class Stat(AceProxyPlugin):
            try:
               response = requests.get(lookup_url % mac_address , headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=5).text
            except:
-              Stat.logger.error("Can't obtain vendor for MAC address " + mac_address)
+              Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
         else:
-           Stat.logger.error("Can't obtain MAC address for Local IP " + ip_address)
+           Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)
 
         return "Local IP address " if not response else response
 
@@ -133,4 +133,3 @@ class Stat(AceProxyPlugin):
         connection.wfile.write('DISK GiB &nbsp;')
         connection.wfile.write('total: %s ' % round(disk.total/2**30,2) + '&nbsp;used: %s' % round(disk.used/2**30,2) + '&nbsp;free: %s </font></p>' % round(disk.free/2**30,2))
         connection.wfile.write('</body></html>')
-

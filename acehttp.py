@@ -170,7 +170,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             try:
                 AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
             except Exception as e:
-                logger.error('Plugin exception: ' + repr(e))
+                logger.error('Plugin exception: %s' % repr(e))
                 logger.error(traceback.format_exc())
                 self.dieWithError()
             finally:
@@ -290,7 +290,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
 
         except (aceclient.AceException, requests.exceptions.RequestException) as e:
-            logger.error("Exception: " + repr(e))
+            logger.error("Exception: %s" % repr(e))
             self.errorhappened = True
             self.dieWithError()
         except gevent.GreenletExit:
@@ -554,7 +554,7 @@ def checkAce():
         if hasattr(AceStuff, 'ace'):
             del AceStuff.ace
         if spawnAce(AceStuff.aceProc, 1):
-            logger.error("Ace Stream died, respawned it with pid " + str(AceStuff.ace.pid))
+            logger.error("Ace Stream died, respawned it with pid %s" % AceStuff.ace.pid)
             if AceConfig.osplatform == 'Windows':
                 # Wait some time because ace engine refreshes the acestream.port file only after full loading...
                 gevent.sleep(AceConfig.acestartuptimeout)
@@ -637,7 +637,7 @@ def clean_proc():
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
-    logger.info("Stopping server...")
+    logger.info("Stopping server.....")
     # Closing all client connections
     for connection in server.RequestHandlerClass.requestlist:
         try:
@@ -688,18 +688,18 @@ if AceConfig.httphost == '0.0.0.0':
 
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
-    logger.error("Cannot bind to port " + str(AceConfig.httpport) + " without root privileges")
+    logger.error("Cannot bind to port %s without root privileges" % AceConfig.httpport)
     sys.exit(1)
 
 server = HTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
 logger = logging.getLogger('HTTPServer')
 
-logger.info("Ace Stream HTTP Proxy server starting ....")
-logger.info("Using python %s" % sys.version.split(' ')[0])
-logger.info("Using gevent %s" % gevent.__version__)
-logger.info("Using psutil %s" % psutil.__version__)
-logger.info("Using requests %s" % requests.__version__)
-logger.info("Using bencode %s" % bencode_version__)
+logger.info("Ace Stream HTTP Proxy server starting .....")
+logger.debug("Using python %s" % sys.version.split(' ')[0])
+logger.debug("Using gevent %s" % gevent.__version__)
+logger.debug("Using psutil %s" % psutil.__version__)
+logger.debug("Using requests %s" % requests.__version__)
+logger.debug("Using bencode %s" % bencode_version__)
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
     if drop_privileges(AceConfig.aceproxyuser):
@@ -737,14 +737,21 @@ if not ace_pid:
         if spawnAce(AceStuff.aceProc, 1):
             ace_pid = AceStuff.ace.pid
             AceStuff.ace = psutil.Process(ace_pid)
-            logger.info("Ace Stream spawned with pid %s" % AceStuff.ace.pid)
+            logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
 else:
     AceStuff.ace = psutil.Process(ace_pid)
 
-# Wait some time because ace engine refreshes the acestream.port file only after full loading...
-if ace_pid and AceConfig.osplatform == 'Windows':
+# Wait some time for ace engine sturtup .....
+if ace_pid :
+    logger.info("Create Ace Stream engine connection .....")
     gevent.sleep(AceConfig.acestartuptimeout)
-    detectPort()
+    # refresh the acestream.port file for Windows only after full loading...
+    if AceConfig.osplatform == 'Windows':
+       detectPort()
+    # Create Ace
+    with AceStuff.clientcounter.lock:
+       if not AceStuff.clientcounter.idleace:
+            AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
@@ -759,6 +766,7 @@ AceStuff.pluginlist = list()
 pluginsmatch = glob.glob('plugins/*_plugin.py')
 sys.path.insert(0, 'plugins')
 pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in pluginsmatch]
+logger.info("Load Ace Stream HTTP Proxy plugins .....")
 for i in pluginslist:
     plugin = __import__(i)
     plugname = i.split('_')[0].capitalize()

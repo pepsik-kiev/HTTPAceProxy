@@ -65,7 +65,7 @@ class Torrentfilms(AceProxyPlugin):
                  metainfo = bencode.bdecode(torrent_file.read())
             infohash = hashlib.sha1(bencode.bencode(metainfo['info'])).hexdigest()
         except:
-            self.logger.error("Failed to get Infohash from " + filename)
+            self.logger.error("Failed to get Infohash from %s" % filename)
             pass
         return infohash
 
