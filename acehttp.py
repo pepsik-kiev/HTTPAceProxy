@@ -737,21 +737,24 @@ if not ace_pid:
         if spawnAce(AceStuff.aceProc, 1):
             ace_pid = AceStuff.ace.pid
             AceStuff.ace = psutil.Process(ace_pid)
-            logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
 else:
     AceStuff.ace = psutil.Process(ace_pid)
 
 # Wait some time for ace engine sturtup .....
 if ace_pid :
-    logger.info("Create Ace Stream engine connection .....")
     gevent.sleep(AceConfig.acestartuptimeout)
+    logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
     # refresh the acestream.port file for Windows only after full loading...
     if AceConfig.osplatform == 'Windows':
        detectPort()
-    # Create Ace
+# Create Ace
+try:
+    logger.info("Create Ace Stream engine connection .....")
     with AceStuff.clientcounter.lock:
        if not AceStuff.clientcounter.idleace:
             AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+except:
+    logging.error("Failed to create Ace Stream engine connection")
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
