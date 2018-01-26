@@ -54,7 +54,6 @@ except ImportError:
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     requestlist = []
-
     def log_message(self, format, *args):
         logger.info("%s - - [%s] %s\n" %
                          (self.address_string(),
