@@ -8,7 +8,15 @@ What is this plugin for?
 __author__ = 'ex_trin'
 
 # Rutor site URL
-siteurl = 'http://rutor.info/'
+url = 'http://rutor.info/'
+
+# Proxy settings.
+# For example you can install tor browser and add in torrc SOCKSPort 9050
+# proxies = {'http' : 'socks5h://127.0.0.1:9050','https' : 'socks5h://127.0.0.1:9050'}
+# If your http-proxy need authentification - proxies = { 'https' : 'https://user:password@ip:port' }
+useproxy = False
+proxies = {'http' : 'socks5://127.0.0.1:9050',
+           'https' : 'socks5://127.0.0.1:9050'}
 
 # Отображать следующие категории
 categories = [("0", u"Все"),

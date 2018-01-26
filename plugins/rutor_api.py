@@ -11,12 +11,15 @@ def ru(x):return unicode(x, 'utf8', 'ignore')
 
 
 def GET(target, referer, post=None):
+    headers ={'User-Agent':'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1) ; .NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET4.0C)','Connection':'close'}
     try:
-        headers ={'User-Agent':'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1) ; .NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET4.0C)','Connection':'close'}
-        http = requests.get(target, headers=headers, data=post).content
-        return http
-    except requests.exceptions.RequestException as e:
-        logger.error("Exception: %s" % repr(e))
+        if config.useproxy:
+          r = requests.get(target, headers=headers, proxies=config.proxies, data=post, timeout=30)
+        else:
+          r = requests.get(target, headers=headers, data=post, timeout=10)
+        return r.content
+    except requests.exceptions.RequestException:
+        logger.error("Can't access to %s" % target)
 
 def cleartext(text):
     text = text.replace("http://s.rutor.info/", '/s/')
@@ -51,16 +54,16 @@ def upd(category, sort, text, n):
     elif text <> '':stext = text
     stext = stext.replace("%", "%20").replace(" ", "%20").replace("?", "%20").replace("#", "%20")
     if stext == "":
-        categoryUrl = config.siteurl + '/browse/' + n + '/' + category + '/0/' + sort
+        categoryUrl = config.url + '/browse/' + n + '/' + category + '/0/' + sort
     else:
-        if text == '1':categoryUrl = config.siteurl + '/search/' + n + '/' + category + '/000/' + sort + '/' + stext
-        else: categoryUrl = config.siteurl + '/search/' + n + '/' + category + '/110/' + sort + '/' + stext
+        if text == '1':categoryUrl = config.url + '/search/' + n + '/' + category + '/000/' + sort + '/' + stext
+        else: categoryUrl = config.url + '/search/' + n + '/' + category + '/110/' + sort + '/' + stext
 
     # Get Category
-    http = GET(categoryUrl, config.siteurl, None)
+    http = GET(categoryUrl, config.url, None)
 
     if http == None:
-        logger.warning('Сервер  %s не отвечает' % config.siteurl)
+        logger.warning('Сервер  %s не отвечает' % config.url)
         return None
     else:
         http = formtext(http)
