@@ -6,8 +6,8 @@ Allfon.tv Playlist Downloader Plugin configuration file
 # proxies = {'http' : 'socks5h://127.0.0.1:9050','https' : 'socks5h://127.0.0.1:9050'}
 # If your http-proxy need authentification - proxies = { 'https' : 'https://user:password@ip:port' }
 useproxy = False
-proxies = {'http' : 'socks5://127.0.0.1:9050',
-           'https' : 'socks5://127.0.0.1:9050'}
+proxies = {'http' : 'socks5h://127.0.0.1:9050',
+           'https' : 'socks5h://127.0.0.1:9050'}
 
 # Insert your allfon.tv playlist URL here
 url = 'http://allfon-tv.pro/autogenplaylist/allfontv.m3u'
