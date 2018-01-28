@@ -8,7 +8,7 @@ What is this plugin for?
 __author__ = 'ex_trin'
 
 # Rutor site URL
-url = 'http://rutor.info/'
+url = 'http://rutor.info'
 
 # Proxy settings.
 # For example you can install tor browser and add in torrc SOCKSPort 9050
