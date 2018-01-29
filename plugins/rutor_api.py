@@ -48,7 +48,7 @@ def upd(category, sort, text, page_num):
         if config.useproxy:
           http = requests.get(categoryUrl, headers=headers, proxies=config.proxies, timeout=30)
         else:
-          http = requests.get(categoryUrl, headers=headers, timeout=10)
+          http = requests.get(categoryUrl, headers=headers, timeout=5)
         http = formtext(http.content)
         LL = http.splitlines()
         return LL
@@ -127,9 +127,9 @@ def SearchN(category, sort, text, filtr, page='0', min_size=0, max_size=0, min_s
 
             Title = "[ %s | %s ]" % (size, unicode(tTitle[5], 'UTF-8', 'ignore'))
             description_title = "Seeds: %s \ Peers: %s</br> File size: %s</br> %s" %(seeds, peers, size, unicode(tTitle[5], 'UTF-8', 'ignore'))
-
+            torrent_url = config.url+tTitle[1] if config.useproxy else tTitle[1]
             itemdict = {'title': Title,
-                        'url': '/rutor/list/%s/' % requests.utils.quote(tTitle[1],''),
+                        'url': '/rutor/list/%s/' % requests.utils.quote(torrent_url,''),
                         'description_title': description_title,
                         'description': '',
                         'type': 'channel'}

@@ -8,6 +8,7 @@ To use it, go to http://127.0.0.1:8000/helloworld
 
 import requests
 import logging
+import bencode, hashlib
 import config.rutor as config
 from urlparse import urlparse, parse_qs
 from rutor_api import SearchN
@@ -21,6 +22,22 @@ class Rutor(AceProxyPlugin):
         self.params = None
         self.AceStuff = AceStuff
         self.logger = logging.getLogger('rutor')
+
+    def getInfohash(self, url):
+        infohash = None
+        headers ={'User-Agent':'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1) ; .NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET4.0C)','Connection':'close'}
+        try:
+            if config.useproxy:
+                raw_data = requests.get(url, headers=headers, proxies=config.proxies, timeout=30)
+            else:
+                raw_data = requests.get(url, headers=headers, timeout=10)
+
+            metainfo = bencode.bdecode(raw_data.content)
+            infohash = hashlib.sha1(bencode.bencode(metainfo['info'])).hexdigest()
+        except:
+            self.logger.error("Failed to get Infohash from %s" % url)
+            pass
+        return infohash
 
     def send_playlist(self, connection, playlist):
         hostport = connection.headers['Host']
@@ -75,11 +92,12 @@ class Rutor(AceProxyPlugin):
                     playlist = PlaylistGenerator()
                     torrent_url = connection.splittedpath[3]
                     torrent_url_unquoted = requests.utils.unquote(connection.splittedpath[3])
+                    infohash = self.getInfohash(torrent_url_unquoted)
                     contentinfo = None
                     with self.AceStuff.clientcounter.lock:
                         if not self.AceStuff.clientcounter.idleace:
                             self.AceStuff.clientcounter.idleace = self.AceStuff.clientcounter.createAce()
-                        contentinfo = self.AceStuff.clientcounter.idleace.GETCONTENTINFO('torrent', torrent_url_unquoted)
+                        contentinfo = self.AceStuff.clientcounter.idleace.GETCONTENTINFO('infohash', infohash)
                     if contentinfo and contentinfo.get('status') in (1, 2) and contentinfo.get('files'):
                         infohash = contentinfo.get('infohash')
                         files = contentinfo.get('files')
