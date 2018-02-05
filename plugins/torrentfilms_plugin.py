@@ -32,6 +32,7 @@ class Torrentfilms(AceProxyPlugin):
 
     def playlistTimedDownloader(self):
         while True:
+            time.sleep(15)
             with self.lock:
                  self.playlistdata()
             gevent.sleep(config.updateevery * 60)
@@ -41,21 +42,20 @@ class Torrentfilms(AceProxyPlugin):
         try:
              filelist = filter(lambda x: x.endswith(('.torrent','.torrent.added')), os.listdir(unicode(config.directory)))
         except:
-             self.logger.error("Can't load torrent files from "+config.directory)
+             self.logger.error("Can't load torrent files from %s" % config.directory)
              return False
 
         for filename in filelist:
-             infohash = self.getInfohash(config.directory+'/'+filename)
-             self.logger.debug('%s : %s' %(filename, infohash))
+             infohash = self.getInfohash('%s/%s' % (config.directory, filename))
+             self.logger.debug('%s : %s' % (filename, infohash))
              if infohash != None:
                   try:
-                     result = requests.get('http://'+AceConfig.acehost+':'+str(AceConfig.aceHTTPport)+'/server/api?method=get_media_files&infohash='+infohash, headers={'Connection':'close'}).json()['result']
+                     url = 'http://%s:%s/server/api?method=get_media_files&infohash=%s' % (AceConfig.acehost, AceConfig.aceHTTPport, infohash)
+                     result = requests.get(url, headers={'Connection':'close'}, timeout=5).json()['result']
                      for key in result:
-                        self.playlist.append([result[key].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><"))),
-                                              infohash, key])
+                        self.playlist.append([result[key].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><"))), infohash, key])
                   except:
-                     self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><"))),
-                                           infohash, '0'])
+                     self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><"))), infohash, '0'])
         return True
 
     def getInfohash(self, filename):
