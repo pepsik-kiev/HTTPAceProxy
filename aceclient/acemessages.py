@@ -143,6 +143,7 @@ class AceMessage(object):
         DOWNLOADSTOP = 'EVENT download_stopped'
         STATE = 'STATE'
         STATUS = 'STATUS'
+        INFO = 'INFO'
         PAUSE = 'PAUSE'
         RESUME = 'RESUME'
         LOADRESP = 'LOADRESP'

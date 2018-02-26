@@ -26,6 +26,9 @@ class Torrentfilms(AceProxyPlugin):
         self.logger = logging.getLogger('plugin_TorrentFilms')
         self.lock = threading.Lock()
         self.playlist = []
+        self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
+                                 '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
+                                 '.ogx','.qt','.rm','.swf','.ts','.vob','.wmv','.wav','.webm')
 
         if config.updateevery:
             gevent.spawn(self.playlistTimedDownloader)
@@ -40,34 +43,28 @@ class Torrentfilms(AceProxyPlugin):
     def playlistdata(self):
         self.playlist = []
         try:
-             filelist = filter(lambda x: x.endswith(('.torrent','.torrent.added')), os.listdir(unicode(config.directory)))
+            filelist = filter(lambda x: x.endswith(('.torrent','.torrent.added')), os.listdir(unicode(config.directory)))
         except:
-             self.logger.error("Can't load torrent files from %s" % config.directory)
-             return False
+            self.logger.error("Can't load torrent files from %s" % config.directory)
+            return False
 
         for filename in filelist:
-             infohash = self.getInfohash('%s/%s' % (config.directory, filename))
-             self.logger.debug('%s : %s' % (filename, infohash))
-             if infohash != None:
-                  try:
-                     url = 'http://%s:%s/server/api?method=get_media_files&infohash=%s' % (AceConfig.acehost, AceConfig.aceHTTPport, infohash)
-                     result = requests.get(url, headers={'Connection':'close'}, timeout=5).json()['result']
-                     for key in result:
-                        self.playlist.append([result[key].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><"))), infohash, key])
-                  except:
-                     self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><"))), infohash, '0'])
-        return True
-
-    def getInfohash(self, filename):
-        infohash = None
-        try:
-            with open(filename, "rb") as torrent_file:
-                 metainfo = bencode.bdecode(torrent_file.read())
+            infohash = None
+            idx = 0
+            with open('%s/%s' % (config.directory, filename), "rb") as torrent_file: metainfo = bencode.bdecode(torrent_file.read())
             infohash = hashlib.sha1(bencode.bencode(metainfo['info'])).hexdigest()
-        except:
-            self.logger.error("Failed to get Infohash from %s" % filename)
-            pass
-        return infohash
+            self.logger.debug('%s' % filename)
+            try:
+               for files in metainfo['info']['files']:
+                  if ''.join(files['path']).endswith(self.videoextdefaults):
+                     self.playlist.append([''.join(files['path']).translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, str(idx)])
+                     idx+=1
+            except:
+                 try:
+                    self.playlist.append([metainfo['info']['name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0'])
+                 except:
+                    self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0'])
+        return True
 
     def createPlaylist(self, hostport, reqtype, fmt):
 

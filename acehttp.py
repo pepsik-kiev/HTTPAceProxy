@@ -674,12 +674,8 @@ if AceConfig.acespawn or AceConfig.transcode:
 
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':
-   s = socket(AF_INET, SOCK_DGRAM)
-   s.connect(("gmail.com",80))
-   if s.getsockname()[0]:
-     AceConfig.httphost = s.getsockname()[0]
-     logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
-   s.close()
+   AceConfig.httphost = [(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+   logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
 
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:

@@ -463,6 +463,9 @@ class AceClient(object):
                 # STATE
                 elif self._recvbuffer.startswith(AceMessage.response.STATE):
                     self._state = self._recvbuffer.split()[1]
+                # INFO
+                elif self._recvbuffer.startswith(AceMessage.response.INFO):
+                    self._state = self._recvbuffer.split()[1]
                 # STATUS
                 elif self._recvbuffer.startswith(AceMessage.response.STATUS):
                     self._tempstatus = self._recvbuffer.split()[1].split(';')[0]
