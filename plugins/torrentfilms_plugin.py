@@ -4,7 +4,6 @@ Torrent Films Playlist Plugin
 http://ip:port/proxyfilms - for use with AceProxy as proxy
 http://ip:port/films - for use with bulit-in AceStream proxy
 (C) Dorik1972
-!!! NEED TO INSTALL BENCODE MODULE !!!
 '''
 import os
 import logging
@@ -64,13 +63,14 @@ class Torrentfilms(AceProxyPlugin):
                     self.playlist.append([metainfo['info']['name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0'])
                  except:
                     self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0'])
+
+        self.playlist.sort(key=lambda data: data[0])
         return True
 
     def createPlaylist(self, hostport, reqtype, fmt):
 
         if config.updateevery == 0:
              self.playlistdata()
-        self.playlist.sort(key=lambda data: data[0])
 
         ln = '#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
         for data in self.playlist:
