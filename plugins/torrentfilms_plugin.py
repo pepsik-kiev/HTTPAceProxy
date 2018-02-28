@@ -64,7 +64,7 @@ class Torrentfilms(AceProxyPlugin):
                  except:
                     self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0', 'Other'])
 
-        self.playlist.sort(key=lambda data: data[0])
+        self.playlist.sort(key=lambda data: (data[3], data[0]))
         return True
 
     def createPlaylist(self, hostport, reqtype, fmt):
