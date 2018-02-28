@@ -56,13 +56,13 @@ class Torrentfilms(AceProxyPlugin):
             try:
                for files in metainfo['info']['files']:
                   if ''.join(files['path']).endswith(self.videoextdefaults):
-                     self.playlist.append([''.join(files['path']).translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, str(idx)])
+                     self.playlist.append([''.join(files['path']).translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, str(idx), metainfo['info']['name']])
                      idx+=1
             except:
                  try:
-                    self.playlist.append([metainfo['info']['name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0'])
+                    self.playlist.append([metainfo['info']['name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0', 'Other'])
                  except:
-                    self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0'])
+                    self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0', 'Other'])
 
         self.playlist.sort(key=lambda data: data[0])
         return True
@@ -77,7 +77,8 @@ class Torrentfilms(AceProxyPlugin):
              name = data[0]
              infohash  = data[1]
              key = data[2]
-             ln += '#EXTINF:-1 group-title="TorrentFilms",' + name + '\n'
+             group = data[3]
+             ln += '#EXTINF:-1 group-title="' + group + '",' + name + '\n'
              if reqtype == 'proxyfilms':
                  ln += 'http://' + hostport + '/infohash/' + infohash + '/' + key
                  if fmt:
