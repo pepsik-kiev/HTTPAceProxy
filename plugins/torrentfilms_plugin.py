@@ -51,16 +51,19 @@ class Torrentfilms(AceProxyPlugin):
             infohash = None
             idx = 0
             with open('%s/%s' % (config.directory, filename), "rb") as torrent_file: metainfo = bencode.bdecode(torrent_file.read())
-            infohash = hashlib.sha1(bencode.bencode(metainfo['info'])).hexdigest()
+            infohash = hashlib.sha1(bencode.bencode(metainfo[b'info'])).hexdigest()
             self.logger.debug('%s' % filename)
-            try:
-               for files in metainfo['info']['files']:
-                  if ''.join(files['path']).endswith(self.videoextdefaults):
-                     self.playlist.append([''.join(files['path']).translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, str(idx), metainfo['info']['name']])
-                     idx+=1
-            except:
+            if b'files'in metainfo[b'info']:
+               try:
+                  for files in metainfo[b'info'][b'files']:
+                     if ''.join(files[b'path']).endswith(self.videoextdefaults):
+                        self.playlist.append([''.join(files[b'path']).translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, str(idx), metainfo[b'info'][b'name']])
+                        idx+=1
+               except Exception as e:
+                  self.logger.error("Can't decode content of: %s\r\n%s" % (filename,repr(e)))
+            else:
                  try:
-                    self.playlist.append([metainfo['info']['name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0', 'Other'])
+                    self.playlist.append([metainfo[b'info'][b'name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0', 'Other'])
                  except:
                     self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0', 'Other'])
 
