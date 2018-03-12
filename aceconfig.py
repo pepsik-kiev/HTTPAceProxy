@@ -153,4 +153,7 @@ class AceConfig(acedefconfig.AceDefConfig):
             return True
         elif useragent == 'GStreamer souphttpsrc (compatible; LG NetCast.TV-2013) libsoup/2.34.2' and headers.get('icy-metadata') != '1':
             return True
-
+        elif useragent == 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1' and 'Range' and not 'accept-encoding' in headers:
+            return True
+        elif useragent == 'samsung-agent/1.1' and 'Range' and not 'accept-encoding' in headers:
+            return True
