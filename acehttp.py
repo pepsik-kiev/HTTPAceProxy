@@ -400,7 +400,6 @@ class Client:
             for k in self.ace._streamReaderConnection.headers:
                 if k.split(':')[0] not in (FORWARD_HEADERS + SKIP_HEADERS):
                     logger.error('NEW HEADERS FOUND: %s' % k.split(':')[0])
-            response_headers.update({'Access-Control-Allow-Origin' : '*'}) # update for javascript players in browsers
             for h in FORWARD_HEADERS:
                 if self.ace._streamReaderConnection.headers.get(h):
                     response_headers[h] = self.ace._streamReaderConnection.headers.get(h)
