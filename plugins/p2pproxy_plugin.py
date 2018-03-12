@@ -144,6 +144,7 @@ class P2pproxy(AceProxyPlugin):
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
                 exported = playlistgen.exportm3u(hostport=hostport, header=header, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
+                connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
