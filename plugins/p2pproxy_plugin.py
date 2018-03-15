@@ -198,11 +198,12 @@ class P2pproxy(AceProxyPlugin):
                 suffix = '&suffix=' + self.get_param('suffix') if 'suffix' in self.params else ''
                 for i in range(days):
                     dfmt = d.strftime('%d-%m-%Y')
-                    url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix) 
+                    url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
                     playlistgen.addItem({'group': '', 'tvg': '', 'name': dfmt, 'url': url})
                     d = d - delta
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
+                connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
@@ -223,6 +224,7 @@ class P2pproxy(AceProxyPlugin):
                         d = d - delta
 
                 connection.send_response(200)
+                connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
 
                 if headers_only:
@@ -355,6 +357,7 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.get_param('fmt')).encode('utf-8')
 
                 connection.send_response(200)
+                connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
