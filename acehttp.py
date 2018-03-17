@@ -110,16 +110,14 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         logger = logging.getLogger('http_hangDetector')
         try:
             while True:
-                if not self.rfile.read():
-                    break
+              if not self.rfile.read(): break
         except:
             pass
         finally:
-            logger.debug("Client disconnected")
+            logger.debug("Client %s disconnected" % self.clientip)
             client = self.client
-
-            if client:
-                client.destroy()
+            if client: client.destroy()
+            return
 
     def do_HEAD(self):
         return self.do_GET(headers_only=True)
@@ -238,81 +236,80 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         shouldStart = AceStuff.clientcounter.add(cid, self.client) == 1
 
         try:
-            # Initializing AceClient
-            if shouldStart:
+           self.hanggreenlet = gevent.spawn(self.hangDetector)
+           gevent.sleep()
+           logger.debug('Broadcast control "%s" to %s started' % (channelName if channelName != None else cid, self.clientip))
+           while self.hanggreenlet:
+             # Initializing AceClient
+             if shouldStart:
                 # Send commands to AceEngine
-                if contentid:
-                    self.client.ace.START('PID', {'content_id': contentid, 'file_indexes': self.params[0]}, AceConfig.streamtype)
-                elif self.reqtype == 'pid':
-                    self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
-                elif self.reqtype == 'torrent':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                    paramsdict['url'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'infohash':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                    paramsdict['infohash'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'url':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                    paramsdict['direct_url'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'raw':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                    paramsdict['data'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'efile':
-                    self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
+                 if contentid:
+                     self.client.ace.START('PID', {'content_id': contentid, 'file_indexes': self.params[0]}, AceConfig.streamtype)
+                 elif self.reqtype == 'pid':
+                     self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
+                 elif self.reqtype == 'torrent':
+                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                     paramsdict['url'] = self.path_unquoted
+                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                 elif self.reqtype == 'infohash':
+                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                     paramsdict['infohash'] = self.path_unquoted
+                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                 elif self.reqtype == 'url':
+                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                     paramsdict['direct_url'] = self.path_unquoted
+                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                 elif self.reqtype == 'raw':
+                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                     paramsdict['data'] = self.path_unquoted
+                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                 elif self.reqtype == 'efile':
+                     self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype) 
 
-                logger.debug("START %s done %s" % (self.reqtype, self.path_unquoted))
+                 logger.warning('Broadcast "%s" started' % (channelName if channelName != None else cid))
 
-                # Getting URL from engine
-                if self.reqtype == 'infohash' or self.reqtype == 'torrent':
-                     self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
-                else:
-                     self.url = self.client.ace.getUrl(AceConfig.videotimeout)
-                # Rewriting host:port for remote Ace Stream Engine
-                p = urlsplit(self.url)
-                p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
-                self.url = urlunsplit(p)
-                logger.debug("Successfully get url %s from AceEngine!" % self.url)
+                 # Getting URL from engine
+                 if self.reqtype == 'infohash' or self.reqtype == 'torrent':
+                      self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
+                 else:
+                      self.url = self.client.ace.getUrl(AceConfig.videotimeout)
+                 # Rewriting host:port for remote Ace Stream Engine
+                 p = urlsplit(self.url)
+                 p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
+                 self.url = urlunsplit(p)
+                 logger.debug("Successfully get url %s from AceEngine!" % self.url)
 
-            self.errorhappened = False
-            self.client.ace.play()
-            self.hanggreenlet = gevent.spawn(self.hangDetector)
-            logger.debug("hangDetector spawned")
-            gevent.sleep()
+             self.errorhappened = False
+             self.client.ace.play()
 
-            if not fmt:
-                fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
-                # Start translation
-            self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
+             if not fmt:
+                 fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
+             # Start translation
+             self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
+
+           # Waiting until hangDetector is joined
+           self.hanggreenlet.join()
+           logger.debug('Broadcast control "%s" to %s finished' % (channelName if channelName != None else cid, self.clientip))
 
         except gevent.GreenletExit:
-            # hangDetector told us about client disconnection
-            logger.debug('greenletExit')
-            pass
+             # hangDetector told us about client disconnection
+             logger.debug('greenletExit')
+             pass
+
         except Exception as e:
-            # Unknown exception
-            logger.error("Exception: %s" % repr(e))
-            self.errorhappened = True
-            self.dieWithError()
+             # Unknown exception
+             logger.error("Exception: %s" % repr(e))
+             self.errorhappened = True
+             self.dieWithError()
         finally:
-            if not self.errorhappened and AceStuff.clientcounter.count(cid) == 1:
-                # If no error happened and we are the only client
-                try:
-                    gevent.sleep(0) #VIDEO_DESTROY_DELAY
-                except:
-                    pass
-            try:
-                remaining = AceStuff.clientcounter.delete(cid, self.client)
-                if self.client:
-                   self.client.destroy()
-                self.ace = None
-                self.client = None
-                logger.debug("END REQUEST")
-            except:
-                logger.error(traceback.format_exc())
+             try:
+                  if AceStuff.clientcounter.delete(cid, self.client) == 0:
+                     self.client.destroy()
+                     self.ace = None
+                     self.client = None
+                     logger.warning('Broadcast "%s" stoped. Last client disconnected' % (channelName if channelName != None else cid))
+             except:
+                 logger.error(traceback.format_exc())
 
     def getCid(self, reqtype, url):
         cid =''
@@ -395,22 +392,20 @@ class Client:
                                'Content-Length',
                                ]
             SKIP_HEADERS = ['Server', 'Date', 'Transfer-Encoding', 'Accept-Ranges']
-            response_headers = {}
-
+            response_headers={}
             for k in self.ace._streamReaderConnection.headers:
                 if k.split(':')[0] not in (FORWARD_HEADERS + SKIP_HEADERS):
                     logger.error('NEW HEADERS FOUND: %s' % k.split(':')[0])
             for h in FORWARD_HEADERS:
                 if self.ace._streamReaderConnection.headers.get(h):
                     response_headers[h] = self.ace._streamReaderConnection.headers.get(h)
-                    self.handler.send_header(h, self.ace._streamReaderConnection.headers.get(h))
+                    self.handler.send_header(h, response_headers[h])
             self.handler.end_headers()
-            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers )
+            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 
         if AceConfig.transcode:
 
-            if not fmt or not fmt in AceConfig.transcodecmd:
-                fmt = 'default'
+            if not fmt or not fmt in AceConfig.transcodecmd: fmt = 'default'
 
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -524,7 +519,7 @@ def drop_privileges(uid_name, gid_name='nogroup'):
     return False
 
 # Spawning procedures
-def spawnAce(cmd, delay=0):
+def spawnAce(cmd, delay=0.1):
     if AceConfig.osplatform == 'Windows':
         reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
         try:
@@ -622,7 +617,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         AceStuff.ace.terminate()
-        gevent.sleep(1)
+        gevent.sleep()
         if isRunning(AceStuff.ace):
             AceStuff.ace.kill()
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually

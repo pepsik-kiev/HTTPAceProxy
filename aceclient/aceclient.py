@@ -264,7 +264,7 @@ class AceClient(object):
                  else:
                      ffmpeg_cmd = 'ffmpeg '
 
-                 ffmpeg_cmd += '-hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+                 ffmpeg_cmd += '-hwaccel auto -hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
                  transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
                  out = transcoder.stdout
                  logger.warning("HLS stream detected. Ffmpeg transcoding started")
@@ -327,19 +327,18 @@ class AceClient(object):
     def closeStreamReader(self):
         logger = logging.getLogger("StreamReader")
         c = self._streamReaderConnection
-
         if c:
             self._streamReaderConnection = None
             retries = 5
             for retry in range(1, retries + 1):
               try:
                   c.close()
+                  break
               except Exception as err:
-                logger.debug("Failed to close video stream attempt {retry}/{retries}: {err}".format(
+                logger.warning("Failed to close video stream attempt {retry}/{retries}: {err}".format(
                               retry=retry, retries=retries, err=repr(err)))
                 time.sleep(retry)
-              else:
-                break
+
             logger.debug("Video stream closed")
 
         self._streamReaderQueue.clear()
@@ -363,7 +362,7 @@ class AceClient(object):
         logger = logging.getLogger('AceClient_recvdata')
 
         while True:
-            gevent.sleep(random.randint(0,2)*0.001)
+            gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n")
                 self._recvbuffer = self._recvbuffer.strip()
@@ -490,7 +489,7 @@ class AceClient(object):
                 # RESUME
                 elif self._recvbuffer.startswith(AceMessage.response.RESUME):
                     logger.debug("RESUME event")
-                    gevent.sleep()    # PAUSE/RESUME delay
+                    #gevent.sleep()    # PAUSE/RESUME delay
                     self._resumeevent.set()
                 # CID
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
