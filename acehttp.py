@@ -114,9 +114,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except:
             pass
         finally:
-            logger.debug("Client %s disconnected" % self.clientip)
             client = self.client
-            if client: client.destroy()
+            if client:
+                client.destroy()
+                logger.debug("Client %s disconnected" % self.clientip)
             return
 
     def do_HEAD(self):
@@ -132,10 +133,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Set HTTP protocol version
         if self.request_version == 'HTTP/1.1':
              self.protocol_version = 'HTTP/1.1'
-        # Don't wait videodestroydelay if error happened
-        self.errorhappened = True
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
+        logger.debug("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
+        logger.debug("Headers: %s" % self.headers.dict)
 
         if AceConfig.firewall:
             # If firewall enabled
@@ -148,8 +149,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     self.dieWithError(403)  # 403 Forbidden
                     return
 
-        logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
-        logger.debug("Headers: %s" % self.headers.dict)
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
@@ -236,13 +235,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         shouldStart = AceStuff.clientcounter.add(cid, self.client) == 1
 
         try:
-           self.hanggreenlet = gevent.spawn(self.hangDetector)
-           gevent.sleep()
-           logger.debug('Broadcast control "%s" to %s started' % (channelName if channelName != None else cid, self.clientip))
-           while self.hanggreenlet:
-             # Initializing AceClient
+             # If there is no existing broadcast
              if shouldStart:
-                # Send commands to AceEngine
+                 logger.warning('Сreate a broadcast.....')
+                 # Send commands to AceEngine
                  if contentid:
                      self.client.ace.START('PID', {'content_id': contentid, 'file_indexes': self.params[0]}, AceConfig.streamtype)
                  elif self.reqtype == 'pid':
@@ -264,32 +260,32 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                      paramsdict['data'] = self.path_unquoted
                      self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                  elif self.reqtype == 'efile':
-                     self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype) 
-
-                 logger.warning('Broadcast "%s" started' % (channelName if channelName != None else cid))
+                     self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
 
                  # Getting URL from engine
                  if self.reqtype == 'infohash' or self.reqtype == 'torrent':
-                      self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
+                     self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
                  else:
-                      self.url = self.client.ace.getUrl(AceConfig.videotimeout)
+                     self.url = self.client.ace.getUrl(AceConfig.videotimeout)
                  # Rewriting host:port for remote Ace Stream Engine
                  p = urlsplit(self.url)
                  p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                  self.url = urlunsplit(p)
-                 logger.debug("Successfully get url %s from AceEngine!" % self.url)
+                 logger.warning('Broadcast "%s" created' % (channelName if channelName != None else cid))
 
-             self.errorhappened = False
-             self.client.ace.play()
+                 self.client.ace.pause();self.client.ace.play()
 
-             if not fmt:
-                 fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
-             # Start translation
-             self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
-
-           # Waiting until hangDetector is joined
-           self.hanggreenlet.join()
-           logger.debug('Broadcast control "%s" to %s finished' % (channelName if channelName != None else cid, self.clientip))
+             self.hanggreenlet = gevent.spawn(self.hangDetector)
+             gevent.sleep()
+             logger.info('Broadcast "%s" to %s started' % (channelName if channelName != None else cid, self.clientip))
+             while self.hanggreenlet:
+                 if not fmt:
+                     fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
+                 # Start translation to client
+                 self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
+             # Waiting until hangDetector is joined
+             self.hanggreenlet.join()
+             logger.info('Broadcast "%s" to %s finished' % (channelName if channelName != None else cid, self.clientip))
 
         except gevent.GreenletExit:
              # hangDetector told us about client disconnection
@@ -299,15 +295,14 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except Exception as e:
              # Unknown exception
              logger.error("Exception: %s" % repr(e))
-             self.errorhappened = True
              self.dieWithError()
         finally:
              try:
-                  if AceStuff.clientcounter.delete(cid, self.client) == 0:
+                if AceStuff.clientcounter.delete(cid, self.client) == 0:
                      self.client.destroy()
                      self.ace = None
                      self.client = None
-                     logger.warning('Broadcast "%s" stoped. Last client disconnected' % (channelName if channelName != None else cid))
+                     logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (channelName if channelName != None else cid))
              except:
                  logger.error(traceback.format_exc())
 
@@ -483,9 +478,10 @@ class Client:
 
     def destroy(self):
         with self.lock:
+            #self.ace._streamReaderState = 1
             self.handler.closeConnection()
-            self.lock.notifyAll()
             self.queue.clear()
+            self.lock.notifyAll()
 
     def __eq__(self, other):
         return self is other

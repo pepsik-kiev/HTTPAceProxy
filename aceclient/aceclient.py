@@ -71,7 +71,7 @@ class AceClient(object):
         self._streamReaderConnection = None
         self._streamReaderState = None
         self._streamReaderQueue = deque()
-        self._engine_version_code = 0;
+        self._engine_version_code = 0
 
         # Logger
         logger = logging.getLogger('AceClientimport tracebacknt_init')
@@ -117,7 +117,7 @@ class AceClient(object):
 
         # Trying to disconnect
         try:
-            logger.debug("Destroying client...")
+            logger.debug("Destroying client.....")
             self._shuttingDown.set()
             self._write(AceMessage.request.SHUTDOWN)
         except:
@@ -233,78 +233,76 @@ class AceClient(object):
         logger = logging.getLogger("StreamReader")
         logger.debug("Opening video stream: %s" % url)
         self._streamReaderState = 1
+        transcoder = None
+
+        if 'range' in req_headers: del req_headers['range']
+        logger.debug("Get headers from client: %s" % req_headers)
 
         try:
-           if 'range' in req_headers:
-               del req_headers['range']
+          connection = self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True)
 
-           logger.debug("Get headers from client: %s" % req_headers)
+          if connection.status_code  not in (200, 206):
+              logger.error("Failed to open video stream %s" % url)
+              return None
 
-           with requests.get(url, headers=req_headers, stream=True) as connection:
-             self._streamReaderConnection = connection
-             transcoder = None
+          if url.endswith('.m3u8'):
+              self._streamReaderConnection.headers = {'Content-Type':'video/mpeg','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
+              popen_params = { "bufsize": AceConfig.readchunksize,
+                               "stdout" : PIPE,
+                               "stderr" : None,
+                               "shell"  : False }
 
-             if connection.status_code  not in (200, 206):
-                 logger.error("Failed to open video stream %s" % url)
-                 return None
 
-             if url.endswith('.m3u8'):
-                 self._streamReaderConnection.headers = {'Content-Type':'video/mpeg','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
-                 popen_params = { "bufsize": AceConfig.readchunksize,
-                                  "stdout" : PIPE,
-                                  "stderr" : None,
-                                  "shell"  : False }
+              if AceConfig.osplatform == 'Windows':
+                   ffmpeg_cmd = 'ffmpeg.exe '
+                   CREATE_NO_WINDOW = 0x08000000
+                   CREATE_NEW_PROCESS_GROUP = 0x00000200
+                   DETACHED_PROCESS = 0x00000008
+                   popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+              else:
+                   ffmpeg_cmd = 'ffmpeg '
 
-                 if AceConfig.osplatform == 'Windows':
-                     ffmpeg_cmd = 'ffmpeg.exe '
-                     CREATE_NO_WINDOW = 0x08000000
-                     CREATE_NEW_PROCESS_GROUP = 0x00000200
-                     DETACHED_PROCESS = 0x00000008
-                     popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                 else:
-                     ffmpeg_cmd = 'ffmpeg '
+              ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+              transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
+              out = transcoder.stdout
+              logger.warning("HLS stream detected. Ffmpeg transcoding started")
+          else:
+              out = connection.raw
 
-                 ffmpeg_cmd += '-hwaccel auto -hide_banner -nostats -loglevel fatal -re -i %s -c copy -f mpegts -' % url
-                 transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
-                 out = transcoder.stdout
-                 logger.warning("HLS stream detected. Ffmpeg transcoding started")
-             else:
-                 out = connection.raw
+          with self._lock:
+              self._streamReaderState = 2
+              self._lock.notifyAll()
 
-             with self._lock:
-                 self._streamReaderState = 2
-                 self._lock.notifyAll()
+          while True:
+                data = None
+                clients = counter.getClients(cid)
 
-             while True:
-                   data = None
-                   clients = counter.getClients(cid)
+                try:
+                    data = out.read(AceConfig.readchunksize)
+                except:
+                    break
 
-                   try:
-                       data = out.read(AceConfig.readchunksize)
-                   except:
-                       break;
+                if data and clients:
+                    with self._lock:
+                        if len(self._streamReaderQueue) == AceConfig.readchunksize:
+                            self._streamReaderQueue.popleft()
+                        self._streamReaderQueue.append(data)
 
-                   if data and clients:
-                       with self._lock:
-                           if len(self._streamReaderQueue) == AceConfig.readchunksize:
-                               self._streamReaderQueue.popleft()
-                           self._streamReaderQueue.append(data)
+                    for c in clients:
+                        try:
+                            c.addChunk(data, 5.0)
+                        except Queue.Full:
+                            if len(clients) > 1:
+                                logger.debug("Disconnecting client: %s" % str(c))
+                                c.destroy()
+                elif not clients:
+                    logger.debug("All clients disconnected - closing video stream")
+                    break
+                else:
+                    logger.warning("No data received")
+                    break
 
-                       for c in clients:
-                           try:
-                               c.addChunk(data, 5.0)
-                           except Queue.Full:
-                               if len(clients) > 1:
-                                   logger.debug("Disconnecting client: %s" % str(c))
-                                   c.destroy()
-                   elif not clients:
-                       logger.debug("All clients disconnected - closing video stream")
-                       break
-                   else:
-                       logger.warning("No data received")
-                       break
-
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.RequestException:
             logger.error("Failed to open video stream")
             logger.error(traceback.format_exc())
         except:
@@ -328,18 +326,16 @@ class AceClient(object):
         logger = logging.getLogger("StreamReader")
         c = self._streamReaderConnection
         if c:
-            self._streamReaderConnection = None
             retries = 5
             for retry in range(1, retries + 1):
               try:
                   c.close()
                   break
               except Exception as err:
-                logger.warning("Failed to close video stream attempt {retry}/{retries}: {err}".format(
-                              retry=retry, retries=retries, err=repr(err)))
+                logger.warning("Failed to close video stream attempt {retry}/{retries}: {err}".format(retry=retry, retries=retries, err=repr(err)))
                 time.sleep(retry)
-
-            logger.debug("Video stream closed")
+        self._streamReaderConnection = None
+        logger.debug("Video stream closed")
 
         self._streamReaderQueue.clear()
 
@@ -349,11 +345,9 @@ class AceClient(object):
         '''
         return self._resumeevent.wait(timeout=timeout)
 
-    def pause(self):
-        self._write(AceMessage.request.PAUSE)
-
-    def play(self):
-        self._write(AceMessage.request.PLAY)
+    def play(self): self._write(AceMessage.request.PLAY)
+    def pause(self): self._write(AceMessage.request.PAUSE)
+    def stop(self): self._write(AceMessage.request.STOP)
 
     def _recvData(self):
         '''
