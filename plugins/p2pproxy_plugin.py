@@ -108,11 +108,9 @@ class P2pproxy(AceProxyPlugin):
 
                 param_group = self.params.get('group')
                 param_filter = self.get_param('filter')
-                if not param_filter:
-                    param_filter = 'all'  # default filter
+                if not param_filter: param_filter = 'all'  # default filter
                 if param_group:
-                    if 'all' in param_group:
-                        param_group = None
+                    if 'all' in param_group: param_group = None
                     else:
                         tmp = []
                         for g in param_group:
@@ -125,16 +123,13 @@ class P2pproxy(AceProxyPlugin):
                 P2pproxy.logger.debug('Generating requested m3u playlist')
                 for channel in translations_list:
                     group_id = channel.getAttribute('group')
-
-                    if param_group and not group_id in param_group:  # filter channels by group
-                        continue
+                    if param_group and not group_id in param_group: continue # filter channels by group
 
                     name = channel.getAttribute('name')
                     group = TorrentTvApi.CATEGORIES[int(group_id)].decode('UTF-8')
                     cid = channel.getAttribute('id')
                     logo = channel.getAttribute('logo')
-                    if config.fullpathlogo:
-                        logo = P2pproxy.TTVU + logo
+                    if config.fullpathlogo: logo = P2pproxy.TTVU + logo
 
                     fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo}
                     fields['tvgid'] = config.tvgid % fields
@@ -159,8 +154,7 @@ class P2pproxy(AceProxyPlugin):
                     return
 
                 param_filter = self.get_param('filter')
-                if not param_filter:
-                    param_filter = 'all'  # default filter
+                if not param_filter: param_filter = 'all'  # default filter
 
                 translations_list = self.api.translations(param_filter, True)
 
@@ -240,8 +234,7 @@ class P2pproxy(AceProxyPlugin):
                         epg_id = channel.getAttribute('epg_id')
                         name = channel.getAttribute('name')
                         logo = channel.getAttribute('logo')
-                        if logo != '' and config.fullpathlogo:
-                            logo = P2pproxy.TTVU + logo
+                        if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
                         for d in dates:
                             n = name + ' (' + d + ')' if len(dates) > 1 else name
                             url = 'http://%s/archive/?type=m3u&date=%s&channel_id=%s%s' % (hostport, d, epg_id, suffix)
@@ -258,16 +251,15 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Connection', 'close')
                 connection.send_header('Content-Type', 'text/xml;charset=utf-8')
 
-                if headers_only:
-                    connection.end_headers()
+                if headers_only: connection.end_headers()
                 else:
                     archive_channels = self.api.archive_channels(True)
                     P2pproxy.logger.debug('Exporting')
                     connection.send_header('Content-Length', str(len(archive_channels)))
                     connection.end_headers()
                     connection.wfile.write(archive_channels)
-
                 return
+
             if len(connection.splittedpath) == 3 and connection.splittedpath[2].split('?')[
                 0] == 'play':  # /archive/play?id=[record_id]
                 record_id = self.get_param('id')
@@ -326,8 +318,7 @@ class P2pproxy(AceProxyPlugin):
                                     record_id = record.getAttribute('record_id')
                                     playlistgen.addItem({'group': channel_name, 'tvg': '',
                                         'name': name, 'url': record_id, 'logo': logo})
-                            except:
-                                P2pproxy.logger.debug('Failed to load archive for %s' % channel_id)
+                            except: P2pproxy.logger.debug('Failed to load archive for %s' % channel_id)
 
                 else:
                     records_list = self.api.records(param_channel, d)
@@ -346,10 +337,8 @@ class P2pproxy(AceProxyPlugin):
                                 channel_name = channel.getAttribute('name')
                                 logo = channel.getAttribute('logo')
 
-                        if channel_name != '':
-                            name = '(' + channel_name + ') ' + name
-                        if logo != '' and config.fullpathlogo:
-                            logo = P2pproxy.TTVU + logo
+                        if channel_name != '': name = '(' + channel_name + ') ' + name
+                        if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
 
                         playlistgen.addItem({'group': channel_name, 'name': n, 'url': record_id, 'logo': logo, 'tvg': ''})
 
@@ -364,8 +353,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.wfile.write(exported)
             else:  # /archive/?date=[param_date]&channel_id=[param_channel]
                 param_date = self.get_param('date')
-                if not param_date:
-                    d = date.today()
+                if not param_date: d = date.today()
                 else:
                     try:
                         param_date = param_date.split('-')
@@ -386,14 +374,14 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Connection', 'close')
                 connection.send_header('Content-Type', 'text/xml;charset=utf-8')
 
-                if headers_only:
-                    connection.end_headers()
+                if headers_only: connection.end_headers()
                 else:
                     records_list = self.api.records(param_channel, d.strftime('%d-%m-%Y'), True)
                     P2pproxy.logger.debug('Exporting')
                     connection.send_header('Content-Length', str(len(records_list)))
                     connection.end_headers()
                     connection.wfile.write(records_list)
+
         elif connection.reqtype == 'logos':  # Used to generate logomap for the torrenttv plugin
             translations_list = self.api.translations('all')
             last = translations_list[-1]
@@ -407,26 +395,20 @@ class P2pproxy(AceProxyPlugin):
                 name = channel.getAttribute('name').encode('utf-8')
                 logo = channel.getAttribute('logo').encode('utf-8')
                 connection.wfile.write("    u'%s': logobase + '%s'" % (name, logo))
-                if not channel == last:
-                    connection.wfile.write(",\n")
-                else:
-                    connection.wfile.write("\n")
+                if not channel == last: connection.wfile.write(",\n")
+                else: connection.wfile.write("\n")
 
             connection.wfile.write("}\n")
 
     def get_param(self, key):
-        if key in self.params:
-            return self.params[key][0]
-        else:
-            return None
+        if key in self.params: return self.params[key][0]
+        else: return None
 
     def get_date_param(self):
         d = self.get_param('date')
 
-        if not d:
-            return date.today()
-        else:
-            return self.parse_date(d)
+        if not d: return date.today()
+        else: return self.parse_date(d)
 
     def parse_date(self, d):
         try:

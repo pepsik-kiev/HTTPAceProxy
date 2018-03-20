@@ -33,7 +33,7 @@ class Stat(AceProxyPlugin):
     def geo_ip_lookup(self, ip_address):
         lookup_url = 'http://freegeoip.net/json/%s'
         Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
-        response = requests.get(lookup_url % ip_address, headers={'User-Agent':'Magic Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=10).json()
+        response = requests.get(lookup_url % ip_address, headers={'User-Agent':'Magic Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=5).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
                 'country'      : '' if not response['country_name'] else response['country_name'] ,
@@ -62,10 +62,8 @@ class Stat(AceProxyPlugin):
            lookup_url = 'http://macvendors.co/api/vendorname/%s'
            try:
               response = requests.get(lookup_url % mac_address , headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=5).text
-           except:
-              Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
-        else:
-           Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)
+           except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
+        else: Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)
 
         return "Local IP address " if not response else response
 
@@ -81,8 +79,7 @@ class Stat(AceProxyPlugin):
         connection.send_header('Connection', 'close')
         connection.end_headers()
 
-        if headers_only:
-            return
+        if headers_only: return
         # Sys Info
         cpu_nums = psutil.cpu_count()
         cpu_percent = psutil.cpu_percent()
@@ -106,18 +103,14 @@ class Stat(AceProxyPlugin):
         for i in self.stuff.clientcounter.clients:
             for c in self.stuff.clientcounter.clients[i]:
                 connection.wfile.write('<tr><td>')
-                if c.channelIcon:
-                    connection.wfile.write('<img src="' + c.channelIcon + '" width="40" height="16"/>&nbsp;')
-                if c.channelName:
-                    connection.wfile.write(c.channelName.encode('UTF8'))
-                else:
-                    connection.wfile.write(i)
+                if c.channelIcon: connection.wfile.write('<img src="' + c.channelIcon + '" width="40" height="16"/>&nbsp;')
+                if c.channelName: connection.wfile.write(c.channelName.encode('UTF8'))
+                else: connection.wfile.write(i)
 
                 connection.wfile.write('</td><td>' + c.handler.clientip + '</td>')
                 clientinrange = any(map(lambda i: ipaddr.IPAddress(c.handler.clientip) in ipaddr.IPNetwork(i),localnetranges))
 
-                if clientinrange:
-                    connection.wfile.write('<td>' + self.mac_lookup(c.handler.clientip).encode('UTF8').strip() + '</td>')
+                if clientinrange: connection.wfile.write('<td>' + self.mac_lookup(c.handler.clientip).encode('UTF8').strip() + '</td>')
                 else:
                     geo_ip_info = self.geo_ip_lookup(c.handler.clientip)
                     connection.wfile.write('<td>' + geo_ip_info.get('country').encode('UTF8') + ', ' +                                                                                                             geo_ip_info.get('city').encode('UTF8') + '&nbsp;<i class="flag ' + geo_ip_info.get('country_code').encode('UTF8').lower() + '"></i>&nbsp;</td>')

@@ -57,23 +57,16 @@ class PlaylistGenerator(object):
         '''
         Exports m3u playlist
         '''
-        if add_ts:
-            # Adding ts:// after http:// for some players
-            hostport = 'ts://' + hostport
+        if add_ts: hostport = 'ts://' + hostport  # Adding ts:// after http:// for some players
 
         if header is None:
-            if not empty_header:
-                itemlist = self.m3uheader
-            else:
-                itemlist = self.m3uemptyheader
-        else:
-            itemlist = header
+            if not empty_header: itemlist = self.m3uheader
+            else: itemlist = self.m3uemptyheader
+        else: itemlist = header
 
         self._changeItems()
-        if self.comparator:
-            items = sorted(self.itemlist, cmp=self.comparator)
-        else:
-            items=self.itemlist
+        if self.comparator: items = sorted(self.itemlist, cmp=self.comparator)
+        else: items=self.itemlist
 
         for i in items:
             item = i.copy()
@@ -102,27 +95,22 @@ class PlaylistGenerator(object):
                     item['url'] = re.sub('^([^/]+)$', lambda match: 'http://' + hostport + path + '/' + match.group(0),
                                             url, flags=re.MULTILINE)
             if fmt:
-                if '?' in item['url']:
-                    item['url'] = item['url'] + '&fmt=' + fmt
-                else:
-                    item['url'] = item['url'] + '/?fmt=' + fmt
+                if '?' in item['url']: item['url'] = item['url'] + '&fmt=' + fmt
+                else: item['url'] = item['url'] + '/?fmt=' + fmt
 
             itemlist += self._generatem3uline(item)
 
         return itemlist
 
     def exportxml(self, hostport, path='',):
+
         try:
             chans = ''
             for i in self.itemlist:
                 i['hostport'] = 'http://' + hostport + path
                 try:
-                    if i['type'] == 'channel':
-                        chans += config.xml_channel_template % i
-                    else:
-                        chans += config.xml_stream_template % i
-                except:
-                    chans += config.xml_channel_template % i
+                    if i['type'] == 'channel': chans += config.xml_channel_template % i
+                    else: chans += config.xml_stream_template % i
+                except: chans += config.xml_channel_template % i
             return config.xml_template % {'items': chans}
-        except:
-            return ''
+        except: return ''

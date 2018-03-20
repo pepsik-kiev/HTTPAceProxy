@@ -21,23 +21,19 @@ class Allfon(AceProxyPlugin):
     playlist = None
     playlisttime = None
 
-    def __init__(self, AceConfig, AceStuff):
-        pass
-
+    def __init__(self, AceConfig, AceStuff): pass
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
         try:
             if config.useproxy:
-                   Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text.encode('UTF-8')
-            else:
-                   Allfon.playlist = requests.get(config.url, headers=headers, timeout=10).text.encode('UTF-8')
+                  Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text.encode('UTF-8')
+            else: Allfon.playlist = requests.get(config.url, headers=headers, timeout=5).text.encode('UTF-8')
             Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
         except requests.exceptions.ConnectionError:
             Allfon.logger.error("Can't download AllFonTV playlist!")
             return False
-
         return True
 
     def handle(self, connection, headers_only=False):
@@ -60,14 +56,11 @@ class Allfon(AceProxyPlugin):
                               Allfon.playlist, re.MULTILINE)
         add_ts = False
         try:
-            if connection.splittedpath[2].lower() == 'ts':
-                add_ts = True
-        except:
-            pass
+            if connection.splittedpath[2].lower() == 'ts': add_ts = True
+        except: pass
 
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
-        for match in matches:
-            playlistgen.addItem(match.groupdict())
+        for match in matches: playlistgen.addItem(match.groupdict())
         Allfon.logger.info('AllFon playlist created')
         url = urlparse(connection.path)
         params = parse_qs(url.query)
@@ -83,5 +76,3 @@ class Allfon(AceProxyPlugin):
         connection.end_headers()
 
         connection.wfile.write(exported)
-
-

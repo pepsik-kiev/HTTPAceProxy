@@ -7,7 +7,6 @@ http://ip:port/films - for use with bulit-in AceStream proxy
 '''
 import os
 import logging
-import requests
 import bencode, hashlib
 import time
 from urlparse import urlparse, parse_qs
@@ -72,8 +71,7 @@ class Torrentfilms(AceProxyPlugin):
 
     def createPlaylist(self, hostport, reqtype, fmt):
 
-        if config.updateevery == 0:
-             self.playlistdata()
+        if config.updateevery == 0: self.playlistdata()
 
         ln = '#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
         for data in self.playlist:
@@ -84,10 +82,8 @@ class Torrentfilms(AceProxyPlugin):
              ln += '#EXTINF:-1 group-title="' + group + '",' + name + '\n'
              if reqtype == 'proxyfilms':
                  ln += 'http://' + hostport + '/infohash/' + infohash + '/' + key
-                 if fmt:
-                    ln += '/stream.mp4/?fmt=' + fmt +'\n'
-                 else:
-                    ln += '/stream.mp4\n'
+                 if fmt: ln += '/stream.mp4/?fmt=' + fmt +'\n'
+                 else: ln += '/stream.mp4\n'
              else:
                   ln += 'http://' + AceConfig.acehost + ':'+str(AceConfig.aceHTTPport)+'/ace/' + config.streamtype + '?infohash=' + infohash + \
                         '&transcode_audio=' + str(AceConfig.transcode_audio) + \

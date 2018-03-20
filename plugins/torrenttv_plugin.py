@@ -38,17 +38,15 @@ class Torrenttv(AceProxyPlugin):
     def playlistTimedDownloader(self):
         while True:
             time.sleep(10)
-            with self.lock:
-                self.downloadPlaylist()
+            with self.lock: self.downloadPlaylist()
             gevent.sleep(config.updateevery * 60)
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
         try:
             if config.useproxy:
-                 origin = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text
-            else:
-                 origin = requests.get(config.url, headers=headers, timeout=10).text
+                  origin = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text
+            else: origin = requests.get(config.url, headers=headers, timeout=5).text
 
             self.logger.info('TTV playlist ' + config.url + ' downloaded')
             self.playlisttime = int(time.time())
@@ -63,8 +61,7 @@ class Torrenttv(AceProxyPlugin):
                 name = encname.decode('UTF-8')
                 logo = self.logomap.get(name)
                 url = itemdict['url']
-                if logo:
-                    itemdict['logo'] = logo
+                if logo: itemdict['logo'] = logo
 
                 if url.startswith('acestream://') or url.startswith('infohash://') \
                                                   or (url.startswith('http://') and url.endswith('.acelive')):
@@ -93,19 +90,15 @@ class Torrenttv(AceProxyPlugin):
                 self.logomap = logos
                 self.logger.debug("Logos updated")
                 self.updatelogos = False
-            except:
-                # p2pproxy plugin seems not configured
-                self.updatelogos = False
-
+            except: self.updatelogos = False # p2pproxy plugin seems not configured
         return True
 
     def handle(self, connection, headers_only=False):
         play = False
 
         with self.lock:
-            # N minutes cache
-            self.cache=30
-            if not self.playlist or (int(time.time()) - self.playlisttime > self.cache * 60):
+            # 30 minutes cache
+            if not self.playlist or (int(time.time()) - self.playlisttime > 30 * 60):
                 self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
                 if not self.downloadPlaylist():
                     connection.dieWithError()
@@ -159,7 +152,5 @@ class Torrenttv(AceProxyPlugin):
                 connection.send_header('Connection', 'close')
                 connection.end_headers()
 
-        if play:
-            connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=fmt)
-        elif not headers_only:
-            connection.wfile.write(exported)
+        if play: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=fmt)
+        elif not headers_only: connection.wfile.write(exported)

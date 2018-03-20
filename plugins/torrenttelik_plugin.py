@@ -16,7 +16,6 @@ from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttelik as config
 
-
 class Torrenttelik(AceProxyPlugin):
 
     handlers = ('torrent-telik', )
@@ -29,9 +28,8 @@ class Torrenttelik(AceProxyPlugin):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
         try:
             if config.useproxy:
-                 Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30).json()
-            else:
-                 Torrenttelik.playlist = requests.get(url, headers=headers, timeout=10).json()
+                  Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30)
+            else: Torrenttelik.playlist = requests.get(url, headers=headers, timeout=5)
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
 
@@ -57,31 +55,24 @@ class Torrenttelik(AceProxyPlugin):
 
         url = None
         list_type = self.getparam('type')
-        if not list_type or list_type.startswith('ttv'):
-            url = config.url_ttv
-        elif list_type.startswith('mob_ttv'):
-            url = config.url_mob_ttv
-        elif list_type.startswith('allfon'):
-            url = config.url_allfon
+        if not list_type or list_type.startswith('ttv'): url = config.url_ttv
+        elif list_type.startswith('mob_ttv'): url = config.url_mob_ttv
+        elif list_type.startswith('allfon'): url = config.url_allfon
 
         # 15 minutes cache
         if not Torrenttelik.playlist or (int(time.time()) - Torrenttelik.playlisttime > 15 * 60):
             if not self.downloadPlaylist(url):
                 connection.dieWithError()
                 return
-
-        try:
-            channels = Torrenttelik.playlist['channels']
+        try: channels = Torrenttelik.playlist.json()['channels']
         except Exception as e:
             Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))
             return
 
         add_ts = False
         try:
-            if connection.splittedpath[2].lower() == 'ts':
-                add_ts = True
-        except:
-            pass
+            if connection.splittedpath[2].lower() == 'ts': add_ts = True
+        except: pass
 
         playlistgen = PlaylistGenerator()
 
@@ -101,7 +92,5 @@ class Torrenttelik(AceProxyPlugin):
         connection.wfile.write(exported)
 
     def getparam(self, key):
-        if key in self.params:
-            return self.params[key][0]
-        else:
-            return None
+        if key in self.params: return self.params[key][0]
+        else: return None

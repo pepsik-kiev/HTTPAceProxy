@@ -48,17 +48,14 @@ class PlaylistConfig():
     def _changeItemByDict(item, key, replacementsDict, setKey=None):
         if len(replacementsDict) > 0:
             value = item[key]
-            if not setKey:
-                setKey = key
+            if not setKey: setKey = key
 
             if isinstance(value, str):
                 value = replacementsDict.get(value)
-                if value:
-                    item[setKey] = value
+                if value: item[setKey] = value
             elif isinstance(value, unicode):
                 value = replacementsDict.get(value.encode('utf8'))
-                if value:
-                    item[setKey] = value.decode('utf8')
+                if value: item[setKey] = value.decode('utf8')
 
     # This comparator is used for the playlist sorting.
     @staticmethod
@@ -66,10 +63,11 @@ class PlaylistConfig():
         result = -1
         if PlaylistConfig.sortByGroupName:
             result = cmp(i1.get('group', ''), i2.get('group', ''))
-            if result != 0:
-                return result
+            if result != 0: return result
+
         if PlaylistConfig.sortByName:
             result = cmp(i1.get('name', ''), i2.get('name', ''))
+
         return result
 
 

@@ -2,12 +2,12 @@
 '''
 Simple Client Counter for VLC VLM
 '''
-from aceconfig import AceConfig
-from . aceclient import AceClient
 import threading
 import logging
 import time
 import gevent
+from aceconfig import AceConfig
+from aceclient import AceClient
 
 class ClientCounter(object):
 
@@ -33,8 +33,7 @@ class ClientCounter(object):
             return len(clients) if clients else 0
 
     def getClients(self, cid):
-        with self.lock:
-            return self.clients.get(cid)
+        with self.lock: return self.clients.get(cid)
 
     def add(self, cid, client):
         with self.lock:
@@ -49,8 +48,7 @@ class ClientCounter(object):
                     client.ace = self.idleace
                     self.idleace = None
                 else:
-                    try:
-                        client.ace = self.createAce()
+                    try: client.ace = self.createAce()
                     except Exception as e:
                         logging.error('Failed to create AceClient: %s' % repr(e))
                         raise e
@@ -63,14 +61,9 @@ class ClientCounter(object):
 
     def delete(self, cid, client):
         with self.lock:
-            if not cid in self.clients:
-                return 0
-
+            if not cid in self.clients: return 0
             clients = self.clients[cid]
-
-            if client not in clients:
-                return len(clients)
-
+            if client not in clients: return len(clients)
             try:
                 if len(clients) > 1:
                     clients.remove(client)
@@ -79,54 +72,44 @@ class ClientCounter(object):
                     del self.clients[cid]
                     clients[0].ace.closeStreamReader()
 
-                    if self.idleace:
-                        client.ace.destroy()
+                    if self.idleace: client.ace.destroy()
                     else:
                         try:
                             client.ace.STOP()
                             self.idleace = client.ace
                             self.idleace.reset()
-                        except:
-                            client.ace.destroy()
-
+                        except: client.ace.destroy()
                     return 0
-            finally:
-                self.total -= 1
+            finally: self.total -= 1
 
     def deleteAll(self, cid):
         clients = None
-
         try:
             with self.lock:
-                if not cid in self.clients:
-                    return
+                if not cid in self.clients: return
 
                 clients = self.clients[cid]
                 del self.clients[cid]
                 self.total -= len(clients)
                 clients[0].ace.closeStreamReader()
 
-                if self.idleace:
-                    clients[0].ace.destroy()
+                if self.idleace: clients[0].ace.destroy()
                 else:
                     try:
                         clients[0].ace.STOP()
                         self.idleace = clients[0].ace
                         self.idleace.reset()
-                    except:
-                        clients[0].ace.destroy()
+                    except: clients[0].ace.destroy()
         finally:
-            if clients:
-                for c in clients:
-                    c.destroy()
+                if clients:
+                   for c in clients: c.destroy()
 
     def destroyIdle(self):
         with self.lock:
             try:
                 if self.idleace:
                     self.idleace.destroy()
-            finally:
-                self.idleace = None
+            finally: self.idleace = None
 
     def checkIdle(self):
         while(True):

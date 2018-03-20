@@ -13,8 +13,6 @@ See helloworld_plugin_.py for the basic plugin example.
 
 class AceProxyPlugin(object):
 
-    def __init__(self, AceConfig, AceStuff):
-        pass
+    def __init__(self, AceConfig, AceStuff): pass
 
-    def handle(self, connection, headers_only=False):
-        raise NotImplementedError
+    def handle(self, connection, headers_only=False): raise NotImplementedError
