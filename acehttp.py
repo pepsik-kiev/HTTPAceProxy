@@ -95,6 +95,22 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.closeConnection()
             except: pass
 
+    def hangDetector(self):
+        '''
+        Detect client disconnection while in the middle of something
+        or just normal connection close.
+        '''
+        logger = logging.getLogger('http_hangDetector')
+        try:
+            while True:
+                if not self.rfile.read():
+                    break
+        except:
+            pass
+        finally:
+            client = self.client
+            if client:  client.destroy()
+
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
     def do_GET(self, headers_only=False):
@@ -195,6 +211,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         shouldStart = AceStuff.clientcounter.add(cid, self.client) == 1
 
         try:
+             self.hanggreenlet = gevent.spawn(self.hangDetector)
+             gevent.sleep()
              # If there is no existing broadcast
              if shouldStart:
                  logger.warning('Create a broadcast.....')
@@ -231,7 +249,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                  p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                  self.url = urlunsplit(p)
                  self.client.ace.play()
-                 self.hanggreenlet = gevent.spawn(self.client.ace.startStreamReader, self.url, self.client.cid, AceStuff.clientcounter, self.headers.dict)
+                 gevent.spawn(self.client.ace.startStreamReader, self.url, self.client.cid, AceStuff.clientcounter, self.headers.dict)
                  gevent.sleep()
                  logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else self.client.cid))
 
@@ -248,7 +266,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
                 if AceStuff.clientcounter.delete(self.client.cid, self.client) == 0:
                     logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else self.client.cid))
-                    self.hanggreenlet.join()
+                    try: self.hanggreenlet.join()
+                    except: pass
                 self.client.destroy()
                 self.ace = None
                 self.client = None
@@ -416,8 +435,8 @@ class Client:
     def destroy(self):
         with self.lock:
              self.handler.closeConnection()
-             self.lock.notifyAll()
              self.queue.clear()
+             self.lock.notifyAll()
 
     def __eq__(self, other): return self is other
 
