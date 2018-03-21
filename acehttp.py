@@ -95,23 +95,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.closeConnection()
             except: pass
 
-    def hangDetector(self):
-        '''
-        Detect client disconnection while in the middle of something
-        or just normal connection close.
-        '''
-        logger = logging.getLogger('http_hangDetector')
-        try:
-            while True:
-              if not self.rfile.read(): break
-        except: pass
-        finally:
-            client = self.client
-            if client:
-              logger.info('Streaming "%s" to %s finished' % (client.channelName if client.channelName != None else client.cid, self.clientip))
-              client.destroy()
-            return
-
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
     def do_GET(self, headers_only=False):
@@ -212,8 +195,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         shouldStart = AceStuff.clientcounter.add(cid, self.client) == 1
 
         try:
-             self.hanggreenlet = gevent.spawn(self.hangDetector)
-             gevent.sleep()
              # If there is no existing broadcast
              if shouldStart:
                  logger.warning('Create a broadcast.....')
@@ -250,24 +231,29 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                  p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                  self.url = urlunsplit(p)
                  self.client.ace.play()
-                 logger.warning('Broadcast "%s" created' % (channelName if channelName != None else cid))
+                 self.hanggreenlet = gevent.spawn(self.client.ace.startStreamReader, self.url, self.client.cid, AceStuff.clientcounter, self.headers.dict)
+                 gevent.sleep()
+                 logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else self.client.cid))
 
-             logger.info('Streaming "%s" to %s started' % (channelName if channelName != None else cid, self.clientip))
+
              if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
              # Start translation to client
-             self.client.handle(shouldStart, self.url, fmt, self.headers.dict)
-             # Waiting until hangDetector is joined
-             self.hanggreenlet.join()
+             logger.info('Streaming "%s" to %s started' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
+             self.client.handle(fmt)
+
         except aceclient.AceException as e: logger.error("AceClient exception: %s" % repr(e)); self.dieWithError()
         except Exception as e: logger.error("Unkonwn exception: %s" % repr(e)); self.dieWithError()
         finally:
              try:
-                if AceStuff.clientcounter.delete(cid, self.client) < 1:
-                     if self.client: self.client.destroy()
-                     self.ace = None
-                     self.client = None
-                     logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (channelName if channelName != None else cid))
-             except: logger.error(traceback.format_exc())
+                logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
+                if AceStuff.clientcounter.delete(self.client.cid, self.client) == 0:
+                    logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else self.client.cid))
+                    self.hanggreenlet.join()
+                self.client.destroy()
+                self.ace = None
+                self.client = None
+             except:
+                logger.error(traceback.format_exc())
 
     def getCid(self, reqtype, url):
         cid =''
@@ -313,13 +299,9 @@ class Client:
         self.connectionTime = time.time()
         self.queue = deque()
 
-    def handle(self, shouldStart, url, fmt=None, req_headers=None):
+    def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
         self.connectionTime = time.time()
-
-        if shouldStart:
-            gevent.spawn(self.ace.startStreamReader, url, self.cid, AceStuff.clientcounter, req_headers)
-            gevent.sleep()
 
         with self.ace._lock:
             start = time.time()
