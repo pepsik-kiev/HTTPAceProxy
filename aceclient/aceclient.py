@@ -242,7 +242,7 @@ class AceClient(object):
                    popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
               else: ffmpeg_cmd = 'ffmpeg '
 
-              ffmpeg_cmd += '-cpuflags armv8 -hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+              ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
               transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
               out = transcoder.stdout
               logger.warning("HLS stream detected. Ffmpeg transcoding started")
