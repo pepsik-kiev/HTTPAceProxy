@@ -38,7 +38,7 @@ class AceClient(object):
         # Shutting down flag
         self._shuttingDown = Event()
         # Product key
-        self._product_key = None
+        self._product_key = AceConfig.acekey
         # Current STATUS
         self._status = None
         # Current STATE
@@ -50,9 +50,9 @@ class AceClient(object):
         # Buffered video pieces
         self._position_buf = None
         # Current AUTH
-        self._auth = None
-        self._gender = None
-        self._age = None
+        self._auth = False
+        self._gender = AceConfig.acesex
+        self._age = AceConfig.aceage
         # Result (Created with AsyncResult() on call)
         self._result = AsyncResult()
         self._authevent = Event()
@@ -63,7 +63,7 @@ class AceClient(object):
         # Event for resuming from PAUSE
         self._resumeevent = Event()
         # Seekback seconds.
-        self._seekback = 0
+        self._seekback = AceConfig.videoseekback
         # Did we get START command again? For seekback.
         self._started_again = False
 
@@ -96,8 +96,6 @@ class AceClient(object):
         # Spawning recvData greenlet
         gevent.spawn(self._recvData)
         gevent.sleep()
-    # Destructor just calls destroy() method
-    def __del__(self): self.destroy()
 
     def destroy(self):
         '''
@@ -111,7 +109,7 @@ class AceClient(object):
 
         # Trying to disconnect
         try:
-            logger.debug("Destroying client.....")
+            logger.debug("Destroying AceStream client ...")
             self._shuttingDown.set()
             self._write(AceMessage.request.SHUTDOWN)
         except: pass # Ignore exceptions on destroy
@@ -135,8 +133,8 @@ class AceClient(object):
         self._age = age
 
         logger = logging.getLogger("AceClient_aceInit") # Logger
-
         self._write(AceMessage.request.HELLO) # Sending HELLO
+
         if not self._authevent.wait(self._resulttimeout):
             errmsg = "Authentication timeout. Wrong key?"
             logger.error(errmsg)
@@ -155,8 +153,8 @@ class AceClient(object):
         try:
             result = self._result.get(timeout=self._resulttimeout)
             if not result:
-                raise AceException("Result not received")
-        except gevent.Timeout: raise AceException("Timeout")
+                raise AceException("Result not received from %s:%s" % (AceConfig.acehost, AceConfig.aceAPIport))
+        except gevent.Timeout: raise AceException("gevent_Timeout")
         return result
 
     def START(self, datatype, value, stream_type):
@@ -242,7 +240,7 @@ class AceClient(object):
                    popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
               else: ffmpeg_cmd = 'ffmpeg '
 
-              ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+              ffmpeg_cmd += '-cpuflags armv8 -hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
               transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
               out = transcoder.stdout
               logger.warning("HLS stream detected. Ffmpeg transcoding started")
@@ -279,30 +277,21 @@ class AceClient(object):
             logger.error(traceback.format_exc())
             if counter.getClients(cid): logger.error("Failed to read video stream")
         finally:
-            self.closeStreamReader()
-            if transcoder:
-               try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
-               except: pass
             with self._lock:
                 self._streamReaderState = 3
                 self._lock.notifyAll()
+            if transcoder:
+               try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
+               except: pass
             counter.deleteAll(cid)
 
     def closeStreamReader(self):
         logger = logging.getLogger("StreamReader")
         c = self._streamReaderConnection
-        if c:
-            retries = 5
-            for retry in range(1, retries + 1):
-              try: c.close(); break
-              except Exception as err:
-                logger.warning("Failed to close video stream attempt {retry}/{retries}: {err}"
-                               .format(retry=retry, retries=retries, err=repr(err)))
-                time.sleep(retry)
+        if c: c.close()
+        self._streamReaderQueue.clear()
         self._streamReaderConnection = None
         logger.debug("Video stream closed")
-
-        self._streamReaderQueue.clear()
 
     def getPlayEvent(self, timeout=None):
         '''
