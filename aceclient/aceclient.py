@@ -50,7 +50,7 @@ class AceClient(object):
         # Buffered video pieces
         self._position_buf = None
         # Current AUTH
-        self._auth = False
+        self._auth = None
         self._gender = AceConfig.acesex
         self._age = AceConfig.aceage
         # Result (Created with AsyncResult() on call)
@@ -94,7 +94,7 @@ class AceClient(object):
                    pass
 
         # Spawning recvData greenlet
-        gevent.spawn(self._recvData)
+        self._hanggreenlet = gevent.spawn(self._recvData)
         gevent.sleep()
 
     def destroy(self):
@@ -240,7 +240,7 @@ class AceClient(object):
                    popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
               else: ffmpeg_cmd = 'ffmpeg '
 
-              ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+              ffmpeg_cmd += '-cpuflags armv8 -hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
               transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
               out = transcoder.stdout
               logger.warning("HLS stream detected. Ffmpeg transcoding started")
@@ -309,8 +309,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while True:
-            gevent.sleep()
+        while self._hanggreenlet:
             try:
                 self._recvbuffer = self._socket.read_until("\r\n")
                 self._recvbuffer = self._recvbuffer.strip()
@@ -338,8 +337,8 @@ class AceClient(object):
                     else: self._write(AceMessage.request.READY_nokey)
                 # NOTREADY
                 elif self._recvbuffer.startswith(AceMessage.response.NOTREADY):
-                    logger.error("Ace is not ready. Wrong auth?")
-                    self._auth = False
+                    logger.error("Ace engine is not ready. Wrong auth?")
+                    self._auth = None
                     self._authevent.set()
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
@@ -431,4 +430,4 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
                     self._cidresult.set(self._recvbuffer)
                     logger.debug("CID: %s" %self._recvbuffer)
-
+        self._hanggreenle.join()
