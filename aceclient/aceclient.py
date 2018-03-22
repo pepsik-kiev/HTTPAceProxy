@@ -430,4 +430,4 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
                     self._cidresult.set(self._recvbuffer)
                     logger.debug("CID: %s" %self._recvbuffer)
-        self._hanggreenle.join()
+        self._hanggreenlet.join()
