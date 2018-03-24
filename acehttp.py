@@ -106,8 +106,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                if not self.rfile.read(): break
         except: pass
         finally:
-            logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
-            self.client.destroy()
+            client = self.client
+            if client:
+               logger.info('Streaming "%s" to %s finished' % (client.channelName if client.channelName != None else client.cid, self.clientip))
+               client.destroy()
             try: self.requestgreenlet.kill()
             except: pass
             finally: gevent.sleep()
@@ -266,8 +268,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         finally:
              try:
                 if AceStuff.clientcounter.delete(cid, self.client) == 0:
-                  logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else cid))
-                  if AceStuff.clientcounter.count(cid)!=0: AceStuff.clientcounter.deleteAll(cid)
+                   logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else cid))
+                self.client.destroy()
+                self.client = None
              except:
                 logger.error(traceback.format_exc())
 
@@ -401,9 +404,7 @@ class Client:
                     logger.warning("No data received in 60 seconds - disconnecting")
         finally:
             if transcoder:
-               try:
-                 transcoder.kill()
-                 logger.warning("Ffmpeg transcoding stoped")
+               try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
                except: pass
 
     def addChunk(self, chunk, timeout):
