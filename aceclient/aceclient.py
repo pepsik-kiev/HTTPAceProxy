@@ -94,8 +94,7 @@ class AceClient(object):
                    pass
 
         # Spawning recvData greenlet
-        self._hanggreenlet = gevent.spawn(self._recvData)
-        gevent.sleep()
+        gevent.spawn(self._recvData) #; gevent.sleep()
 
     def destroy(self):
         '''
@@ -131,12 +130,13 @@ class AceClient(object):
         self._product_key = product_key
         self._gender = gender
         self._age = age
+        self._seekback = AceConfig.videoseekback
 
-        logger = logging.getLogger("AceClient_aceInit") # Logger
-        self._write(AceMessage.request.HELLO) # Sending HELLO
+        logger = logging.getLogger("AceClient_aceInit")
+        self._write(AceMessage.request.HELLO) # Sending HELLOBG
 
         if not self._authevent.wait(self._resulttimeout):
-            errmsg = "Authentication timeout. Wrong key?"
+            errmsg = "Authentication timeout. Wrong key?" # HELLOTS not resived from engine
             logger.error(errmsg)
             raise AceException(errmsg)
             return
@@ -181,19 +181,18 @@ class AceClient(object):
             self._write(AceMessage.request.STOP)
             self._getResult()
 
-    def LOADASYNC(self, datatype, value):
+    def LOADASYNC(self, datatype, params):
         self._result = AsyncResult()
-        self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), value))
+        self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
         return self._getResult()
 
-    def GETCONTENTINFO(self, datatype, value):
+    def CONTENTINFO(self, datatype, value):
         dict = {'torrent': 'url', 'infohash':'infohash', 'raw':'data', 'pid':'content_id'}
-        self.paramsdict={dict[datatype]:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
-        contentinfo = self.LOADASYNC(datatype, self.paramsdict)
-        return contentinfo
+        paramsdict = {dict[datatype]:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
+        return self.LOADASYNC(datatype, paramsdict)
 
     def GETCID(self, datatype, url):
-        contentinfo = self.GETCONTENTINFO(datatype, url)
+        contentinfo = self.CONTENTINFO(datatype, url)
         self._cidresult = AsyncResult()
         self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), 0, 0, 0))
         cid = self._cidresult.get(True, 5)
@@ -277,21 +276,22 @@ class AceClient(object):
             logger.error(traceback.format_exc())
             if counter.getClients(cid): logger.error("Failed to read video stream")
         finally:
-            with self._lock:
-                self._streamReaderState = 3
-                self._lock.notifyAll()
+            self.closeStreamReader()
             if transcoder:
                try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
                except: pass
-            counter.deleteAll(cid)
+            with self._lock:
+                self._streamReaderState = 3
+                self._lock.notifyAll()
 
     def closeStreamReader(self):
         logger = logging.getLogger("StreamReader")
         c = self._streamReaderConnection
-        if c: c.close()
+        if c:
+           c.close()
+           self._streamReaderConnection = None
+           logger.debug("Video stream closed")
         self._streamReaderQueue.clear()
-        self._streamReaderConnection = None
-        logger.debug("Video stream closed")
 
     def getPlayEvent(self, timeout=None):
         '''
@@ -309,7 +309,8 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while self._hanggreenlet:
+        while True:
+            gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n")
                 self._recvbuffer = self._recvbuffer.strip()
@@ -430,4 +431,3 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
                     self._cidresult.set(self._recvbuffer)
                     logger.debug("CID: %s" %self._recvbuffer)
-        self._hanggreenlet.join()

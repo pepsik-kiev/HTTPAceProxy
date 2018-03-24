@@ -52,6 +52,7 @@ class ClientCounter(object):
                     except Exception as e:
                         logging.error('Failed to create AceClient: %s' % repr(e))
                         raise e
+                        return 0
 
                 clients = [client]
                 self.clients[cid] = clients
@@ -113,9 +114,9 @@ class ClientCounter(object):
 
     def checkIdle(self):
         while(True):
-            gevent.sleep(60.0)
+            gevent.sleep(30.0)
             with self.lock:
                 ace = self.idleace
-                if ace and (ace._idleSince + 60.0 <= time.time()):
+                if ace and (ace._idleSince + 30.0 <= time.time()):
                     self.idleace = None
                     ace.destroy()

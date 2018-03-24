@@ -42,7 +42,7 @@ class AceMessage(object):
         # Requests (from client to acestream)
         # API Version
         HELLO = 'HELLOBG version=' + str(AceConst.APIVERSION)  # Hello
-        READY_nokey = 'READY'  # Sent when readyx
+        READY_nokey = 'READY'  # Sent when ready
         PAUSE = 'EVENT pause'
         PLAY  = 'EVENT play'
         STOP  = 'STOP'

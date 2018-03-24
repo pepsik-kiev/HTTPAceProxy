@@ -103,13 +103,15 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         logger = logging.getLogger('http_hangDetector')
         try:
             while True:
-                if not self.rfile.read():
-                    break
-        except:
-            pass
+               if not self.rfile.read(): break
+        except: pass
         finally:
-            client = self.client
-            if client:  client.destroy()
+            logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
+            self.client.destroy()
+            try: self.requestgreenlet.kill()
+            except: pass
+            finally: gevent.sleep()
+            return
 
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
@@ -122,6 +124,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.connected = True
         # Set HTTP protocol version
         if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
+        # Current greenlet
+        self.requestgreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
         logger.debug("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
@@ -209,9 +213,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         self.client = Client(cid, self, channelName, channelIcon)
         shouldStart = AceStuff.clientcounter.add(cid, self.client) == 1
-
+        logger.error
         try:
-             self.hanggreenlet = gevent.spawn(self.hangDetector)
+             gevent.spawn(self.hangDetector)
              gevent.sleep()
              # If there is no existing broadcast
              if shouldStart:
@@ -249,49 +253,41 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                  p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                  self.url = urlunsplit(p)
                  self.client.ace.play()
-                 gevent.spawn(self.client.ace.startStreamReader, self.url, self.client.cid, AceStuff.clientcounter, self.headers.dict)
-                 gevent.sleep()
                  logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else self.client.cid))
 
-
              if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
-             # Start translation to client
+             # Start streaming to client
              logger.info('Streaming "%s" to %s started' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
-             self.client.handle(fmt)
+             self.client.handle(shouldStart, self.url, fmt)
 
+        except gevent.GreenletExit: pass
         except aceclient.AceException as e: logger.error("AceClient exception: %s" % repr(e)); self.dieWithError()
         except Exception as e: logger.error("Unkonwn exception: %s" % repr(e)); self.dieWithError()
         finally:
              try:
-                logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
-                if AceStuff.clientcounter.delete(self.client.cid, self.client) == 0:
-                    logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else self.client.cid))
-                    try: self.hanggreenlet.join()
-                    except: pass
-                self.client.destroy()
-                self.ace = None
-                self.client = None
+                if AceStuff.clientcounter.delete(cid, self.client) == 0:
+                  logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else cid))
+                  if AceStuff.clientcounter.count(cid)!=0: AceStuff.clientcounter.deleteAll(cid)
              except:
                 logger.error(traceback.format_exc())
 
     def getCid(self, reqtype, url):
         cid =''
-        if  url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent') or url.endswith('.acestream')):
+        if url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent') or url.endswith('.acestream')):
             try:
-                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
-                with requests.get(url, headers=headers, stream = True, timeout=10) as r: f = b64encode(r.raw.read())
-                headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
-                cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
+               headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
+               with requests.get(url, headers=headers, stream = True, timeout=10) as r: f = b64encode(r.raw.read())
+               headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+               cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
             except: pass
 
             if cid == '':
-                logging.debug("Failed to get ContentID from WEB API")
-                try:
-                   with AceStuff.clientcounter.lock:
-                        if not AceStuff.clientcounter.idleace:
-                           AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                        cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                except: logging.debug("Failed to get ContentID from engine")
+               logging.error("Failed to get ContentID from WEB API")
+               try:
+                  with AceStuff.clientcounter.lock:
+                    if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+                    cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
+               except: logging.error("Failed to get ContentID from engine")
 
         return None if not cid or cid == '' else cid
 
@@ -318,9 +314,14 @@ class Client:
         self.connectionTime = time.time()
         self.queue = deque()
 
-    def handle(self, fmt=None):
+    def handle(self, shouldStart, url, fmt=None):
         logger = logging.getLogger("ClientHandler")
         self.connectionTime = time.time()
+
+        if shouldStart:
+            self.ace._streamReaderState = 1
+            gevent.spawn(self.ace.startStreamReader, url, self.cid, AceStuff.clientcounter, self.handler.headers.dict)
+            gevent.sleep()
 
         with self.ace._lock:
             start = time.time()
@@ -438,7 +439,7 @@ class Client:
              self.queue.clear()
              self.lock.notifyAll()
 
-    def __eq__(self, other): return self is other
+    #def __eq__(self, other): return self is other
 
 class AceStuff(object):
     '''
@@ -501,13 +502,6 @@ def checkAce():
             logger.error("Can't spawn Ace Stream!")
             clean_proc()
             sys.exit(1)
-    else:
-        try:
-            with AceStuff.clientcounter.lock:
-                 if not AceStuff.clientcounter.idleace:
-                     AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-        except: logging.error("Failed to create Ace!")
-        finally: logger.debug("AceStream alive on %s:%d" % (AceConfig.acehost, AceConfig.aceAPIport))
 
 def detectPort():
     try:
@@ -560,7 +554,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         AceStuff.ace.terminate()
-        gevent.sleep()
+        gevent.sleep(1)
         if isRunning(AceStuff.ace): AceStuff.ace.kill()
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
@@ -633,14 +627,14 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
         logger.error("Cannot drop privileges to user %s" % AceConfig.aceproxyuser)
         sys.exit(1)
 
-# Creating ClientCounter
-AceStuff.clientcounter = ClientCounter()
-
 # setting signal handlers
 try:
     gevent.signal(signal.SIGHUP, _reloadconfig)
     gevent.signal(signal.SIGTERM, shutdown)
 except AttributeError: pass  # not available on Windows
+
+# Creating ClientCounter
+AceStuff.clientcounter = ClientCounter()
 
 #### AceEngine startup
 if AceConfig.osplatform == 'Windows': name = 'ace_engine.exe'
@@ -666,13 +660,6 @@ if ace_pid :
     logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
     # refresh the acestream.port file for Windows only after full loading...
     if AceConfig.osplatform == 'Windows': detectPort()
-# Create Ace
-try:
-    logger.info("Create Ace Stream engine connection .....")
-    with AceStuff.clientcounter.lock:
-       if not AceStuff.clientcounter.idleace:
-            AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-except: logging.error("Failed to create Ace Stream engine connection")
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
