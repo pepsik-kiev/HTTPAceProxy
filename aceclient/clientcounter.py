@@ -21,9 +21,9 @@ class ClientCounter(object):
     def createAce(self):
         logger = logging.getLogger('CreateAce')
         ace = AceClient(AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport, AceConfig.acehostslist,
-                                  connect_timeout=AceConfig.aceconntimeout,result_timeout=AceConfig.aceresulttimeout)
+                        AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
         logger.debug("AceClient created")
-        ace.aceInit(gender=AceConfig.acesex, age=AceConfig.aceage, product_key=AceConfig.acekey)
+        ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey)
         logger.debug("AceClient inited")
         return ace
 
@@ -72,7 +72,6 @@ class ClientCounter(object):
                 else:
                     del self.clients[cid]
                     clients[0].ace.closeStreamReader()
-
                     if self.idleace: client.ace.destroy()
                     else:
                         try:

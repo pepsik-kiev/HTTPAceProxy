@@ -38,7 +38,7 @@ class AceClient(object):
         # Shutting down flag
         self._shuttingDown = Event()
         # Product key
-        self._product_key = AceConfig.acekey
+        self._product_key = None
         # Current STATUS
         self._status = None
         # Current STATE
@@ -51,8 +51,8 @@ class AceClient(object):
         self._position_buf = None
         # Current AUTH
         self._auth = None
-        self._gender = AceConfig.acesex
-        self._age = AceConfig.aceage
+        self._gender = None
+        self._age = None
         # Result (Created with AsyncResult() on call)
         self._result = AsyncResult()
         self._authevent = Event()
@@ -63,7 +63,7 @@ class AceClient(object):
         # Event for resuming from PAUSE
         self._resumeevent = Event()
         # Seekback seconds.
-        self._seekback = AceConfig.videoseekback
+        self._seekback = 0
         # Did we get START command again? For seekback.
         self._started_again = False
 
@@ -94,7 +94,8 @@ class AceClient(object):
                    pass
 
         # Spawning recvData greenlet
-        gevent.spawn(self._recvData) #; gevent.sleep()
+        if self._socket: gevent.spawn(self._recvData); gevent.sleep()
+        else: logger.error("The are no alive AceStream Engines found"); return
 
     def destroy(self):
         '''
@@ -126,7 +127,7 @@ class AceClient(object):
             self._socket.write(message + "\r\n")
         except EOFError as e: raise AceException("Write error! " + repr(e))
 
-    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_18_24, product_key=None):
+    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=AceConfig.acekey):
         self._product_key = product_key
         self._gender = gender
         self._age = age
