@@ -49,7 +49,7 @@ class P2pproxy(AceProxyPlugin):
         query = urlparse(connection.path).query
         self.params = parse_qs(query)
 
-        if connection.reqtype == 'channels' or connection.reqtype == 'channels.m3u':  # /channels/ branch
+        if connection.reqtype in ('channels', 'channels.m3u'):  # /channels/ branch
             if len(connection.splittedpath) == 3 and connection.splittedpath[2].split('?')[
                 0] == 'play':  # /channels/play?id=[id]
                 channel_id = self.get_param('id')

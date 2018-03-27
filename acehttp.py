@@ -7,7 +7,6 @@ Website: https://github.com/ValdikSS/AceProxy
 '''
 
 import gevent, gevent.monkey
-from gevent.queue import Full
 # Monkeypatching and all the stuff
 gevent.monkey.patch_all()
 
@@ -39,11 +38,11 @@ from base64 import b64encode
 import time
 import threading
 import requests
+import Queue
 from bencode import __version__ as bencode_version__
 import ipaddr
 from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
 import BaseHTTPServer, SocketServer
-import Queue
 from modules.PluginInterface import AceProxyPlugin
 try:
     import pwd
@@ -53,7 +52,7 @@ except ImportError: pass # Windows
 
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
-    requestlist = []
+    requestlist = deque()
     def log_message(self, format, *args):
         logger.info("%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(),
                     requests.utils.unquote(format%args).decode('UTF-8')))
@@ -68,7 +67,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         Add request to requestlist, handle request and remove from the list
         '''
         HTTPHandler.requestlist.append(self)
-        BaseHTTPServer.BaseHTTPRequestHandler.handle_one_request(self)
+        try: BaseHTTPServer.BaseHTTPRequestHandler.handle_one_request(self)
+        except: pass
         HTTPHandler.requestlist.remove(self)
 
     def closeConnection(self):
@@ -95,26 +95,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.closeConnection()
             except: pass
 
-    def hangDetector(self):
-        '''
-        Detect client disconnection while in the middle of something
-        or just normal connection close.
-        '''
-        logger = logging.getLogger('http_hangDetector')
-        try:
-            while True:
-               if not self.rfile.read(): break
-        except: pass
-        finally:
-            client = self.client
-            if client:
-               logger.info('Streaming "%s" to %s finished' % (client.channelName if client.channelName != None else client.cid, self.clientip))
-               client.destroy()
-            try: self.requestgreenlet.kill()
-            except: pass
-            finally: gevent.sleep()
-            return
-
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
     def do_GET(self, headers_only=False):
@@ -126,8 +106,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.connected = True
         # Set HTTP protocol version
         if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
-        # Current greenlet
-        self.requestgreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
         logger.debug("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
@@ -208,75 +186,78 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # End parameters
 
         self.url = None
+        CID = self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
+        if self.reqtype == 'torrent': CID = self.getInfohash(self.reqtype, self.path_unquoted)
+        if not CID: CID = self.getCid(self.reqtype, self.path_unquoted)
+        if not CID: CID = self.path_unquoted
+        self.client = Client(CID, self, channelName, channelIcon)
 
-        self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-        contentid = self.getCid(self.reqtype, self.path_unquoted)
-        cid = contentid if contentid else self.path_unquoted
-
-        self.client = Client(cid, self, channelName, channelIcon)
-        shouldStart = AceStuff.clientcounter.add(cid, self.client) == 1
-        logger.error
         try:
-             gevent.spawn(self.hangDetector)
-             gevent.sleep()
-             # If there is no existing broadcast
-             if shouldStart:
-                 logger.warning('Create a broadcast.....')
-                 # Send commands to AceEngine
-                 if contentid:
-                     self.client.ace.START('PID', {'content_id': contentid, 'file_indexes': self.params[0]}, AceConfig.streamtype)
-                 elif self.reqtype == 'pid':
-                     self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
-                 elif self.reqtype == 'torrent':
-                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                     paramsdict['url'] = self.path_unquoted
-                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                 elif self.reqtype == 'infohash':
-                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                     paramsdict['infohash'] = self.path_unquoted
-                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                 elif self.reqtype == 'url':
-                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                     paramsdict['direct_url'] = self.path_unquoted
-                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                 elif self.reqtype == 'raw':
-                     paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                     paramsdict['data'] = self.path_unquoted
-                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                 elif self.reqtype == 'efile':
-                     self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
+            # If there is no existing broadcast
+            if AceStuff.clientcounter.add(CID, self.client) == 1:
+                logger.warning('Create a broadcast.....')
+                # Send commands to AceEngine
+                if self.reqtype == 'pid':
+                    self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
+                elif self.reqtype == 'torrent':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['url'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'infohash':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['infohash'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'url':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['direct_url'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'raw':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['data'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'efile':
+                    self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
 
-                 # Getting URL from engine
-                 if self.reqtype == 'infohash' or self.reqtype == 'torrent':
-                       self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
-                 else: self.url = self.client.ace.getUrl(AceConfig.videotimeout)
-                 # Rewriting host:port for remote Ace Stream Engine
-                 p = urlsplit(self.url)
-                 p = p._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
-                 self.url = urlunsplit(p)
-                 self.client.ace.play()
-                 logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else self.client.cid))
+                # Getting URL from engine
+                if self.reqtype == 'infohash' or self.reqtype == 'torrent':
+                      self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
+                else: self.url = self.client.ace.getUrl(AceConfig.videotimeout)
+                # Rewriting host:port for remote Ace Stream Engine
+                p = urlsplit(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
+                self.url = urlunsplit(p)
+                self.client.ace.play() # send EVENT play to AceSnream Engine
+                # Start streamreader for broadcast
+                gevent.spawn(self.client.ace.startStreamReader, self.url, self.client.cid, AceStuff.clientcounter, self.headers.dict)
+                gevent.sleep()
+                logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else self.client.cid))
 
-             if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
-             # Start streaming to client
-             logger.info('Streaming "%s" to %s started' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
-             self.client.handle(shouldStart, self.url, fmt)
-
-        except gevent.GreenletExit: pass
         except aceclient.AceException as e: logger.error("AceClient exception: %s" % repr(e)); self.dieWithError()
         except Exception as e: logger.error("Unkonwn exception: %s" % repr(e)); self.dieWithError()
+        else:
+              if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
+              # streaming to client
+              logger.info('Streaming "%s" to %s started' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
+              self.client.handle(fmt)
+              logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
         finally:
-             try:
-                if AceStuff.clientcounter.delete(cid, self.client) == 0:
-                   logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else cid))
-                self.client.destroy()
-                self.client = None
-             except:
-                logger.error(traceback.format_exc())
+              if AceStuff.clientcounter.delete(self.client.cid, self.client) == 0:
+                 logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else self.client.cid))
+              self.client.destroy()
+              self.client = None
+
+    def getInfohash(self, reqtype, url):
+        infohash = None
+        if url.startswith('http') and url.endswith(('.acelive', '.torrent', '.acestream')):
+            try:
+                with AceStuff.clientcounter.lock:
+                   if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+                   infohash = AceStuff.clientcounter.idleace.GETINFOHASH(reqtype, url)
+            except: logging.error("Failed to get Infohash from engine")
+        return None if not infohash or infohash == '' else infohash
 
     def getCid(self, reqtype, url):
-        cid =''
-        if url.startswith('http') and (url.endswith('.acelive') or url.endswith('.torrent') or url.endswith('.acestream')):
+        cid = None
+        if url.startswith('http') and url.endswith(('.acelive', '.torrent', '.acestream')):
             try:
                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
                with requests.get(url, headers=headers, stream = True, timeout=10) as r: f = b64encode(r.raw.read())
@@ -284,7 +265,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
             except: pass
 
-            if cid == '':
+            if not cid:
                logging.error("Failed to get ContentID from WEB API")
                try:
                   with AceStuff.clientcounter.lock:
@@ -317,14 +298,9 @@ class Client:
         self.connectionTime = time.time()
         self.queue = deque()
 
-    def handle(self, shouldStart, url, fmt=None):
+    def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
         self.connectionTime = time.time()
-
-        if shouldStart:
-            self.ace._streamReaderState = 1
-            gevent.spawn(self.ace.startStreamReader, url, self.cid, AceStuff.clientcounter, self.handler.headers.dict)
-            gevent.sleep()
 
         with self.ace._lock:
             start = time.time()
@@ -336,7 +312,6 @@ class Client:
                     logger.warning("Video stream not opened in 5 seconds - disconnecting")
                     self.handler.dieWithError()
                     return
-
             if self.handler.connected and self.ace._streamReaderState != 2:
                 logger.warning("No video stream found")
                 self.handler.dieWithError()
@@ -400,12 +375,12 @@ class Client:
                         try: out.write(data)
                         except: break
                     else: break
-                except Queue.Empty:
-                    logger.warning("No data received in 60 seconds - disconnecting")
+                except Queue.Empty: logger.warning("No data received in 60 seconds - disconnecting"); break
         finally:
             if transcoder:
                try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
                except: pass
+            return
 
     def addChunk(self, chunk, timeout):
         start = time.time()
@@ -414,8 +389,7 @@ class Client:
                 remaining = start + timeout + time.time()
                 if remaining > 0:
                     self.lock.wait(remaining)
-                else:
-                    raise Queue.Full
+                else: raise Queue.Full
             if self.handler.connected:
                 self.queue.append(chunk)
                 self.lock.notifyAll()
@@ -439,8 +413,6 @@ class Client:
              self.handler.closeConnection()
              self.queue.clear()
              self.lock.notifyAll()
-
-    #def __eq__(self, other): return self is other
 
 class AceStuff(object):
     '''
@@ -564,12 +536,12 @@ def clean_proc():
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info("Stopping server.....")
+    with AceStuff.clientcounter.lock:
+        if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
     # Closing all client connections
     for connection in server.RequestHandlerClass.requestlist:
         try:
-            # Set errorhappened to prevent waiting for videodestroydelay
-            connection.errorhappened = True
-            connection.closeConnection()
+            connection.closeConnection(); logger.debug('Close connection %s' % connection)
         except: logger.warning("Cannot kill a connection!")
     clean_proc()
     server.server_close()
@@ -669,7 +641,7 @@ except: pass
 # Creating dict of handlers
 AceStuff.pluginshandlers = dict()
 # And a list with plugin instances
-AceStuff.pluginlist = list()
+AceStuff.pluginlist = deque()
 pluginsmatch = glob.glob('plugins/*_plugin.py')
 sys.path.insert(0, 'plugins')
 pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in pluginsmatch]

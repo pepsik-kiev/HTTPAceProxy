@@ -113,9 +113,9 @@ class ClientCounter(object):
 
     def checkIdle(self):
         while(True):
-            gevent.sleep(30.0)
+            gevent.sleep(60.0)
             with self.lock:
                 ace = self.idleace
-                if ace and (ace._idleSince + 30.0 <= time.time()):
+                if ace and (ace._idleSince + 60.0 <= time.time()):
                     self.idleace = None
                     ace.destroy()

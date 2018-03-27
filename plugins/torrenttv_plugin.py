@@ -63,7 +63,7 @@ class Torrenttv(AceProxyPlugin):
                 url = itemdict['url']
                 if logo: itemdict['logo'] = logo
 
-                if url.startswith('acestream://') or url.startswith('infohash://') \
+                if url.startswith(('acestream://', 'infohash://')) \
                                                   or (url.startswith('http://') and url.endswith('.acelive')):
                     self.channels[name] = url
                     itemdict['url'] = requests.utils.quote(encname, '') + '.mp4'
