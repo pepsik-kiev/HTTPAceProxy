@@ -262,7 +262,7 @@ class AceClient(object):
                 clients = counter.getClients(cid)
                 if clients:
                    try: data = out.read(AceConfig.readchunksize)
-                   except: pass #;logger.debug("No data received")
+                   except: logger.debug("No data received"); pass
                    else:
                         with self._lock:
                             if len(self._streamReaderQueue) == AceConfig.readcachesize:
