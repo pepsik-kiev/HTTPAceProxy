@@ -67,8 +67,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         Add request to requestlist, handle request and remove from the list
         '''
         HTTPHandler.requestlist.append(self)
-        try: BaseHTTPServer.BaseHTTPRequestHandler.handle_one_request(self)
-        except: pass
+        BaseHTTPServer.BaseHTTPRequestHandler.handle_one_request(self)
         HTTPHandler.requestlist.remove(self)
 
     def closeConnection(self):
