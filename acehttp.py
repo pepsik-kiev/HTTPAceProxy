@@ -49,10 +49,8 @@ try:
     import grp
 except ImportError: pass # Windows
 
-
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
-    requestlist = deque()
     def log_message(self, format, *args):
         logger.info("%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(),
                     requests.utils.unquote(format%args).decode('UTF-8')))
@@ -62,14 +60,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def log_error(self, format, *args): logger.error(format, *args)
 
-    def handle_one_request(self):
-        '''
-        Add request to requestlist, handle request and remove from the list
-        '''
-        HTTPHandler.requestlist.append(self)
-        BaseHTTPServer.BaseHTTPRequestHandler.handle_one_request(self)
-        HTTPHandler.requestlist.remove(self)
-
     def closeConnection(self):
         '''
         Disconnecting client
@@ -77,6 +67,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.connected:
             self.connected = False
             try:
+                if not self.wfile.closed: self.wfile.flush()
                 self.wfile.close()
                 self.rfile.close()
                 self.connection.shutdown(SHUT_RDWR)
@@ -274,16 +265,20 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         return None if not cid or cid == '' else cid
 
-class HTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+    """
+    Handle requests in a separate thread.
+    """
+    daemon_threads = True # Ctrl-C will cleanly kill all spawned threads
+    allow_reuse_address = True # much faster rebinding
 
     def process_request(self, request, client_address):
-        checkAce()
+        checkAce() # Check is acestream alive before start translation
         SocketServer.ThreadingMixIn.process_request(self, request, client_address)
 
     def handle_error(self, request, client_address):
         #logging.debug(traceback.format_exc())
         pass
-
 
 class Client:
 
@@ -365,7 +360,6 @@ class Client:
         else:
             transcoder = None
             out = self.handler.wfile
-
         try:
             while self.handler.connected and self.ace._streamReaderState == 2:
                 try:
@@ -534,17 +528,13 @@ def clean_proc():
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
-    logger.info("Stopping server.....")
+    logger.warning("Shutdown server.....")
     with AceStuff.clientcounter.lock:
         if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
-    # Closing all client connections
-    for connection in server.RequestHandlerClass.requestlist:
-        try:
-            connection.closeConnection(); logger.debug('Close connection %s' % connection)
-        except: logger.warning("Cannot kill a connection!")
     clean_proc()
     server.server_close()
-    sys.exit()
+    logger.info("Shutdown complete, bye Bye.....")
+    sys.exit(0)
 
 def _reloadconfig(signum=None, frame=None):
     '''
@@ -582,7 +572,6 @@ if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport
     logger.error("Cannot bind to port %s without root privileges" % AceConfig.httpport)
     sys.exit(1)
 
-server = HTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
 logger = logging.getLogger('HTTPServer')
 
 logger.info("Ace Stream HTTP Proxy server starting .....")
@@ -658,7 +647,8 @@ for i in pluginslist:
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-try:
-    logger.info("Server started and waiting for requests at %s:%s" % (AceConfig.httphost ,AceConfig.httpport))
-    while True: server.handle_request()
+server = ThreadedHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
+logger.info('Server started and waiting for requests at %s:%s' % (AceConfig.httphost ,AceConfig.httpport))
+logger.info('Use <Ctrl-C> to stop')
+try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()
