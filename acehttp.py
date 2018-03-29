@@ -217,21 +217,21 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.url = urlunsplit(p)
                 self.client.ace.play() # send EVENT play to AceSnream Engine
                 # Start streamreader for broadcast
-                gevent.spawn(self.client.ace.startStreamReader, self.url, self.client.cid, AceStuff.clientcounter, self.headers.dict)
+                gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
                 gevent.sleep()
-                logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else self.client.cid))
+                logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else CID))
 
         except aceclient.AceException as e: logger.error("AceClient exception: %s" % repr(e)); self.dieWithError()
         except Exception as e: logger.error("Unkonwn exception: %s" % repr(e)); self.dieWithError()
         else:
               if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
               # streaming to client
-              logger.info('Streaming "%s" to %s started' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
+              logger.info('Streaming "%s" to %s started' % (self.client.channelName if self.client.channelName != None else CID, self.clientip))
               self.client.handle(fmt)
-              logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else self.client.cid, self.clientip))
+              logger.info('Streaming "%s" to %s finished' % (self.client.channelName if self.client.channelName != None else CID, self.clientip))
         finally:
-              if AceStuff.clientcounter.delete(self.client.cid, self.client) == 0:
-                 logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else self.client.cid))
+              if AceStuff.clientcounter.delete(CID, self.client) == 0:
+                 logger.warning('Broadcast "%s" destroyed. Last client disconnected' % (self.client.channelName if self.client.channelName != None else CID))
               self.client.destroy()
               self.client = None
 
