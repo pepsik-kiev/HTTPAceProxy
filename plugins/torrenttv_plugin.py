@@ -64,7 +64,7 @@ class Torrenttv(AceProxyPlugin):
                 if logo: itemdict['logo'] = logo
 
                 if url.startswith(('acestream://', 'infohash://')) \
-                                                  or (url.startswith('http://') and url.endswith('.acelive')):
+                      or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                     self.channels[name] = url
                     itemdict['url'] = requests.utils.quote(encname, '') + '.mp4'
                 self.playlist.addItem(itemdict)
@@ -95,7 +95,6 @@ class Torrenttv(AceProxyPlugin):
 
     def handle(self, connection, headers_only=False):
         play = False
-
         with self.lock:
             # 30 minutes cache
             if not self.playlist or (int(time.time()) - self.playlisttime > 30 * 60):
@@ -127,7 +126,7 @@ class Torrenttv(AceProxyPlugin):
                     connection.path = '/infohash/' + url[11:] + '/stream.mp4'
                     connection.splittedpath = connection.path.split('/')
                     connection.reqtype = 'infohash'
-                elif url.startswith('http://') and (url.endswith('.torrent') or url.endswith('.acelive')):
+                elif url.startswith(('http://', 'https://')) and url.endswith(('.torrent', '.acelive','.acestream', '.acemedia')):
                     connection.path = '/torrent/' + requests.utils.quote(url, '') + '/stream.mp4'
                     connection.splittedpath = connection.path.split('/')
                     connection.reqtype = 'torrent'

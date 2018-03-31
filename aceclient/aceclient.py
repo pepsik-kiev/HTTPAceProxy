@@ -230,7 +230,7 @@ class AceClient(object):
                 return None
 
             if url.endswith('.m3u8'):
-                connection.headers = {'Content-Type':'video/mpeg','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
+                self._streamReaderConnection.headers = {'Content-Type':'application/octet-stream','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
                 popen_params = { "bufsize": AceConfig.readchunksize,
                                  "stdout" : PIPE,
                                  "stderr" : None,
