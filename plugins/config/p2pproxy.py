@@ -21,9 +21,6 @@ email = 're.place@me'
 # Insert your torrent-tv account password
 password ='ReplaceMe'
 
-# Session timeout
-sessiontimeout = 1800
-
 # Generate logo with full path (e.g. http://torrent-tv.ru/uploads/ornzQpk6WCW6xk0lyBhlwqH8u2QyU7.png)
 # or put only the logo file name (e.g. ornzQpk6WCW6xk0lyBhlwqH8u2QyU7.png)
 # This option is only for m3u playlists.

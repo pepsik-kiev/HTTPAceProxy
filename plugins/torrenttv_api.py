@@ -11,6 +11,7 @@ import xml.dom.minidom as dom
 import logging
 import time
 import threading
+import os, uuid, ConfigParser
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -38,13 +39,11 @@ class TorrentTvApi(object):
 
     API_URL = 'http://api.torrent-tv.ru/v3/'
 
-    def __init__(self, email, password, maxIdle, zoneid = '1'):
+    def __init__(self, email, password):
         self.email = email
         self.password = password
-        self.maxIdle = maxIdle
-        self.session = None
+        self.conf = self.session = self.guid = None
         self.allTranslations = None
-        self.lastActive = 0.0
         self.lock = threading.RLock()
         self.log = logging.getLogger("TTV API")
 
@@ -58,20 +57,31 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: unique session string
         """
+        self.conf = ConfigParser.RawConfigParser()
+        if not os.path.isfile('.aceconfig'): open('.aceconfig', 'w+').close()
+        self.conf.read('.aceconfig')
+        try:
+            self.guid = self.conf.get("torrenttv_api", "guid")
+            self.session = self.conf.get("torrenttv_api", "session")
+        except:
+            self.guid = uuid.uuid4().hex
+            self.session = None
+
         with self.lock:
-            if self.session and (time.time() - self.lastActive) < self.maxIdle:
-                self.lastActive = time.time()
+            if self.session:
                 self.log.debug("Reusing previous session: %s" % self.session)
                 return self.session
 
             self.log.debug("Creating new session")
-            self.session = None
             headers = {'User-Agent':'Magic Browser','Connection':'close'}
-            params = {'typeresult':'json','username':self.email,'password':self.password,'application':'samsung','guid':str(random.randint(100000000,199999999))}
+            params = {'typeresult':'json','username':self.email,'password':self.password,'application':'tsproxy','guid':self.guid}
             result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'auth.php', params=params, headers=headers, timeout=5).json())
             self.session = result['session']
-            self.lastActive = time.time()
             self.log.debug("New session created: %s" % self.session)
+            if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
+            self.conf.set('torrenttv_api', 'guid', self.guid)
+            self.conf.set('torrenttv_api', 'session', self.session)
+            with open('.aceconfig', 'w+') as config: self.conf.write(config)
 
             return self.session
 

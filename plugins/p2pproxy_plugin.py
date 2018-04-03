@@ -39,7 +39,7 @@ class P2pproxy(AceProxyPlugin):
     def __init__(self, AceConfig, AceStuff):
         super(P2pproxy, self).__init__(AceConfig, AceStuff)
         self.params = None
-        self.api = TorrentTvApi(config.email, config.password, config.sessiontimeout)
+        self.api = TorrentTvApi(config.email, config.password)
 
     def handle(self, connection, headers_only=False):
         P2pproxy.logger.debug('Handling request')
