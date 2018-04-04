@@ -11,7 +11,7 @@ import xml.dom.minidom as dom
 import logging
 import time
 import threading
-import os, uuid, ConfigParser
+import uuid, ConfigParser
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -58,14 +58,18 @@ class TorrentTvApi(object):
         :return: unique session string
         """
         self.conf = ConfigParser.RawConfigParser()
-        if not os.path.isfile('.aceconfig'): open('.aceconfig', 'w+').close()
-        self.conf.read('.aceconfig')
         try:
-            self.guid = self.conf.get("torrenttv_api", "guid")
+            self.conf.read('.aceconfig')
             self.session = self.conf.get("torrenttv_api", "session")
+            self.guid = self.conf.get("torrenttv_api", "guid")
         except:
             self.guid = uuid.uuid4().hex
-            self.session = None
+        else:
+            if not self.conf.has_option("torrenttv_api", "email") or self.conf.get("torrenttv_api", "email") != self.email:
+               self.session = None
+               if self.conf.has_option("torrenttv_api", "guid"): self.guid = self.conf.get("torrenttv_api", "guid")
+               else: self.guid = uuid.uuid4().hex
+
 
         with self.lock:
             if self.session:
@@ -78,9 +82,11 @@ class TorrentTvApi(object):
             result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'auth.php', params=params, headers=headers, timeout=5).json())
             self.session = result['session']
             self.log.debug("New session created: %s" % self.session)
+            # Store session detales to config file
             if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
-            self.conf.set('torrenttv_api', 'guid', self.guid)
+            self.conf.set('torrenttv_api', 'email', self.email)
             self.conf.set('torrenttv_api', 'session', self.session)
+            self.conf.set('torrenttv_api', 'guid', self.guid)
             with open('.aceconfig', 'w+') as config: self.conf.write(config)
 
             return self.session

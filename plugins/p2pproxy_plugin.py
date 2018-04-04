@@ -35,11 +35,12 @@ class P2pproxy(AceProxyPlugin):
     TTVU = TTV + 'uploads/'
     handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logos')
     logger = logging.getLogger('plugin_p2pproxy')
+    api = TorrentTvApi(config.email, config.password)
 
     def __init__(self, AceConfig, AceStuff):
         super(P2pproxy, self).__init__(AceConfig, AceStuff)
         self.params = None
-        self.api = TorrentTvApi(config.email, config.password)
+        if not self.api: self.api = TorrentTvApi(config.email, config.password)
 
     def handle(self, connection, headers_only=False):
         P2pproxy.logger.debug('Handling request')
