@@ -104,6 +104,20 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', requests.utils.unquote(self.requestline), str(code), str(size))
 
+    def closeConnection(self):
+        '''
+        Disconnecting client
+        '''
+        if self.connection:
+            try:
+               if not self.wfile.closed: self.wfile.flush()
+               self.wfile.close()
+               self.rfile.close()
+               try: self.connection.shutdown(SHUT_RDWR)
+               except SocketException: pass
+            except: pass
+            self.connection = None
+
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
         Close connection with error
@@ -113,6 +127,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             try:
                 self.send_error(errorcode)
                 self.end_headers()
+                self.closeConnection()
             except: pass
 
     def do_HEAD(self): return self.do_GET(headers_only=True)
@@ -149,9 +164,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
             except Exception as e:
-                 #logger.error(traceback.format_exc())
+                 logger.error(traceback.format_exc())
                  self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-            finally: return
+            finally: self.closeConnection(); return
 
         self.handleRequest(headers_only)
 
@@ -186,6 +201,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "video/mpeg")
             self.send_header("Connection", "Close")
             self.end_headers()
+            self.closeConnection()
             return
 
         # Check is AceStream engine alive before start streaming
@@ -410,8 +426,8 @@ class Client:
 
     def destroy(self):
         with self.lock:
-             self.queue.clear()
              self.lock.notifyAll()
+             self.queue.clear()
 
 class AceStuff(object):
     '''
@@ -466,7 +482,7 @@ def checkAce():
             del AceStuff.ace
         if spawnAce(AceStuff.aceProc, 1):
             logger.error("Ace Stream died, respawned it with pid %s" % AceStuff.ace.pid)
-            # Wait some time for ace engine sturtup ..... 
+            # Wait some time for ace engine sturtup .....
             gevent.sleep(AceConfig.acestartuptimeout)
             # refresh the acestream.port file for Windows only after full loading...
             if AceConfig.osplatform == 'Windows': detectPort()
