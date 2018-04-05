@@ -46,6 +46,7 @@ class TorrentTvApi(object):
         self.allTranslations = None
         self.lock = threading.RLock()
         self.log = logging.getLogger("TTV API")
+        self.conf = ConfigParser.RawConfigParser()
 
     def auth(self):
         """
@@ -57,19 +58,17 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: unique session string
         """
-        self.conf = ConfigParser.RawConfigParser()
         try:
             self.conf.read('.aceconfig')
             self.session = self.conf.get("torrenttv_api", "session")
             self.guid = self.conf.get("torrenttv_api", "guid")
         except:
-            self.guid = uuid.uuid4().hex
+            self.session = None
+            if self.conf.has_option("torrenttv_api", "guid"): self.guid = self.conf.get("torrenttv_api", "guid")
+            else: self.guid = uuid.uuid4().hex
         else:
             if not self.conf.has_option("torrenttv_api", "email") or self.conf.get("torrenttv_api", "email") != self.email:
                self.session = None
-               if self.conf.has_option("torrenttv_api", "guid"): self.guid = self.conf.get("torrenttv_api", "guid")
-               else: self.guid = uuid.uuid4().hex
-
 
         with self.lock:
             if self.session:
@@ -272,4 +271,8 @@ class TorrentTvApi(object):
         with self.lock:
             self.session = None
             self.allTranslations = None
+            self.conf.read('.aceconfig')
+            if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
+            self.conf.set('torrenttv_api', 'session', self.session)
+            with open('.aceconfig', 'w+') as config: self.conf.write(config)
             self.auth()
