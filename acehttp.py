@@ -98,14 +98,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     protocol_version = "HTTP/1.1"
 
-    def log_message(self, format, *args):
-        logger.info("%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(),
-                    requests.utils.unquote(format%args).decode('UTF-8')))
+    def log_message(self, format, *args): pass
+        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.utils.unquote(self.path)))
 
-    def log_request(self, code='-', size='-'):
-        logger.debug('"%s" %s %s', self.requestline, str(code), str(size))
+    def log_request(self, code='-', size='-'): pass
+        #logger.debug('"%s" %s %s', requests.utils.unquote(self.requestline), str(code), str(size))
 
-    def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.WARN):
+    def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
         Close connection with error
         '''
@@ -125,15 +124,14 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         logger = logging.getLogger('do_GET')
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
-        logger.debug("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
+        logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
         # If firewall enabled
         if AceConfig.firewall:
             self.clientinrange = any(map(lambda i: ipaddr.IPAddress(self.clientip) in ipaddr.IPNetwork(i), AceConfig.firewallnetranges))
 
             if (AceConfig.firewallblacklistmode and self.clientinrange) or (not AceConfig.firewallblacklistmode and not self.clientinrange):
-                logger.info('Dropping connection from %s due to firewall rules' % self.clientip)
-                self.dieWithError(403)  # 403 Forbidden
+                self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.WARNING)  # 403 Forbidden
                 return
         try:
             self.splittedpath = self.path.split('/')
@@ -141,19 +139,18 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             # If first parameter is 'pid','torrent', 'infohash'.... etc or it should be handled
             # by plugin
             if not (self.reqtype in ('pid','torrent','infohash','url','raw','efile') or self.reqtype in AceStuff.pluginshandlers):
-                self.dieWithError(400)  # 400 Bad Request
+                self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
                 return
         except IndexError:
-            self.dieWithError(400)  # 400 Bad Request
+            self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
             return
 
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
             except Exception as e:
-                logger.error('Plugin exception: %s' % repr(e))
-                #logger.error(traceback.format_exc())
-                self.dieWithError()
+                 #logger.error(traceback.format_exc())
+                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
             finally: return
 
         self.handleRequest(headers_only)
@@ -171,15 +168,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # And if it ends with regular video extension
         try:
             if not self.path.endswith(self.videoextdefaults):
-                logger.error("Request seems like valid but no valid video extension was provided")
-                self.dieWithError(400)
+                self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.WARNING)
                 return
-        except IndexError: self.dieWithError(400); return  # 400 Bad Request
+        except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
 
         # Limit concurrent connections
         if 0 < AceConfig.maxconns <= AceStuff.clientcounter.total:
-            logger.info("Maximum connections reached, can't serve this")
-            self.dieWithError(503)  # 503 Service Unavailable
+            self.dieWithError(503, "Maximum client connections reached, can't serve this", logging.ERROR)  # 503 Service Unavailable
             return
 
         # Pretend to work fine with Fake or HEAD request.
@@ -192,77 +187,79 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_header("Connection", "Close")
             self.end_headers()
             return
+
         # Check is AceStream engine alive before start streaming
         if self.connection: checkAce()
+
         # Make list with parameters
         # file_indexes developer_id affiliate_id zone_id stream_id
         self.params = list()
         for i in xrange(3, 8):
            try: self.params.append(int(self.splittedpath[i]))
            except (IndexError, ValueError): self.params.append('0')
+
         # End parameters
-        if self.connection:
-           self.url = None
-           CID = self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-           if self.reqtype == 'torrent': CID = self.getInfohash(self.reqtype, self.path_unquoted)
-           if not CID: CID = self.getCid(self.reqtype, self.path_unquoted)
-           if not CID: CID = self.path_unquoted
-           self.client = Client(CID, self, channelName, channelIcon)
-           try:
-               # If there is no existing broadcast
-               if AceStuff.clientcounter.add(CID, self.client) == 1:
-                   logger.warning('Create a broadcast.....')
-                   # Send commands to AceEngine
-                   if self.reqtype == 'pid':
-                       self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
-                   elif self.reqtype == 'torrent':
-                       paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                       paramsdict['url'] = self.path_unquoted
-                       self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                   elif self.reqtype == 'infohash':
-                       paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                       paramsdict['infohash'] = self.path_unquoted
-                       self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                   elif self.reqtype == 'url':
-                       paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                       paramsdict['direct_url'] = self.path_unquoted
-                       self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                   elif self.reqtype == 'raw':
-                       paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
-                       paramsdict['data'] = self.path_unquoted
-                       self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                   elif self.reqtype == 'efile':
-                       self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
+        self.url = None
+        CID = self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
+        if self.reqtype == 'torrent': CID = self.getInfohash(self.reqtype, self.path_unquoted)
+        if not CID: CID = self.getCid(self.reqtype, self.path_unquoted)
+        if not CID: CID = self.path_unquoted
+        self.client = Client(CID, self, channelName, channelIcon)
+        try:
+            # If there is no existing broadcast
+            if AceStuff.clientcounter.add(CID, self.client) == 1:
+                logger.warning('Create a broadcast.....')
+                # Send commands to AceEngine
+                if self.reqtype == 'pid':
+                    self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
+                elif self.reqtype == 'torrent':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['url'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'infohash':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['infohash'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'url':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['direct_url'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'raw':
+                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict['data'] = self.path_unquoted
+                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                elif self.reqtype == 'efile':
+                    self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
 
-                   # Getting URL from engine
-                   if self.reqtype == 'infohash' or self.reqtype == 'torrent':
-                         self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
-                   else: self.url = self.client.ace.getUrl(AceConfig.videotimeout)
-                   # Rewriting host:port for remote Ace Stream Engine
-                   p = urlsplit(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
-                   self.url = urlunsplit(p)
-                   self.client.ace.play() # send EVENT play to AceSnream Engine
-                   # Start streamreader for broadcast
-                   gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
-                   gevent.sleep()
-                   logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else CID))
+                # Getting URL from engine
+                if self.reqtype == 'infohash' or self.reqtype == 'torrent':
+                      self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
+                else: self.url = self.client.ace.getUrl(AceConfig.videotimeout)
+                # Rewriting host:port for remote Ace Stream Engine
+                p = urlsplit(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
+                self.url = urlunsplit(p)
+                self.client.ace.play() # send EVENT play to AceSnream Engine
+                # Start streamreader for broadcast
+                gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
+                gevent.sleep()
+                logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else CID))
 
-           except aceclient.AceException as e: logger.error("AceClient exception: %s" % repr(e)); self.dieWithError()
-           except Exception as e: logger.error("Unkonwn exception: %s" % repr(e)); self.dieWithError()
-           else:
-                  if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
-                  # streaming to client
-                  logger.info('Streaming "%s" to %s started' %
+        except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
+        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
+        else:
+               if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
+               # streaming to client
+               logger.info('Streaming "%s" to %s started' %
+                           (self.client.channelName if self.client.channelName != None else CID, self.clientip))
+               self.client.handle(fmt)
+               logger.info('Streaming "%s" to %s finished' %
                               (self.client.channelName if self.client.channelName != None else CID, self.clientip))
-                  self.client.handle(fmt)
-                  logger.info('Streaming "%s" to %s finished' %
-                              (self.client.channelName if self.client.channelName != None else CID, self.clientip))
-           finally:
-                 if AceStuff.clientcounter.delete(CID, self.client) == 0:
-                    logger.warning('Broadcast "%s" destroyed. Last client disconnected' %
-                                   (self.client.channelName if self.client.channelName != None else CID))
-                 self.client.destroy()
-                 self.client = None
+        finally:
+              if AceStuff.clientcounter.delete(CID, self.client) == 0:
+                 logger.warning('Broadcast "%s" destroyed. Last client disconnected' %
+                                (self.client.channelName if self.client.channelName != None else CID))
+              self.client.destroy()
+              self.client = None
 
     def getInfohash(self, reqtype, url):
         infohash = None
@@ -317,12 +314,10 @@ class Client:
                 if remaining > 0:
                     self.ace._lock.wait(remaining)
                 else:
-                    logger.warning("Video stream not opened in 5 seconds - disconnecting")
-                    self.handler.dieWithError()
+                    self.handler.dieWithError(500, 'Video stream not opened in 5 seconds - disconnecting')
                     return
             if self.handler.connection and self.ace._streamReaderState != 2:
-                logger.warning("No video stream found")
-                self.handler.dieWithError()
+                self.handler.dieWithError(500, 'No video stream found', logging.WARNING)
                 return
 
         # Sending client headers to videostream

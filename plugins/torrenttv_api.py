@@ -73,7 +73,7 @@ class TorrentTvApi(object):
 
         with self.lock:
             if self.session:
-                self.log.debug("Reusing previous session: %s" % self.session)
+                self.log.debug("Reusing saved session: %s" % self.session)
                 return self.session
 
             self.log.debug("Creating new session")

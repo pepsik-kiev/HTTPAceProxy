@@ -67,7 +67,7 @@ class P2pproxy(AceProxyPlugin):
                         connection.wfile.write('\r\n')
                         return
                     else:
-                        connection.dieWithError()  # Bad request
+                        connection.dieWithError(400, 'Bad request')  # Bad request
                         return
 
                 if headers_only:
@@ -265,7 +265,7 @@ class P2pproxy(AceProxyPlugin):
                 0] == 'play':  # /archive/play?id=[record_id]
                 record_id = self.get_param('id')
                 if not record_id:
-                    connection.dieWithError()  # Bad request
+                    connection.dieWithError(400, 'Bad request')  # Bad request
                     return
 
                 if headers_only:
@@ -360,13 +360,11 @@ class P2pproxy(AceProxyPlugin):
                         param_date = param_date.split('-')
                         d = date(int(param_date[2]), int(param_date[1]), int(param_date[0]))
                     except IndexError:
-                        P2pproxy.logger.error('date param is not correct!')
-                        connection.dieWithError()
+                        connection.dieWithError(500, 'Date param is not correct!', logging.ERROR)
                         return
                 param_channel = self.get_param('channel_id')
                 if param_channel == '' or not param_channel:
-                    P2pproxy.logger.error('Got /archive/ request but no channel_id specified!')
-                    connection.dieWithError()
+                    connection.dieWithError(500, 'Got /archive/ request but no channel_id specified!', logging.ERROR)
                     return
 
 
