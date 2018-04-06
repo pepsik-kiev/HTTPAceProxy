@@ -26,7 +26,7 @@ class AceException(Exception):
 
 class AceClient(object):
 
-    def __init__(self, acehost, aceAPIport, aceHTTPport, acehostslist, connect_timeout=5, result_timeout=10):
+    def __init__(self, acehostslist, connect_timeout=5, result_timeout=10):
         # Receive buffer
         self._recvbuffer = None
         # Stream URL
@@ -76,23 +76,16 @@ class AceClient(object):
 
         # Logger
         logger = logging.getLogger('AceClientimport tracebacknt_init')
-
         # Try to connect AceStream engine
-        try:
-            self._socket = telnetlib.Telnet(acehost, aceAPIport, connect_timeout)
-            AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport = acehost, aceAPIport, aceHTTPport
-            logger.debug("Successfully connected to AceStream on %s:%d" % (acehost, aceAPIport))
-        except:
-            for AceEngine in acehostslist:
-               try:
-                   self._socket = telnetlib.Telnet(AceEngine[0], AceEngine[1], connect_timeout)
-                   AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport = AceEngine[0], AceEngine[1], AceEngine[2]
-                   logger.debug("Successfully connected to AceStream on %s:%d" % (AceEngine[0], AceEngine[1]))
-                   break
-               except:
-                   logger.debug("The are no alive AceStream on %s:%d" % (AceEngine[0], AceEngine[1]))
-                   pass
-
+        for AceEngine in acehostslist:
+           try:
+               self._socket = telnetlib.Telnet(AceEngine[0], AceEngine[1], connect_timeout)
+               AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport = AceEngine[0], AceEngine[1], AceEngine[2]
+               logger.debug("Successfully connected to AceStream on %s:%d" % (AceEngine[0], AceEngine[1]))
+               break
+           except:
+               logger.debug("The are no alive AceStream on %s:%d" % (AceEngine[0], AceEngine[1]))
+               pass
         # Spawning recvData greenlet
         if self._socket: gevent.spawn(self._recvData); gevent.sleep()
         else: logger.error("The are no alive AceStream Engines found"); return
@@ -314,8 +307,7 @@ class AceClient(object):
         while True:
             gevent.sleep()
             try:
-                self._recvbuffer = self._socket.read_until("\r\n")
-                self._recvbuffer = self._recvbuffer.strip()
+                self._recvbuffer = self._socket.read_until("\r\n").strip()
                 logger.debug('<<< ' + self._recvbuffer)
             except:
                 # If something happened during read, abandon reader.
@@ -323,8 +315,7 @@ class AceClient(object):
                     logger.error("Exception at socket read")
                     self._shuttingDown.set()
                 return
-
-            if self._recvbuffer:
+            else:
                 # Parsing everything only if the string is not empty
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
                     # Parse HELLO
@@ -345,9 +336,7 @@ class AceClient(object):
                     self._authevent.set()
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
-                    _contentinfo_raw = self._recvbuffer.split()[2:]
-                    _contentinfo_raw = ' '.join(_contentinfo_raw)
-                    _contentinfo = json.loads(_contentinfo_raw)
+                    _contentinfo = json.loads(' '.join(self._recvbuffer.split()[2:]))
                     if _contentinfo.get('status') == 100:
                         logger.error("LOADASYNC returned error with message: %s" % _contentinfo.get('message'))
                         self._result.set(False)
@@ -361,8 +350,7 @@ class AceClient(object):
                         # AceStream sends us STOP and START again with new link.
                         # We use only second link then.
                         try:
-                            self._url = self._recvbuffer.split()[1]
-                            self._urlresult.set(self._url)
+                            self._urlresult.set(self._recvbuffer.split()[1])
                             self._resumeevent.set()
                         except IndexError as e: self._url = None
                     else: logger.debug("START received. Waiting for %s." % AceMessage.response.LIVEPOS)

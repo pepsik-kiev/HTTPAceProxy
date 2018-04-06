@@ -295,15 +295,14 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                with requests.get(url, headers=headers, stream = True, timeout=10) as r: f = b64encode(r.raw.read())
                headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
                cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
-            except: pass
-
-            if not cid:
-               logging.error("Failed to get ContentID from WEB API")
-               try:
-                  with AceStuff.clientcounter.lock:
-                    if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                    cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-               except: logging.error("Failed to get ContentID from engine")
+            except:
+               if not cid:
+                  logging.error("Failed to get ContentID from WEB API")
+                  try:
+                     with AceStuff.clientcounter.lock:
+                       if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+                       cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
+                  except: logging.error("Failed to get ContentID from engine")
 
         return None if not cid or cid == '' else cid
 
@@ -367,12 +366,6 @@ class Client:
                                  "stdout" : self.handler.wfile,
                                  "stderr" : stderr,
                                  "shell"  : False }
-                if AceConfig.osplatform == 'Windows':
-                   # from msdn [1]
-                   CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
-                   CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
-                   DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
-                   popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
 
                 transcoder = psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)
                 out = transcoder.stdin
@@ -466,9 +459,10 @@ def spawnAce(cmd, delay=0.1):
         except:
             logger.error("Can't find acestream!")
             sys.exit(1)
-        engine = _winreg.QueryValueEx(key, 'EnginePath')
-        AceStuff.acedir = os.path.dirname(engine[0])
-        cmd = engine[0].split()
+        else:
+            engine = _winreg.QueryValueEx(key, 'EnginePath')
+            AceStuff.acedir = os.path.dirname(engine[0])
+            cmd = engine[0].split()
     try:
         AceStuff.ace = psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
         gevent.sleep(delay)
@@ -502,15 +496,15 @@ def detectPort():
         clean_proc()
         sys.exit(1)
     import _winreg
-    import os.path
     reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
     try:
         key = _winreg.OpenKey(reg, 'Software\AceStream')
     except:
         logger.error("Can't find AceStream!")
         sys.exit(1)
-    engine = _winreg.QueryValueEx(key, 'EnginePath')
-    AceStuff.acedir = os.path.dirname(engine[0])
+    else:
+        engine = _winreg.QueryValueEx(key, 'EnginePath')
+        AceStuff.acedir = os.path.dirname(engine[0])
     try:
         AceConfig.aceAPIport = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
         logger.info("Detected ace port: %s" % AceConfig.aceAPIport)
@@ -572,32 +566,19 @@ def _reloadconfig(signum=None, frame=None):
     from aceconfig import AceConfig
     logger.info('Config reloaded')
 
-logging.basicConfig(level=AceConfig.loglevel,
-                    filename=AceConfig.logfile,
-                    format=AceConfig.logfmt,
-                    datefmt=AceConfig.logdatefmt)
-logger = logging.getLogger('INIT')
-
-#### Initial settings for AceEngine
-AceConfig.acehost = AceConfig.acehostslist[0][0]
-AceConfig.aceAPIport = AceConfig.acehostslist[0][1]
-AceConfig.aceHTTPport = AceConfig.acehostslist[0][2]
-
+logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile,
+                    format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
+logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
-
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':
    AceConfig.httphost = [(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
    logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
-
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
     logger.error("Cannot bind to port %s without root privileges" % AceConfig.httpport)
     sys.exit(1)
-
-logger = logging.getLogger('HTTPServer')
-server = None
 
 logger.info("Ace Stream HTTP Proxy server starting .....")
 logger.debug("Using python %s" % sys.version.split(' ')[0])
@@ -612,16 +593,13 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
     else:
         logger.error("Cannot drop privileges to user %s" % AceConfig.aceproxyuser)
         sys.exit(1)
-
 # setting signal handlers
 try:
     gevent.signal(signal.SIGHUP, _reloadconfig)
     gevent.signal(signal.SIGTERM, shutdown)
 except AttributeError: pass  # not available on Windows
-
 # Creating ClientCounter
 AceStuff.clientcounter = ClientCounter()
-
 #### AceEngine startup
 if AceConfig.osplatform == 'Windows': name = 'ace_engine.exe'
 else: name = 'acestreamengine'
@@ -631,7 +609,6 @@ if not ace_pid:
     if AceConfig.acespawn:
         if AceConfig.osplatform == 'Windows':
             import _winreg
-            import os.path
             AceStuff.aceProc = ""
         else:
             AceStuff.aceProc = AceConfig.acecmd.split()
@@ -646,7 +623,6 @@ if ace_pid :
     logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
     # refresh the acestream.port file for Windows only after full loading...
     if AceConfig.osplatform == 'Windows': detectPort()
-
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
 try: os.chdir(os.path.dirname(os.path.realpath(__file__)))

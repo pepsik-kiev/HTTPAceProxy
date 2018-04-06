@@ -20,8 +20,7 @@ class ClientCounter(object):
 
     def createAce(self):
         logger = logging.getLogger('CreateAce')
-        ace = AceClient(AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport, AceConfig.acehostslist,
-                        AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+        ace = AceClient(AceConfig.acehostslist, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
         logger.debug("AceClient created")
         ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey)
         logger.debug("AceClient inited")
