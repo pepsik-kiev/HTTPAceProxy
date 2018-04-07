@@ -506,8 +506,8 @@ def detectPort():
         engine = _winreg.QueryValueEx(key, 'EnginePath')
         AceStuff.acedir = os.path.dirname(engine[0])
     try:
-        AceConfig.aceAPIport = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
-        logger.info("Detected ace port: %s" % AceConfig.aceAPIport)
+        AceConfig.acehostslist[0][1] = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
+        logger.info("Detected ace port: %s" % AceConfig.acehostslist[0][1])
     except IOError:
         logger.error("Couldn't detect port! acestream.port file doesn't exist?")
         clean_proc()
