@@ -141,13 +141,12 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
         logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
-        # If firewall enabled
-        if AceConfig.firewall:
-            self.clientinrange = any(map(lambda i: ipaddr.IPAddress(self.clientip) in ipaddr.IPNetwork(i), AceConfig.firewallnetranges))
 
-            if (AceConfig.firewallblacklistmode and self.clientinrange) or (not AceConfig.firewallblacklistmode and not self.clientinrange):
-                self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.WARNING)  # 403 Forbidden
-                return
+        # If firewall enabled
+        if AceConfig.firewall and not checkFirewall(self.clientip):
+           self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
+           return
+
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
@@ -178,12 +177,18 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
                                  '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
                                  '.ogx','.qt','.rm','.swf','.ts','.vob','.wmv','.wav','.webm')
+
+        # If firewall enabled
+        if AceConfig.firewall and not checkFirewall(self.clientip):
+           self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
+           return
+
         # Check if third parameter exists…/pid/blablablablabla/video.mpg
         #                                                     |_________|
         # And if it ends with regular video extension
         try:
             if not self.path.endswith(self.videoextdefaults):
-                self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.WARNING)
+                self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
                 return
         except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
 
@@ -468,6 +473,11 @@ def spawnAce(cmd, delay=0.1):
         gevent.sleep(delay)
         return True
     except: return False
+
+def checkFirewall(clientip):
+    clientinrange = any(map(lambda i: ipaddr.IPAddress(clientip) in ipaddr.IPNetwork(i), AceConfig.firewallnetranges))
+    if (AceConfig.firewallblacklistmode and clientinrange) or (not AceConfig.firewallblacklistmode and not clientinrange): return False
+    return True
 
 def checkAce():
     if AceConfig.acespawn and not isRunning(AceStuff.ace):
