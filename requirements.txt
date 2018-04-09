@@ -1,0 +1,9 @@
+requests==2.18.4
+bencode==1.0
+gevent==1.3a2
+psutil==5.4.3
+bencode.py==2.0.0
+certifi==2018.1.18
+#chardet-4.0.0-py2.py3-none-any.whl
+idna==2.6
+urllib3==1.22

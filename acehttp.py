@@ -9,13 +9,7 @@ import gevent, gevent.monkey
 gevent.monkey.patch_all()
 
 import os, sys
-# Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
-wheels_dir = os.path.join(base_dir, 'modules/wheels')
-wheels_list = filter(lambda x: x.endswith('.whl'), os.listdir(wheels_dir))
-for filename in wheels_list:
-  sys.path.insert(0, wheels_dir + '/' + filename)
-
 modules_dir = os.path.join(base_dir, 'modules')
 sys.path.insert(0, modules_dir)
 
@@ -37,7 +31,8 @@ import time
 import threading
 import requests
 import Queue
-from bencode import __version__ as bencode_version__
+import pkg_resources
+bencode_version__ = pkg_resources.get_distribution("bencode.py").version
 import ipaddr
 from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
 import BaseHTTPServer, SocketServer
