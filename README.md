@@ -9,5 +9,6 @@ HTTPAceProxy supports Ace Stream Content-ID hashes (PIDs), .acelive files, infoh
 and has a different plugins for simple use with SmartTV, KODI, VLC etc. for [TorrentTV](http://torrent-tv.ru/), [AllFon](http://allfon-tv.com/),
 [Torrent monitor](https://github.com/ElizarovEugene/TorrentMonitor) and other.
 
-To build the docker image: ```docker build -t httpaceproxy .```
+To build the docker image: ```docker build -t httpaceproxy .```.
+
 The docker image is for ARMv7 systems. In case you're on traditional x64 machines, replace the FROM with ```FROM python:2```.
