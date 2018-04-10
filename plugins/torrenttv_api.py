@@ -42,7 +42,7 @@ class TorrentTvApi(object):
     def __init__(self, email, password):
         self.email = email
         self.password = password
-        self.conf = self.session = self.guid = None
+        self.session = self.guid = None
         self.allTranslations = None
         self.lock = threading.RLock()
         self.log = logging.getLogger("TTV API")
@@ -58,17 +58,17 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: unique session string
         """
-        try:
-            self.conf.read('.aceconfig')
-            self.session = self.conf.get("torrenttv_api", "session")
-            self.guid = self.conf.get("torrenttv_api", "guid")
-        except:
-            self.session = None
-            if self.conf.has_option("torrenttv_api", "guid"): self.guid = self.conf.get("torrenttv_api", "guid")
-            else: self.guid = uuid.uuid4().hex
+        try: self.conf.read('.aceconfig')
+        except: self.session = None; self.guid = uuid.uuid4().hex
         else:
-            if not self.conf.has_option("torrenttv_api", "email") or self.conf.get("torrenttv_api", "email") != self.email:
-               self.session = None
+           try: self.session = self.conf.get("torrenttv_api", "session")
+           except: self.session = None
+           try: self.guid = self.conf.get("torrenttv_api", "guid")
+           except: self.guid = uuid.uuid4().hex
+           try: self.conf.get("torrenttv_api", "email")
+           except: self.session = None
+           else:
+               if self.conf.get("torrenttv_api", "email") != self.email: self.session = None
 
         with self.lock:
             if self.session:
@@ -271,8 +271,9 @@ class TorrentTvApi(object):
         with self.lock:
             self.session = None
             self.allTranslations = None
-            self.conf.read('.aceconfig')
+            try: self.conf.read('.aceconfig')
+            except: pass
             if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
-            self.conf.set('torrenttv_api', 'session', self.session)
+            self.conf.set('torrenttv_api', 'session', '')
             with open('.aceconfig', 'w+') as config: self.conf.write(config)
             self.auth()
