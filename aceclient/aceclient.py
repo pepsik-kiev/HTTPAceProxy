@@ -268,6 +268,7 @@ class AceClient(object):
                                 if len(clients) > 1:
                                     logger.debug("Disconnecting client: %s" % c)
                                     c.destroy()
+                else: break
         finally:
             logger.debug('All clients disconnected - broadcast stoped')
             self.closeStreamReader()
