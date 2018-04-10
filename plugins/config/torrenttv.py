@@ -31,7 +31,7 @@ logobase = 'http://1ttv.org/uploads/'
 logomap = {
     u'0x0 Fireplace HD': logobase + 'H1VboxDJC7sE7x3nKXoYT0X5r4LIqD.png',
     u'0x0 Music HD': logobase + 'hFj4tnC5uqAgpod3doHnJGZxgZXaiP.png',
-    u'1  Республиканский': logobase + 'QxsosYDL5JABz26VGnrz7PvDvbbHnE.png',
+    u'1 Республиканский': logobase + 'QxsosYDL5JABz26VGnrz7PvDvbbHnE.png',
     u'1 HD': logobase + 'FtLnmUwjG18XJFEKYvLKjwUq1gwHVZ.png',
     u'1 MUSIC CHANNEL': logobase + '45atLSHAjViMISJinK8A0jQA34I0Fi.png',
     u'1 TV Georgia': logobase + 'V7mGlkUIBggg2MRuxohXaG2BzpqSTt.png',

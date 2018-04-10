@@ -208,7 +208,7 @@ class AceClient(object):
 
     def startStreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger("StreamReader")
-        logger.debug("Opening video stream: %s" % url)
+        logger.debug("Open video stream: %s" % url)
         self._streamReaderState = 1
         transcoder = None
 
@@ -255,7 +255,7 @@ class AceClient(object):
                 clients = counter.getClients(cid)
                 if clients:
                    try: data = out.read(AceConfig.readchunksize)
-                   except: logger.debug("No data received"); pass
+                   except: logger.debug("No data received"); break
                    else:
                         with self._lock:
                             if len(self._streamReaderQueue) == AceConfig.readcachesize:
@@ -268,8 +268,8 @@ class AceClient(object):
                                 if len(clients) > 1:
                                     logger.debug("Disconnecting client: %s" % c)
                                     c.destroy()
-                else: logger.debug("All clients disconnected - closing video stream"); break
         finally:
+            logger.debug('All clients disconnected - broadcast stoped')
             self.closeStreamReader()
             if transcoder:
                try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
@@ -283,9 +283,9 @@ class AceClient(object):
         logger = logging.getLogger("StreamReader")
         c = self._streamReaderConnection
         if c:
+           logger.debug('Close video stream: %s' % c.url)
            c.close()
            self._streamReaderConnection = None
-           logger.debug("Video stream closed")
         self._streamReaderQueue.clear()
 
     def getPlayEvent(self, timeout=None):
@@ -398,7 +398,6 @@ class AceClient(object):
                     if self._tempstatus != self._status:
                         self._status = self._tempstatus
                         logger.debug("STATUS changed to %s" % self._status)
-
                     if self._status == 'main:err':
                         logger.error(self._status + ' with message ' + self._recvbuffer.split(';')[2])
                         self._result.set_exception(

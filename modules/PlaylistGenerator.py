@@ -44,14 +44,10 @@ class PlaylistGenerator(object):
     def _changeItems(self):
         for item in self.itemlist:
             self.changeItem(item)
-            if not 'tvg' in item:
-                item['tvg'] = item.get('name').replace(' ', '_')
-            if not 'tvgid' in item:
-                item['tvgid'] = ''
-            if not 'group' in item:
-                item['group'] = ''
-            if not 'logo' in item:
-                item['logo'] = ''
+            if not 'tvg' in item: item['tvg'] = item.get('name').replace(' ', '_')
+            if not 'tvgid' in item: item['tvgid'] = ''
+            if not 'group' in item: item['group'] = ''
+            if not 'logo' in item: item['logo'] = ''
 
     def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False, process_url=True, header=None, fmt=None):
         '''
@@ -76,8 +72,6 @@ class PlaylistGenerator(object):
             if process_url:
                 # For .acelive and .torrent
                 item['url'] = re.sub('^(http.+)$', lambda match: 'http://' + hostport + path + '/torrent/' + \
-                                 requests.utils.quote(match.group(0), '') + '/stream.mp4', url, flags=re.MULTILINE)
-                item['url'] = re.sub('^(http.+)$', lambda match: 'http://' + hostport + path + '/infohash/' + \
                                  requests.utils.quote(match.group(0), '') + '/stream.mp4', url, flags=re.MULTILINE)
                 if url == item['url']:  # For PIDs
                     item['url'] = re.sub('^(acestream://)?(?P<pid>[0-9a-f]{40})$', 'http://' + hostport + path + '/pid/\\g<pid>/stream.mp4',

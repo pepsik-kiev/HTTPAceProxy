@@ -42,10 +42,6 @@ import ipaddr
 from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
-try:
-    import pwd
-    import grp
-except ImportError: pass # Windows
 
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
     '''
@@ -80,10 +76,8 @@ class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
         '''
         simply collect requests and put them on the queue for the workers.
         '''
-        try:
-            request, client_address = self.get_request()
-        except SocketException:
-            return
+        try: request, client_address = self.get_request()
+        except SocketException: return
         if self.verify_request(request, client_address):
             try: self.requests.put((request, client_address))
             except Queue.Full: logger.warning('Reached the maximum number of connections allowed')
@@ -116,7 +110,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                try: self.connection.shutdown(SHUT_RDWR)
                except SocketException: pass
             except: pass
-            self.connection = None
+        self.connection = None
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -162,9 +156,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e:
+            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                  #logger.error(traceback.format_exc())
-                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
             finally: self.closeConnection(); return
 
         self.handleRequest(headers_only)
@@ -301,14 +294,12 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
                cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
             except:
-               if not cid:
-                  logging.error("Failed to get ContentID from WEB API")
-                  try:
-                     with AceStuff.clientcounter.lock:
-                       if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                       cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                  except: logging.error("Failed to get ContentID from engine")
-
+               logging.error("Failed to get ContentID from WEB API")
+               try:
+                 with AceStuff.clientcounter.lock:
+                   if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+                   cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
+               except: logging.error("Failed to get ContentID from engine")
         return None if not cid or cid == '' else cid
 
 class Client:
@@ -432,7 +423,9 @@ class AceStuff(object):
     Inter-class interaction class
     '''
 # taken from http://stackoverflow.com/questions/2699907/dropping-root-permissions-in-python
-def drop_privileges(uid_name, gid_name='nogroup'):
+def drop_privileges(uid_name='nobody', gid_name='nogroup'):
+    try: import pwd, grp
+    except ImportError: return False # Windows
 
     # Get the uid/gid from the name
     running_uid = pwd.getpwnam(uid_name).pw_uid
@@ -583,7 +576,7 @@ logger = logging.getLogger('HTTPServer')
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':
-   AceConfig.httphost = [(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+   AceConfig.httphost = [(s.connect(('1.1.1.1', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
    logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
@@ -596,6 +589,7 @@ logger.debug("Using gevent %s" % gevent.__version__)
 logger.debug("Using psutil %s" % psutil.__version__)
 logger.debug("Using requests %s" % requests.__version__)
 logger.debug("Using bencode %s" % bencode_version__)
+
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
     if drop_privileges(AceConfig.aceproxyuser):

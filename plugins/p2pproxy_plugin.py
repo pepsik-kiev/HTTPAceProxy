@@ -21,7 +21,6 @@ __author__ = 'miltador'
 import logging, re
 import requests
 from urlparse import urlparse, parse_qs
-import base64
 from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
 from datetime import date, timedelta, datetime

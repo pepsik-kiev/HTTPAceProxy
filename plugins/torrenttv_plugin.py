@@ -110,7 +110,7 @@ class Torrenttv(AceProxyPlugin):
 
             if path.startswith('/torrenttv/channel/'):
                 if not path.endswith('.mp4'):
-                    connection.dieWithError(404, 'Invalid path: ' + path, logging.ERROR)
+                    connection.dieWithError(404, 'Invalid path: ' + requests.utils.unquote(path), logging.ERROR)
                     return
 
                 name = requests.utils.unquote(path[19:-4]).decode('UTF8')
@@ -126,7 +126,7 @@ class Torrenttv(AceProxyPlugin):
                     connection.path = '/infohash/' + url[11:] + '/stream.mp4'
                     connection.splittedpath = connection.path.split('/')
                     connection.reqtype = 'infohash'
-                elif url.startswith(('http://', 'https://')) and url.endswith(('.torrent', '.acelive','.acestream', '.acemedia')):
+                elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive','.acestream', '.acemedia')):
                     connection.path = '/torrent/' + requests.utils.quote(url, '') + '/stream.mp4'
                     connection.splittedpath = connection.path.split('/')
                     connection.reqtype = 'torrent'
