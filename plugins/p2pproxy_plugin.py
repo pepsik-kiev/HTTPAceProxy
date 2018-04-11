@@ -71,7 +71,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if headers_only:
                     connection.send_response(200)
-                    connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                    connection.send_header('Content-Type', 'video/mpeg')
                     connection.end_headers()
                     return
 
@@ -102,7 +102,7 @@ class P2pproxy(AceProxyPlugin):
             elif connection.reqtype == 'channels.m3u' or self.get_param('type') == 'm3u':  # /channels/?filter=[filter]&group=[group]&type=m3u
                 if headers_only:
                     connection.send_response(200)
-                    connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                    connection.send_header('Content-Type', 'application/x-mpegurl')
                     connection.end_headers()
                     return
 
@@ -139,8 +139,7 @@ class P2pproxy(AceProxyPlugin):
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
                 exported = playlistgen.exportm3u(hostport=hostport, header=header, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                connection.send_header('Content-Type', 'application/x-mpegurl')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -197,8 +196,7 @@ class P2pproxy(AceProxyPlugin):
                     d = d - delta
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                connection.send_header('Content-Type', 'application/x-mpegurl')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -218,8 +216,7 @@ class P2pproxy(AceProxyPlugin):
                         d = d - delta
 
                 connection.send_response(200)
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                connection.send_header('Content-Type', 'application/x-mpegurl')
 
                 if headers_only:
                     connection.end_headers()
@@ -293,7 +290,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if headers_only:
                     connection.send_response(200)
-                    connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                    connection.send_header('Content-Type', 'application/x-mpegurl')
                     connection.end_headers()
                     return
 
@@ -346,8 +343,7 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.get_param('fmt')).encode('utf-8')
 
                 connection.send_response(200)
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                connection.send_header('Content-Type', 'application/x-mpegurl')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -365,7 +361,6 @@ class P2pproxy(AceProxyPlugin):
                 if param_channel == '' or not param_channel:
                     connection.dieWithError(500, 'Got /archive/ request but no channel_id specified!', logging.ERROR)
                     return
-
 
                 connection.send_response(200)
                 connection.send_header('Access-Control-Allow-Origin', '*')
