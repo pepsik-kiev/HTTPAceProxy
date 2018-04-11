@@ -107,10 +107,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                if not self.wfile.closed: self.wfile.flush()
                self.wfile.close()
                self.rfile.close()
-               try: self.connection.shutdown(SHUT_RDWR)
-               except SocketException: pass
+               self.connection.shutdown(SHUT_RDWR)
             except: pass
-        self.connection = None
+            self.connection = None
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -274,6 +273,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                                 (self.client.channelName if self.client.channelName != None else CID))
               self.client.destroy()
               self.client = None
+              return
 
     def getInfohash(self, reqtype, url):
         infohash = None
@@ -415,8 +415,9 @@ class Client:
 
     def destroy(self):
         with self.lock:
-             self.lock.notifyAll()
+             self.handler.connection.close()
              self.queue.clear()
+             self.lock.notifyAll()
 
 class AceStuff(object):
     '''

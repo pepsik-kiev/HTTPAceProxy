@@ -216,9 +216,9 @@ class AceClient(object):
         logger.debug("Get headers from client: %s" % req_headers)
 
         try:
-            connection = self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True)
+            self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True)
 
-            if connection.status_code  not in (200, 206):
+            if self._streamReaderConnection.status_code  not in (200, 206):
                 logger.error("Failed to open video stream %s" % url)
                 return None
 
@@ -241,7 +241,7 @@ class AceClient(object):
                 transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
                 out = transcoder.stdout
                 logger.warning("HLS stream detected. Ffmpeg transcoding started")
-            else: out = connection.raw
+            else: out = self._streamReaderConnection.raw
 
         except requests.exceptions.RequestException:
             logger.error("Failed to open video stream")
@@ -253,27 +253,28 @@ class AceClient(object):
             while True:
                 data = None
                 clients = counter.getClients(cid)
-                if clients:
-                   try: data = out.read(AceConfig.readchunksize)
-                   except: logger.debug("No data received"); break
-                   else:
-                        with self._lock:
-                            if len(self._streamReaderQueue) == AceConfig.readcachesize:
-                                self._streamReaderQueue.popleft()
-                            self._streamReaderQueue.append(data)
+                try: data = out.read(AceConfig.readchunksize)
+                except: pass
 
-                        for c in clients:
-                            try: c.addChunk(data, 5.0)
-                            except Queue.Full:
-                                if len(clients) > 1:
-                                    logger.debug("Disconnecting client: %s" % c)
-                                    c.destroy()
-                else: break
+                if data and clients:
+                    with self._lock:
+                        if len(self._streamReaderQueue) == AceConfig.readcachesize:
+                            self._streamReaderQueue.popleft()
+                        self._streamReaderQueue.append(data)
+
+                    for c in clients:
+                        try:
+                            c.addChunk(data, 5.0)
+                        except Queue.Full:
+                            if len(clients) > 1:
+                                logger.debug("Disconnecting client: %s" % str(c))
+                                c.destroy()
+                elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
+                else: logger.warning('No data received - broadcast stoped'); break
         finally:
-            logger.debug('All clients disconnected - broadcast stoped')
             self.closeStreamReader()
             if transcoder:
-               try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
+               try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
             with self._lock:
                 self._streamReaderState = 3
