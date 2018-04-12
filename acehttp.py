@@ -221,7 +221,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             # If there is no existing broadcast
             if AceStuff.clientcounter.add(CID, self.client) == 1:
-                logger.warning('Create a broadcast.....')
+                logger.warning('Create a broadcast "%s"' % (self.client.channelName if self.client.channelName != None else CID))
                 # Send commands to AceEngine
                 if self.reqtype == 'pid':
                     self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
@@ -415,7 +415,7 @@ class Client:
 
     def destroy(self):
         with self.lock:
-             self.handler.connection.close()
+             if self.handler.connection: self.handler.connection.close()
              self.queue.clear()
              self.lock.notifyAll()
 
