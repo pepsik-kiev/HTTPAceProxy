@@ -149,11 +149,17 @@ class AceConfig(acedefconfig.AceDefConfig):
             return False
         elif useragent in AceConfig.fakeuas:
             return True
-        elif useragent == 'Lavf/55.33.100' and not 'Range' in headers:
+       # Samsung ES series
+        elif useragent == 'Lavf/55.33.100' and headers.get('Range') != 'bytes=0-':
             return True
+        # Samsung H series
+        elif useragent == 'Lavf52.104.0' and headers.get('Range') != 'bytes=0-':
+            return True
+        # LG Netacast 2013 year series
         elif useragent == 'GStreamer souphttpsrc (compatible; LG NetCast.TV-2013) libsoup/2.34.2' and headers.get('icy-metadata') != '1':
             return True
-        elif useragent == 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1' and 'Range' and not 'accept-encoding' in headers:
+        # Samsung K series
+        elif useragent == 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4.0 TV Safari/538.1' and 'Range' in headers and not 'accept-encoding' in headers:
             return True
-        elif useragent == 'samsung-agent/1.1' and 'Range' and not 'accept-encoding' in headers:
+        elif useragent == 'samsung-agent/1.1' and 'Range' in headers and not 'accept-encoding' in headers:
             return True
