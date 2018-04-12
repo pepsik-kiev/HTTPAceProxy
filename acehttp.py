@@ -42,54 +42,23 @@ import ipaddr
 from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
+from concurrent.futures import ThreadPoolExecutor
 
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
-    '''
-    use a thread pool instead of a new thread on every request
-    '''
-    numThreads = AceConfig.maxconns
     allow_reuse_address = True
 
-    def serve_forever(self):
-        '''
-        Handle one request at a time until doomsday.
-        '''
-        # set up the threadpool
-        self.requests = Queue.Queue(self.numThreads)
-
-        for x in range(self.numThreads):
-            t = threading.Thread(target = self.process_request_thread)
-            t.setDaemon(True)
-            t.start()
-        # server main loop
-        while True: self.handle_request()
-        self.server_close()
-
-    def process_request_thread(self):
-        '''
-        obtain request from queue instead of directly from server socket
-        '''
-        while True:
-            SocketServer.ThreadingMixIn.process_request_thread(self, *self.requests.get())
-
-    def handle_request(self):
-        '''
-        simply collect requests and put them on the queue for the workers.
-        '''
-        try: request, client_address = self.get_request()
-        except SocketException: return
-        if self.verify_request(request, client_address):
-            try: self.requests.put((request, client_address))
-            except Queue.Full: logger.warning('Reached the maximum number of connections allowed')
+    def process_request(self, request, client_address):
+        self.pool.submit(self.process_request_thread, request, client_address)
 
     def handle_error(self, request, client_address):
         #logging.debug(traceback.format_exc())
         pass
 
-class ThreadedHTTPServer(ThreadPoolMixIn, SocketServer.TCPServer): pass
+class ThreadedPoolHTTPServer(ThreadPoolMixIn, SocketServer.TCPServer):
+        # default threads value = cpu_num() * 5
+        pool = ThreadPoolExecutor()
 
-class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-
+class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, format, *args): pass
@@ -652,7 +621,7 @@ for i in pluginslist:
     for j in plugininstance.handlers: AceStuff.pluginshandlers[j] = plugininstance
     AceStuff.pluginlist.append(plugininstance)
 # Start complite. Wating for requests
-server = ThreadedHTTPServer((AceConfig.httphost, AceConfig.httpport),HTTPHandler)
+server = ThreadedPoolHTTPServer((AceConfig.httphost, AceConfig.httpport),ThreadedHTTPHandler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost ,AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()

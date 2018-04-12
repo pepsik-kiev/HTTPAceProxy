@@ -87,7 +87,7 @@ class AceClient(object):
                logger.debug("The are no alive AceStream on %s:%d" % (AceEngine[0], AceEngine[1]))
                pass
         # Spawning recvData greenlet
-        if self._socket: gevent.spawn(self._recvData); gevent.sleep()
+        if self._socket: self.enginegreenlet = gevent.spawn(self._recvData); gevent.sleep()
         else: logger.error("The are no alive AceStream Engines found"); return
 
     def destroy(self):
@@ -306,11 +306,11 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while True:
+        while self.enginegreenlet:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n").strip()
-                logger.debug('<<< ' + self._recvbuffer)
+                logger.debug('<<< ' + requests.utils.unquote(self._recvbuffer))
             except:
                 # If something happened during read, abandon reader.
                 if not self._shuttingDown.isSet():
