@@ -10,7 +10,7 @@ proxies = {'http' : 'socks5h://127.0.0.1:9050',
            'https' : 'socks5h://127.0.0.1:9050'}
 
 # Insert your allfon.tv playlist URL here
-url = 'http://allfon-tv.pro/autogenplaylist/allfontv.m3u'
+url = 'https://allfon-tv.com/autogenplaylist/allfontv.m3u'
 
 # EPG urls & EPG timeshift
 tvgurl = 'http://www.teleguide.info/download/new3/jtv.zip'

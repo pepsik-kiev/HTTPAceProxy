@@ -306,7 +306,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while self.enginegreenlet:
+        while self.enginegreenlet and self._socket:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n").strip()
@@ -316,8 +316,8 @@ class AceClient(object):
                 if not self._shuttingDown.isSet():
                     logger.error("Exception at socket read")
                     self._shuttingDown.set()
-                return
-            else:
+                else: self._socket.close(); return
+            finally:
                 # Parsing everything only if the string is not empty
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
                     # Parse HELLO
@@ -333,9 +333,9 @@ class AceClient(object):
                     else: self._write(AceMessage.request.READY_nokey)
                 # NOTREADY
                 elif self._recvbuffer.startswith(AceMessage.response.NOTREADY):
-                    logger.error("Ace engine is not ready. Wrong auth?")
                     self._auth = None
                     self._authevent.set()
+                    logger.error("Ace engine is not ready. Wrong auth?")
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
                     _contentinfo = json.loads(' '.join(self._recvbuffer.split()[2:]))
@@ -360,8 +360,8 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
-                    logger.debug("Got SHUTDOWN from engine")
                     self._socket.close()
+                    logger.debug("Got SHUTDOWN from engine")
                     return
                 # AUTH
                 elif self._recvbuffer.startswith(AceMessage.response.AUTH):
@@ -410,12 +410,12 @@ class AceClient(object):
                     elif self._status == 'main:idle': self._result.set(True)
                 # PAUSE
                 elif self._recvbuffer.startswith(AceMessage.response.PAUSE):
-                    logger.debug("PAUSE event")
                     self._resumeevent.clear()
+                    logger.debug("PAUSE event")
                 # RESUME
                 elif self._recvbuffer.startswith(AceMessage.response.RESUME):
-                    logger.debug("RESUME event")
                     self._resumeevent.set()
+                    logger.debug("RESUME event")
                 # CID
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
                     self._cidresult.set(self._recvbuffer)
