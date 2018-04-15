@@ -129,7 +129,7 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         self.handleRequest(headers_only)
 
-    def handleRequest(self, headers_only, channelName=None, channelIcon='http://static.acestream.net/sites/acestream/img/ACE-logo.png', fmt=None):
+    def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
         self.requrl = urlparse(self.path)
         self.reqparams = parse_qs(self.requrl.query)
@@ -184,6 +184,7 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         CID, NAME = self.getCID(self.reqtype, self.path_unquoted, int(self.params[0]))
         if not CID: CID = self.path_unquoted
         if NAME and not channelName: channelName = NAME
+        if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         self.client = Client(CID, self, channelName, channelIcon)
         try:
             # If there is no existing broadcast
