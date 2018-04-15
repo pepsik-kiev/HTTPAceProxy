@@ -63,7 +63,6 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.utils.unquote(self.path)))
-
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', requests.utils.unquote(self.requestline), str(code), str(size))
 
@@ -77,7 +76,7 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                self.wfile.close()
                self.rfile.close()
                self.connection.shutdown(SHUT_RDWR)
-            except: pass
+            except: self.connection.close()
             self.connection = None
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
@@ -130,7 +129,7 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         self.handleRequest(headers_only)
 
-    def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
+    def handleRequest(self, headers_only, channelName=None, channelIcon='http://static.acestream.net/sites/acestream/img/ACE-logo.png', fmt=None):
         logger = logging.getLogger('HandleRequest')
         self.requrl = urlparse(self.path)
         self.reqparams = parse_qs(self.requrl.query)
@@ -174,18 +173,17 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.connection: checkAce()
 
         # Make list with parameters
-        # file_indexes developer_id affiliate_id zone_id stream_id
+        # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         self.params = list()
         for i in xrange(3, 8):
            try: self.params.append(int(self.splittedpath[i]))
            except (IndexError, ValueError): self.params.append('0')
+        # End list with parameters
 
-        # End parameters
-        self.url = None
-        CID = self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-        if self.reqtype == 'torrent': CID = self.getInfohash(self.reqtype, self.path_unquoted)
-        if not CID: CID = self.getCid(self.reqtype, self.path_unquoted)
+        self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
+        CID, NAME = self.getCID(self.reqtype, self.path_unquoted, int(self.params[0]))
         if not CID: CID = self.path_unquoted
+        if NAME and not channelName: channelName = NAME
         self.client = Client(CID, self, channelName, channelIcon)
         try:
             # If there is no existing broadcast
@@ -238,38 +236,22 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                               (self.client.channelName if self.client.channelName != None else CID, self.clientip))
         finally:
               if AceStuff.clientcounter.delete(CID, self.client) == 0:
-                 logger.warning('Broadcast "%s" destroyed. Last client disconnected' %
+                 logger.warning('Broadcast "%s" stoped. Last client disconnected' %
                                 (self.client.channelName if self.client.channelName != None else CID))
               self.client.destroy()
-              self.client = None
               return
 
-    def getInfohash(self, reqtype, url):
-        infohash = None
-        if url.startswith(('http', 'https')) and url.endswith(('.acelive', '.torrent', '.acestream', '.acemedia')):
-            try:
-                with AceStuff.clientcounter.lock:
-                   if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                   infohash = AceStuff.clientcounter.idleace.GETINFOHASH(reqtype, url)
-            except: logging.error("Failed to get Infohash from engine")
-        return None if not infohash or infohash == '' else infohash
-
-    def getCid(self, reqtype, url):
-        cid = None
-        if url.startswith(('http','https')) and url.endswith(('.acelive', '.torrent', '.acestream', '.acemedia')):
-            try:
-               headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
-               with requests.get(url, headers=headers, stream = True, timeout=10) as r: f = b64encode(r.raw.read())
-               headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
-               cid = requests.post('http://api.torrentstream.net/upload/raw', data=f, headers=headers, timeout=5).json()['content_id']
-            except:
-               logging.error("Failed to get ContentID from WEB API")
-               try:
-                 with AceStuff.clientcounter.lock:
-                   if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                   cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-               except: logging.error("Failed to get ContentID from engine")
-        return None if not cid or cid == '' else cid
+    def getCID(self, reqtype, url, file_idx):
+        infohash = name = None
+        try:
+            with AceStuff.clientcounter.lock:
+               if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+               contentinfo = AceStuff.clientcounter.idleace.GETCONTENTINFO(reqtype, url)
+               if contentinfo.get('status') in (1, 2):
+                  infohash = contentinfo.get('infohash')
+                  name = requests.utils.unquote(contentinfo.get('files')[file_idx][0])
+        except: logging.error("Failed to get Infohash from engine")
+        return (None, None) if not infohash else (infohash, name)
 
 class Client:
 
@@ -322,7 +304,7 @@ class Client:
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 
-        if AceConfig.transcode:
+        if AceConfig.transcode and AceConfig.osplatform != 'Windows':
             if not fmt or not fmt in AceConfig.transcodecmd: fmt = 'default'
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -342,13 +324,11 @@ class Client:
             transcoder = None
             out = self.handler.wfile
         try:
-            while self.handler.connection and self.ace._streamReaderState == 2:
+            while self.handler.connection:
                 try:
                     data = self.getChunk(60.0)
-                    if data and self.handler.connection:
-                        try: out.write(data)
-                        except: break
-                    else: break
+                    try: out.write(data)
+                    except: break
                 except Queue.Empty: logger.warning("No data received in 60 seconds - disconnecting"); break
         finally:
             if transcoder:
@@ -384,9 +364,9 @@ class Client:
 
     def destroy(self):
         with self.lock:
-             if self.handler.connection: self.handler.connection.close()
-             self.queue.clear()
+             self.handler.closeConnection()
              self.lock.notifyAll()
+             self.queue.clear()
 
 class AceStuff(object):
     '''
@@ -521,11 +501,11 @@ def clean_proc():
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
-    clean_proc()
     logger.warning("Shutdown server.....")
-    server.socket.close()
-    logger.info("Shutdown complete, bye Bye.....")
-    sys.exit(0)
+    clean_proc()
+    server.shutdown()
+    server.server_close()
+    sys.exit()
 
 def _reloadconfig(signum=None, frame=None):
     '''

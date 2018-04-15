@@ -87,16 +87,17 @@ class AceClient(object):
                logger.debug("The are no alive AceStream on %s:%d" % (AceEngine[0], AceEngine[1]))
                pass
         # Spawning recvData greenlet
-        if self._socket: self.enginegreenlet = gevent.spawn(self._recvData); gevent.sleep()
+        if self._socket: gevent.spawn(self._recvData); gevent.sleep()
         else: logger.error("The are no alive AceStream Engines found"); return
 
     def destroy(self):
         '''
         AceClient Destructor
         '''
-        if self._shuttingDown.isSet(): return # Already in the middle of destroying
-
         logger = logging.getLogger("AceClient_destroy") # Logger
+
+        if self._shuttingDown.isSet(): return  # Already in the middle of destroying
+
         self._resumeevent.set() # We should resume video to prevent read greenlet deadlock
         self._urlresult.set()   # And to prevent getUrl deadlock
 
@@ -180,21 +181,17 @@ class AceClient(object):
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
         return self._getResult()
 
-    def CONTENTINFO(self, datatype, value):
+    def GETCONTENTINFO(self, datatype, value):
         dict = {'torrent': 'url', 'infohash':'infohash', 'raw':'data', 'pid':'content_id'}
         paramsdict = {dict[datatype]:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
         return self.LOADASYNC(datatype, paramsdict)
 
     def GETCID(self, datatype, url):
-        contentinfo = self.CONTENTINFO(datatype, url)
+        contentinfo = self.GETCONTENTINFO(datatype, url)
         self._cidresult = AsyncResult()
         self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), 0, 0, 0))
         cid = self._cidresult.get(True, 5)
         return '' if not cid or cid == '' else cid[2:]
-
-    def GETINFOHASH(self, datatype, url):
-        infohash = self.CONTENTINFO(datatype, url).get('infohash')
-        return '' if not infohash or infohash == '' else infohash
 
     def getUrl(self, timeout=30):
         logger = logging.getLogger("AceClient_getURL") # Logger
@@ -270,7 +267,12 @@ class AceClient(object):
                                 logger.debug("Disconnecting client: %s" % str(c))
                                 c.destroy()
                 elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
-                else: logger.warning('No data received - broadcast stoped'); break
+                else:
+                     logger.warning('No data received - broadcast stoped')
+                     for c in clients:
+                         logger.debug("Disconnecting client: %s" % c.handler.clientip)
+                         c.destroy()
+                     break
         finally:
             self.closeStreamReader()
             if transcoder:
@@ -306,18 +308,17 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while self.enginegreenlet and self._socket:
+        while True:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n").strip()
                 logger.debug('<<< ' + requests.utils.unquote(self._recvbuffer))
             except:
                 # If something happened during read, abandon reader.
-                if not self._shuttingDown.isSet():
-                    logger.error("Exception at socket read")
-                    self._shuttingDown.set()
-                else: self._socket.close(); return
-            finally:
+                logger.error("Exception at socket read")
+                if not self._shuttingDown.isSet(): self._shuttingDown.set()
+                return
+            else:
                 # Parsing everything only if the string is not empty
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
                     # Parse HELLO
@@ -360,8 +361,7 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
-                    self._socket.close()
-                    logger.debug("Got SHUTDOWN from engine")
+                    self._socket.close(); logger.debug("AceClient destroyed")
                     return
                 # AUTH
                 elif self._recvbuffer.startswith(AceMessage.response.AUTH):
@@ -399,7 +399,7 @@ class AceClient(object):
                     self._tempstatus = self._recvbuffer.split()[1].split(';')[0]
                     if self._tempstatus != self._status:
                         self._status = self._tempstatus
-                        logger.debug("STATUS changed to %s" % self._status)
+                        #logger.debug("STATUS changed to %s" % self._status)
                     if self._status == 'main:err':
                         logger.error(self._status + ' with message ' + self._recvbuffer.split(';')[2])
                         self._result.set_exception(
@@ -411,12 +411,12 @@ class AceClient(object):
                 # PAUSE
                 elif self._recvbuffer.startswith(AceMessage.response.PAUSE):
                     self._resumeevent.clear()
-                    logger.debug("PAUSE event")
+                    #logger.debug("PAUSE event")
                 # RESUME
                 elif self._recvbuffer.startswith(AceMessage.response.RESUME):
                     self._resumeevent.set()
-                    logger.debug("RESUME event")
+                    #logger.debug("RESUME event")
                 # CID
                 elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
                     self._cidresult.set(self._recvbuffer)
-                    logger.debug("CID: %s" %self._recvbuffer)
+                    #logger.debug("CID: %s" %self._recvbuffer)

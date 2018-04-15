@@ -96,7 +96,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Transcoding configuration for HTTP AceProxy
     # ----------------------------------------------------
     #
-    # Enable/disable transcoding
+    # Enable/disable transcoding (Lnux based OS Only!!! This solution didn't work on Windows OS)
     transcode = False
     # Dictionary with a set of transcoding commands. Transcoding command is an executable commandline expression
     # that reads an input stream from STDIN and writes a transcoded stream to STDOUT. The commands are selected
