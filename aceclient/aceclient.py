@@ -103,7 +103,7 @@ class AceClient(object):
 
         # Trying to disconnect
         try:
-            logger.debug("Destroying AceStream client ...")
+            logger.debug("Destroying AceStream client.....")
             self._shuttingDown.set()
             self._write(AceMessage.request.SHUTDOWN)
         except: pass # Ignore exceptions on destroy
@@ -267,12 +267,7 @@ class AceClient(object):
                                 logger.debug("Disconnecting client: %s" % str(c))
                                 c.destroy()
                 elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
-                else:
-                     logger.warning('No data received - broadcast stoped')
-                     for c in clients:
-                         logger.debug("Disconnecting client: %s" % c.handler.clientip)
-                         c.destroy()
-                     break
+                else: logger.warning('No data received - broadcast stoped'); break
         finally:
             self.closeStreamReader()
             if transcoder:
@@ -339,7 +334,7 @@ class AceClient(object):
                     logger.error("Ace engine is not ready. Wrong auth?")
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
-                    _contentinfo = json.loads(' '.join(self._recvbuffer.split()[2:]))
+                    _contentinfo = json.loads(requests.utils.unquote(' '.join(self._recvbuffer.split()[2:])))
                     if _contentinfo.get('status') == 100:
                         logger.error("LOADASYNC returned error with message: %s" % _contentinfo.get('message'))
                         self._result.set(False)

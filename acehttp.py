@@ -136,9 +136,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e: 
-                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                 logger.error(traceback.format_exc())
+            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+                 #logger.error(traceback.format_exc())
             finally: self.closeConnection(); return
 
         self.handleRequest(headers_only)
@@ -264,7 +263,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                contentinfo = AceStuff.clientcounter.idleace.GETCONTENTINFO(reqtype, url)
                if contentinfo.get('status') in (1, 2):
                   infohash = contentinfo.get('infohash')
-                  name = requests.utils.unquote(contentinfo.get('files')[file_idx][0])
+                  name = contentinfo.get('files')[file_idx][0]
         except: logging.error("Failed to get Infohash from engine")
         return (None, None) if not infohash else (infohash, name)
 
