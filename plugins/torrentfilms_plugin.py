@@ -72,7 +72,6 @@ class Torrentfilms(AceProxyPlugin):
     def createPlaylist(self, hostport, reqtype, fmt):
 
         if config.updateevery == 0: self.playlistdata()
-
         ln = '#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
         for data in self.playlist:
              name = data[0]
@@ -85,11 +84,11 @@ class Torrentfilms(AceProxyPlugin):
                  if fmt: ln += '/stream.mp4/?fmt=' + fmt +'\n'
                  else: ln += '/stream.mp4\n'
              else:
-                  ln += 'http://' + AceConfig.acehost + ':'+str(AceConfig.aceHTTPport)+'/ace/' + config.streamtype + '?infohash=' + infohash + \
-                        '&transcode_audio=' + str(AceConfig.transcode_audio) + \
-                        '&transcode_mp3=' + str(AceConfig.transcode_mp3) + \
-                        '&transcode_ac3=' + str(AceConfig.transcode_ac3) + \
-                        '&preferred_audio_language=' + AceConfig.preferred_audio_language + '&_idx=' + key + '\n'
+                  ln += 'http://%s:%s/ace/%s?infohash=%s&transcode_audio=%s&transcode_mp3=%s&transcode_ac3=%s&preferred_audio_language=%s&_idx=%s\n' % \
+                        (AceConfig.acehostslist[0][0] if not AceConfig.acehost else AceConfig.acehost ,
+                         AceConfig.acehostslist[0][2] if not AceConfig.aceHTTPport else AceConfig.aceHTTPport,
+                         config.streamtype, infohash,AceConfig.transcode_audio, AceConfig.transcode_mp3,
+                         AceConfig.transcode_ac3, AceConfig.preferred_audio_language, key)
 
         self.logger.info('Torrent  playlist created')
         return ln

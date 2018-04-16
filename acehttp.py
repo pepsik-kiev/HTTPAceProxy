@@ -4,9 +4,9 @@
 AceProxy: Ace Stream to HTTP Proxy
 Website: https://github.com/pepsik-kiev/HTTPAceProxy
 '''
-import gevent, gevent.monkey
+import gevent
 # Monkeypatching and all the stuff
-gevent.monkey.patch_all()
+from gevent import monkey; monkey.patch_all()
 
 import os, sys
 # Uppend the directory for custom modules at the front of the path.
@@ -47,19 +47,30 @@ from concurrent.futures import ThreadPoolExecutor
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
     allow_reuse_address = True
 
+    def process_request_thread(self, request, client_address):
+        try:
+            self.finish_request(request, client_address)
+            self.close_request(request)
+        except SocketException: pass
+        except Exception:
+            self.handle_error(request, client_address)
+            self.close_request(request)
+
     def process_request(self, request, client_address):
         self.pool.submit(self.process_request_thread, request, client_address)
 
     def handle_error(self, request, client_address):
-        #logging.debug(traceback.format_exc())
+        logging.debug(traceback.format_exc())
         pass
 
-class ThreadedPoolHTTPServer(ThreadPoolMixIn, SocketServer.TCPServer):
-        # default threads value = cpu_num() * 5
-        pool = ThreadPoolExecutor()
+class ThreadedPoolHTTPServer(ThreadPoolMixIn, BaseHTTPServer.HTTPServer):
+    """
+    Handle requests in a pool of separate threads.
+    """
+    # default threads value = cpu_num() * 5 for custom value max_workers=N
+    pool = ThreadPoolExecutor()
 
-class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
+class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.utils.unquote(self.path)))
@@ -98,6 +109,8 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         GET request handler
         '''
         logger = logging.getLogger('do_GET')
+        if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
+
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
         logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
@@ -123,8 +136,9 @@ class ThreadedHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                 #logger.error(traceback.format_exc())
+            except Exception as e: 
+                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+                 logger.error(traceback.format_exc())
             finally: self.closeConnection(); return
 
         self.handleRequest(headers_only)
@@ -502,10 +516,11 @@ def clean_proc():
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
-    logger.warning("Shutdown server.....")
+    logger.info("Shutdown server.....")
     clean_proc()
     server.shutdown()
     server.server_close()
+    logger.info('Bye Bye .....')
     sys.exit()
 
 def _reloadconfig(signum=None, frame=None):
@@ -548,13 +563,16 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
     else:
         logger.error("Cannot drop privileges to user %s" % AceConfig.aceproxyuser)
         sys.exit(1)
+
 # setting signal handlers
 try:
     gevent.signal(signal.SIGHUP, _reloadconfig)
     gevent.signal(signal.SIGTERM, shutdown)
 except AttributeError: pass  # not available on Windows
+
 # Creating ClientCounter
 AceStuff.clientcounter = ClientCounter()
+
 #### AceEngine startup
 if AceConfig.osplatform == 'Windows': name = 'ace_engine.exe'
 else: name = 'acestreamengine'
@@ -578,6 +596,7 @@ if ace_pid :
     logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
     # refresh the acestream.port file for Windows only after full loading...
     if AceConfig.osplatform == 'Windows': detectPort()
+
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
 try: os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -601,8 +620,9 @@ for i in pluginslist:
     logger.debug('Plugin loaded: %s' % plugname)
     for j in plugininstance.handlers: AceStuff.pluginshandlers[j] = plugininstance
     AceStuff.pluginlist.append(plugininstance)
+
 # Start complite. Wating for requests
-server = ThreadedPoolHTTPServer((AceConfig.httphost, AceConfig.httpport),ThreadedHTTPHandler)
+server = ThreadedPoolHTTPServer((AceConfig.httphost, AceConfig.httpport),HTTPHandler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost ,AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()
