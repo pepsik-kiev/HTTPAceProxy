@@ -98,7 +98,7 @@ class Stat(AceProxyPlugin):
         connection.wfile.write('<p>Connections limit: ' + str(self.config.maxconns) + '&nbsp;&nbsp;&nbsp;Connected clients: ' + str(self.stuff.clientcounter.total) + '</p>')
 
         connection.wfile.write('<table  border="2" cellspacing="0" cellpadding="3">')
-        connection.wfile.write('<tr align=CENTER valign=BASELINE BGCOLOR="#eeeee5"><td>Channel name/CID</td><td>Client IP</td><td>Client/Location</td><td>Start time</td><td>Duration</td></tr>')
+        connection.wfile.write('<tr align=CENTER valign=BASELINE BGCOLOR="#eeeee5"><td>Channel name</td><td>Client IP</td><td>Client/Location</td><td>Start time</td><td>Duration</td></tr>')
 
         for i in self.stuff.clientcounter.clients:
             for c in self.stuff.clientcounter.clients[i]:

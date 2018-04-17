@@ -6,7 +6,7 @@ http://ip:port/ttvplaylist
 import logging, re
 import time
 import gevent
-from urlparse import urlparse, parse_qs
+from urlparse import parse_qs
 import hashlib
 import traceback, threading
 import requests
@@ -103,7 +103,7 @@ class Torrenttv(AceProxyPlugin):
                     connection.dieWithError()
                     return
 
-            url = urlparse(connection.path)
+            url = requests.utils.urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
             params = parse_qs(url.query)
             fmt = params['fmt'][0] if 'fmt' in params else None

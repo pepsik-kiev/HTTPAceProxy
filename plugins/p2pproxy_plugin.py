@@ -20,7 +20,7 @@ __author__ = 'miltador'
 
 import logging, re
 import requests
-from urlparse import urlparse, parse_qs
+from urlparse import parse_qs
 from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
 from datetime import date, timedelta, datetime
@@ -45,7 +45,7 @@ class P2pproxy(AceProxyPlugin):
 
         hostport = connection.headers['Host']
 
-        query = urlparse(connection.path).query
+        query = requests.utils.urlparse(connection.path).query
         self.params = parse_qs(query)
         # /channels/ branch
         if connection.reqtype in ('channels', 'channels.m3u'):

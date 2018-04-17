@@ -39,7 +39,7 @@ import requests
 import Queue
 from bencode import __version__ as bencode_version__
 import ipaddr
-from urlparse import urlparse, urlsplit, urlunsplit, parse_qs
+from urlparse import urlsplit, urlunsplit, parse_qs
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
@@ -144,7 +144,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
-        self.requrl = urlparse(self.path)
+        self.requrl = requests.utils.urlparse(self.path)
         self.reqparams = parse_qs(self.requrl.query)
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',

@@ -307,7 +307,7 @@ class AceClient(object):
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n").strip()
-                logger.debug('<<< ' + requests.utils.unquote(self._recvbuffer))
+                logger.debug('<<< ' + requests.utils.unquote(self._recvbuffer).decode('utf8'))
             except:
                 # If something happened during read, abandon reader.
                 logger.error("Exception at socket read")
