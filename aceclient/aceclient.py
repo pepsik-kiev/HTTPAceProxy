@@ -264,7 +264,7 @@ class AceClient(object):
                             c.addChunk(data, 5.0)
                         except Queue.Full:
                             if len(clients) > 1:
-                                logger.debug("Disconnecting client: %s" % str(c))
+                                logger.debug("Disconnecting client: %s" % c.clientip)
                                 c.destroy()
                 elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
                 else: logger.warning('No data received - broadcast stoped'); break
@@ -334,7 +334,7 @@ class AceClient(object):
                     logger.error("Ace engine is not ready. Wrong auth?")
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
-                    _contentinfo = json.loads(requests.utils.unquote(' '.join(self._recvbuffer.split()[2:])))
+                    _contentinfo = json.loads(requests.utils.unquote(' '.join(self._recvbuffer.split()[2:])).decode('utf8'))
                     if _contentinfo.get('status') == 100:
                         logger.error("LOADASYNC returned error with message: %s" % _contentinfo.get('message'))
                         self._result.set(False)

@@ -13,8 +13,7 @@ import os, sys
 base_dir = os.path.dirname(os.path.realpath(__file__))
 wheels_dir = os.path.join(base_dir, 'modules/wheels')
 wheels_list = filter(lambda x: x.endswith('.whl'), os.listdir(wheels_dir))
-for filename in wheels_list:
-  sys.path.insert(0, wheels_dir + '/' + filename)
+for filename in wheels_list: sys.path.insert(0, wheels_dir + '/' + filename)
 
 modules_dir = os.path.join(base_dir, 'modules')
 sys.path.insert(0, modules_dir)
@@ -45,7 +44,8 @@ from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
 
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
-    allow_reuse_address = True
+    allow_reuse_address = daemon_threads = True
+    requestlist = []
 
     def process_request_thread(self, request, client_address):
         try:
@@ -55,40 +55,30 @@ class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
         except Exception:
             self.handle_error(request, client_address)
             self.close_request(request)
+        finally: self.requestlist.remove(request)
 
     def process_request(self, request, client_address):
+        self.requestlist.append(request)
         self.pool.submit(self.process_request_thread, request, client_address)
 
     def handle_error(self, request, client_address):
         logging.debug(traceback.format_exc())
         pass
 
+
 class ThreadedPoolHTTPServer(ThreadPoolMixIn, BaseHTTPServer.HTTPServer):
     """
     Handle requests in a pool of separate threads.
     """
-    # default threads value = cpu_num() * 5 for custom value max_workers=N
-    pool = ThreadPoolExecutor()
+    # default threads value if max_workers=None - cpu_num() * 5 for custom value max_workers=N
+    pool = ThreadPoolExecutor(max_workers=None, thread_name_prefix='PoolHTTPServerThread')
 
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def log_message(self, format, *args): pass
-        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.utils.unquote(self.path)))
+        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.utils.unquote(self.path).decode('utf8')))
     def log_request(self, code='-', size='-'): pass
-        #logger.debug('"%s" %s %s', requests.utils.unquote(self.requestline), str(code), str(size))
-
-    def closeConnection(self):
-        '''
-        Disconnecting client
-        '''
-        if self.connection:
-            try:
-               if not self.wfile.closed: self.wfile.flush()
-               self.wfile.close()
-               self.rfile.close()
-               self.connection.shutdown(SHUT_RDWR)
-            except: self.connection.close()
-            self.connection = None
+        #logger.debug('"%s" %s %s', requests.utils.unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -99,7 +89,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             try:
                 self.send_error(errorcode)
                 self.end_headers()
-                self.closeConnection()
             except: pass
 
     def do_HEAD(self): return self.do_GET(headers_only=True)
@@ -138,7 +127,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
             except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                  #logger.error(traceback.format_exc())
-            finally: self.closeConnection(); return
+            finally: return
 
         self.handleRequest(headers_only)
 
@@ -179,7 +168,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "video/mpeg")
             self.send_header("Connection", "Close")
             self.end_headers()
-            self.closeConnection()
             return
 
         # Check is AceStream engine alive before start streaming
@@ -378,9 +366,8 @@ class Client:
 
     def destroy(self):
         with self.lock:
-             self.handler.closeConnection()
-             self.lock.notifyAll()
              self.queue.clear()
+             self.lock.notifyAll()
 
 class AceStuff(object):
     '''
@@ -502,7 +489,7 @@ def findProcess(name):
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        logger.warning('AceStream terminate.....')
+        logger.info('AceStream terminate.....')
         with AceStuff.clientcounter.lock:
             if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
             gevent.sleep(1)
@@ -515,8 +502,12 @@ def clean_proc():
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
-    logger.info("Shutdown server.....")
+    logger.info('Shutdown server.....')
+    for connection in server.requestlist:
+        try: logger.debug("Kill a connection from %s" % connection.getpeername()[0]); connection.shutdown(SHUT_RDWR)
+        except: logger.warning("Cannot kill a connection from %s" % connection.getpeername()[0])
     clean_proc()
+    server.pool.shutdown()
     server.shutdown()
     server.server_close()
     logger.info('Bye Bye .....')
