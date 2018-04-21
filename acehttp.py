@@ -32,13 +32,14 @@ from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
 from collections import deque
 from base64 import b64encode
+from itertools import izip as zip
 import time
 import threading
 import requests
 import Queue
 from bencode import __version__ as bencode_version__
 import ipaddr
-from urlparse import urlsplit, urlunsplit, parse_qs
+from urlparse import parse_qs
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
@@ -179,7 +180,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         for i in xrange(3, 8):
            try: self.params.append(int(self.splittedpath[i]))
            except (IndexError, ValueError): self.params.append('0')
-        # End list with parameters
+        #End list with parameters
 
         self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
         CID, NAME = self.getCID(self.reqtype, self.path_unquoted, int(self.params[0]))
@@ -195,31 +196,30 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 if self.reqtype == 'pid':
                     self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
                 elif self.reqtype == 'torrent':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
                     paramsdict['url'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'infohash':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
                     paramsdict['infohash'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'url':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
                     paramsdict['direct_url'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'raw':
-                    paramsdict = dict(zip(aceclient.acemessages.AceConst.START_PARAMS, self.params))
+                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
                     paramsdict['data'] = self.path_unquoted
                     self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 elif self.reqtype == 'efile':
                     self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
 
                 # Getting URL from engine
-                if self.reqtype == 'infohash' or self.reqtype == 'torrent':
-                      self.url = self.client.ace.getUrl(AceConfig.videotimeout*2)
-                else: self.url = self.client.ace.getUrl(AceConfig.videotimeout)
+                self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'torrent') else self.client.ace.getUrl(AceConfig.videotimeout)
+
                 # Rewriting host:port for remote Ace Stream Engine
-                p = urlsplit(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
-                self.url = urlunsplit(p)
+                p = requests.utils.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
+                self.url = requests.utils.urlunparse(p)
                 self.client.ace.play() # send EVENT play to AceSnream Engine
                 # Start streamreader for broadcast
                 gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
@@ -426,8 +426,7 @@ def checkFirewall(clientip):
 def checkAce():
     if AceConfig.acespawn and not isRunning(AceStuff.ace):
         AceStuff.clientcounter.destroyIdle()
-        if hasattr(AceStuff, 'ace'):
-            del AceStuff.ace
+        if hasattr(AceStuff, 'ace'): del AceStuff.ace
         if spawnAce(AceStuff.aceProc, 1):
             logger.error("Ace Stream died, respawned it with pid %s" % AceStuff.ace.pid)
             # Wait some time for ace engine sturtup .....
@@ -498,7 +497,8 @@ def clean_proc():
         if isRunning(AceStuff.ace): AceStuff.ace.kill(); logger.warning('AceStream kill.....')
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
-            os.remove(AceStuff.acedir + '\\acestream.port')
+            try: os.remove(AceStuff.acedir + '\\acestream.port')
+            except: pass
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
@@ -523,7 +523,7 @@ def _reloadconfig(signum=None, frame=None):
     logger = logging.getLogger('reloadconfig')
     reload(aceconfig)
     from aceconfig import AceConfig
-    logger.info('Config reloaded')
+    logger.info('Ace Stream HTTP Proxy config reloaded')
 
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile,
                     format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
@@ -564,8 +564,7 @@ except AttributeError: pass  # not available on Windows
 AceStuff.clientcounter = ClientCounter()
 
 #### AceEngine startup
-if AceConfig.osplatform == 'Windows': name = 'ace_engine.exe'
-else: name = 'acestreamengine'
+name = 'ace_engine.exe' if AceConfig.osplatform == 'Windows' else 'acestreamengine'
 ace_pid = findProcess(name)
 AceStuff.ace = None
 if not ace_pid:

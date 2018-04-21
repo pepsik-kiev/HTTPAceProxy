@@ -3,7 +3,6 @@
 Torrent Films Playlist Plugin
 http://ip:port/proxyfilms - for use with AceProxy as proxy
 http://ip:port/films - for use with bulit-in AceStream proxy
-(C) Dorik1972
 '''
 import os
 import logging

@@ -93,10 +93,11 @@ class AceConfig(acedefconfig.AceDefConfig):
     maxconns = 10
     #
     # ----------------------------------------------------
-    # Transcoding configuration for HTTP AceProxy
+    #       Transcoding configuration for HTTP AceProxy
+    # (Lnux based OS Only!!! This solution didn't work on Windows OS)
     # ----------------------------------------------------
     #
-    # Enable/disable transcoding (Lnux based OS Only!!! This solution didn't work on Windows OS)
+    # Enable/disable transcoding
     transcode = False
     # Dictionary with a set of transcoding commands. Transcoding command is an executable commandline expression
     # that reads an input stream from STDIN and writes a transcoded stream to STDOUT. The commands are selected
@@ -115,18 +116,6 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Other settings
     # ----------------------------------------------------
     #
-    # Some video players (mostly STBs and Smart TVs) can generate dummy requests
-    # to detect MIME-type or something before playing which Ace Stream handles badly.
-    # We send them 200 OK and do nothing.
-    # We add their User-Agents here
-    fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
-    #
-    # Some video players have very short timeout and can disconnect from the proxy
-    # before the headers sent.
-    # We send them 200 OK and MPEG MIME-type right after connection has been initiated
-    fakeheaderuas = ('HLS Client/2.0 (compatible; LG NetCast.TV-2012)',
-                     'Mozilla/5.0 (DirectFB; Linux armv7l) AppleWebKit/534.26+ (KHTML, like Gecko) Version/5.0 Safari/534.26+ LG Browser/5.00.00(+mouse+3D+SCREEN+TUNER; LGE; 42LM670T-ZA; 04.41.03; 0x00000001;); LG NetCast.TV-2012 0'
-                     )
     # Logging configuration
     #
     # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -138,9 +127,16 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Full path to a log file
     # For Windows OS something like that logfile = "c:\\Python27\\log_AceHttp.txt"
     logfile = None
-
+    #
     # This method is used to detect fake requests. Some players send such
     # requests in order to detect the MIME type and/or check the stream availability.
+    # Some video players (mostly STBs and Smart TVs) can generate dummy requests
+    # to detect MIME-type or something before playing which Ace Stream handles badly.
+    # We send them 200 OK and do nothing.
+    # We add their User-Agents here
+    #
+    fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
+    #
     @staticmethod
     def isFakeRequest(path, params, headers):
         useragent = headers.get('User-Agent')

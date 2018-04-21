@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*- 
-__author__ = 'miltador'
 '''
 Torrent-telik.com Playlist Downloader Plugin
 (based on ytv plugin by ValdikSS)
@@ -92,5 +91,4 @@ class Torrenttelik(AceProxyPlugin):
         connection.wfile.write(exported)
 
     def getparam(self, key):
-        if key in self.params: return self.params[key][0]
-        else: return None
+        return self.params[key][0] if key in self.params else None

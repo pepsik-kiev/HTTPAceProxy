@@ -6,12 +6,12 @@ Forms requests to API, checks result for errors and returns in desired form (lis
 __author__ = 'miltador'
 
 import requests
-import random
 import xml.dom.minidom as dom
 import logging
 import time
 import threading
-import uuid, ConfigParser
+import ConfigParser
+from uuid import getnode
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -48,6 +48,10 @@ class TorrentTvApi(object):
         self.log = logging.getLogger("TTV API")
         self.conf = ConfigParser.RawConfigParser()
 
+    def get_mac(self):
+        mac = hex(getnode()).replace('0x', '')
+        return ''.join([mac[i: i+2] for i in range(0, 11, 2)])
+
     def auth(self):
         """
         User authentication
@@ -59,12 +63,12 @@ class TorrentTvApi(object):
         :return: unique session string
         """
         try: self.conf.read('.aceconfig')
-        except: self.session = None; self.guid = uuid.uuid4().hex
+        except: self.session = None; self.guid = self.get_mac()
         else:
            try: self.session = self.conf.get("torrenttv_api", "session")
            except: self.session = None
            try: self.guid = self.conf.get("torrenttv_api", "guid")
-           except: self.guid = uuid.uuid4().hex
+           except: self.guid = self.get_mac()
            try: self.conf.get("torrenttv_api", "email")
            except: self.session = None
            else:

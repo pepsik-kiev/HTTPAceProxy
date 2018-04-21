@@ -116,20 +116,15 @@ class Torrenttv(AceProxyPlugin):
                 name = requests.utils.unquote(path[19:-4]).decode('UTF8')
                 url = self.channels.get(name)
                 if not url:
-                    connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR)
-                    return
+                    connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
                 elif url.startswith('acestream://'):
-                    connection.path = '/pid/' + url[12:] + '/stream.mp4'
-                    connection.splittedpath = connection.path.split('/')
-                    connection.reqtype = 'pid'
+                    connection.path = '/pid/%s/stream.mp4' % url.split('/')[2]
                 elif url.startswith('infohash://'):
-                    connection.path = '/infohash/' + url[11:] + '/stream.mp4'
-                    connection.splittedpath = connection.path.split('/')
-                    connection.reqtype = 'infohash'
-                elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive','.acestream', '.acemedia')):
-                    connection.path = '/torrent/' + requests.utils.quote(url, '') + '/stream.mp4'
-                    connection.splittedpath = connection.path.split('/')
-                    connection.reqtype = 'torrent'
+                    connection.path = '/infohash/%s/stream.mp4' % url.split('/')[2]
+                elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
+                    connection.path = '/torrent/%s/stream.mp4' % requests.utils.quote(url, '')
+                connection.splittedpath = connection.path.split('/')
+                connection.reqtype = connection.splittedpath[1].lower()
                 play = True
             elif self.etag == connection.headers.get('If-None-Match'):
                 self.logger.debug('ETag matches - returning 304')

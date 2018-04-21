@@ -55,14 +55,11 @@ class PlaylistGenerator(object):
         '''
         if add_ts: hostport = 'ts://' + hostport  # Adding ts:// after http:// for some players
 
-        if header is None:
-            if not empty_header: itemlist = self.m3uheader
-            else: itemlist = self.m3uemptyheader
+        if header is None: itemlist = self.m3uheader if not empty_header else self.m3uemptyheader
         else: itemlist = header
 
         self._changeItems()
-        if self.comparator: items = sorted(self.itemlist, cmp=self.comparator)
-        else: items=self.itemlist
+        items = sorted(self.itemlist, cmp=self.comparator) if self.comparator else self.itemlist
 
         for i in items:
             item = i.copy()

@@ -46,13 +46,11 @@ class AceDefConfig(object):
     videotimeout = 30
     useacelive = True
     fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
-    fakeheaderuas = ('HLS Client/2.0 (compatible; LG NetCast.TV-2012)',
-                     'Mozilla/5.0 (DirectFB; Linux armv7l) AppleWebKit/534.26+ (KHTML, like Gecko) Version/5.0 Safari/534.26+ LG Browser/5.00.00(+mouse+3D+SCREEN+TUNER; LGE; 42LM670T-ZA; 04.41.03; 0x00000001;); LG NetCast.TV-2012 0'
-                     )
     loglevel = logging.DEBUG
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'
     logdatefmt='%d.%m %H:%M:%S'
     logfile = None
+
     @staticmethod
     def isFakeRequest(path, params, headers):
         useragent = headers.get('User-Agent')

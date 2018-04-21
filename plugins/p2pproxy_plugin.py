@@ -395,14 +395,11 @@ class P2pproxy(AceProxyPlugin):
             connection.wfile.write("}\n")
 
     def get_param(self, key):
-        if key in self.params: return self.params[key][0]
-        else: return None
+        return self.params[key][0] if key in self.params else None
 
     def get_date_param(self):
         d = self.get_param('date')
-
-        if not d: return date.today()
-        else: return self.parse_date(d)
+        return date.today() if not d else self.parse_date(d)
 
     def parse_date(self, d):
         try:
