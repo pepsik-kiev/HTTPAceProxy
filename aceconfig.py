@@ -1,7 +1,7 @@
 '''
-AceProxy configuration scrip
-Edit this file.
+AceProxy configuration scrip Edit this file.
 '''
+
 import acedefconfig, logging
 from aceclient.acemessages import AceConst
 
