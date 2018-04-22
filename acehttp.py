@@ -186,12 +186,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         CID, NAME = self.getCID(self.reqtype, self.path_unquoted, int(self.params[0]))
         if not CID: CID = self.path_unquoted
         if NAME and not channelName: channelName = NAME
+        elif not channelName: channelName = CID
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         self.client = Client(CID, self, channelName, channelIcon)
         try:
             # If there is no existing broadcast
             if AceStuff.clientcounter.add(CID, self.client) == 1:
-                logger.warning('Create a broadcast "%s"' % (self.client.channelName if self.client.channelName != None else CID))
+                logger.warning('Create a broadcast "%s"' % self.client.channelName)
                 # Send commands to AceEngine
                 if self.reqtype == 'pid':
                     self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
@@ -215,7 +216,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
 
                 # Getting URL from engine
-                self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'torrent') else self.client.ace.getUrl(AceConfig.videotimeout)
+                self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'torrent', 'raw') else self.client.ace.getUrl(AceConfig.videotimeout)
 
                 # Rewriting host:port for remote Ace Stream Engine
                 p = requests.utils.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
@@ -224,22 +225,19 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Start streamreader for broadcast
                 gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
                 gevent.sleep()
-                logger.warning('Broadcast "%s" created' % (self.client.channelName if self.client.channelName != None else CID))
+                logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
                if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
                # streaming to client
-               logger.info('Streaming "%s" to %s started' %
-                           (self.client.channelName if self.client.channelName != None else CID, self.clientip))
+               logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
                self.client.handle(fmt)
-               logger.info('Streaming "%s" to %s finished' %
-                              (self.client.channelName if self.client.channelName != None else CID, self.clientip))
+               logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
         finally:
               if AceStuff.clientcounter.delete(CID, self.client) == 0:
-                 logger.warning('Broadcast "%s" stoped. Last client disconnected' %
-                                (self.client.channelName if self.client.channelName != None else CID))
+                 logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
               self.client.destroy()
               return
 
