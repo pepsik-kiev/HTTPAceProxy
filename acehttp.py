@@ -221,7 +221,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Rewriting host:port for remote Ace Stream Engine
                 p = requests.utils.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                 self.url = requests.utils.urlunparse(p)
-                self.client.ace.play() # send EVENT play to AceSnream Engine
                 # Start streamreader for broadcast
                 gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
                 gevent.sleep()

@@ -267,16 +267,13 @@ class AceClient(object):
                                 logger.debug("Disconnecting client: %s" % c.clientip)
                                 c.destroy()
                 elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
-                else: logger.warning('No data received - broadcast stoped'); break
+                else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
         finally:
-            self.closeStreamReader()
+            with self._lock: self._streamReaderState = 3; self._lock.notifyAll()
+            #self.closeStreamReader()
             if transcoder:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
-            with self._lock:
-                self._streamReaderState = 3
-                self._lock.notifyAll()
-            counter.deleteAll(cid)
 
     def closeStreamReader(self):
         logger = logging.getLogger("StreamReader")
@@ -303,7 +300,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while True:
+        while self._socket:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n").strip()

@@ -70,7 +70,6 @@ class ClientCounter(object):
                     return len(clients)
                 else:
                     del self.clients[cid]
-                    clients[0].ace.closeStreamReader()
                     if self.idleace: client.ace.destroy()
                     else:
                         try:
@@ -78,6 +77,7 @@ class ClientCounter(object):
                             self.idleace = client.ace
                             self.idleace.reset()
                         except: client.ace.destroy()
+                    clients[0].ace.closeStreamReader()
                     return 0
             finally: self.total -= 1
 
@@ -90,8 +90,6 @@ class ClientCounter(object):
                 clients = self.clients[cid]
                 del self.clients[cid]
                 self.total -= len(clients)
-                clients[0].ace.closeStreamReader()
-
                 if self.idleace: clients[0].ace.destroy()
                 else:
                     try:
@@ -99,6 +97,7 @@ class ClientCounter(object):
                         self.idleace = clients[0].ace
                         self.idleace.reset()
                     except: clients[0].ace.destroy()
+                clients[0].ace.closeStreamReader()
         finally:
                 if clients:
                    for c in clients: c.destroy()
