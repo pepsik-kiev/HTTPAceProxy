@@ -131,18 +131,16 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
 
         if not self._authevent.wait(self._resulttimeout):
-            errmsg = "Authentication timeout. Wrong key?" # HELLOTS not resived from engine
+            errmsg = "Authentication timeout during AceEngine init. Wrong key?" # HELLOTS not resived from engine
             logger.error(errmsg)
             raise AceException(errmsg)
             return
 
         if not self._auth:
-            errmsg = "Authentication error. Wrong key?"
+            errmsg = "Authentication error during AceEngine init. Wrong key?"
             logger.error(errmsg)
             raise AceException(errmsg)
             return
-
-        logger.debug("AceInit ended")
 
     def _getResult(self):
         try:
@@ -171,7 +169,7 @@ class AceClient(object):
         '''
         Stop video method
         '''
-        if self._state is not None and self._state != '0':
+        if self._state and self._state != '0':
             self._result = AsyncResult()
             self._write(AceMessage.request.STOP)
             self._getResult()
@@ -300,42 +298,38 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while self._socket:
+        while True:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until("\r\n").strip()
-                logger.debug('<<< ' + requests.utils.unquote(self._recvbuffer).decode('utf8'))
+                logger.debug('<<< %s' % requests.utils.unquote(self._recvbuffer).decode('utf8'))
             except:
                 # If something happened during read, abandon reader.
                 logger.error("Exception at socket read")
-                if not self._shuttingDown.isSet(): self._shuttingDown.set()
-                return
+                if not self._shuttingDown.isSet(): self._shuttingDown.set(); return
             else:
                 # Parsing everything only if the string is not empty
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
                     # Parse HELLO
-                    if 'version_code=' in self._recvbuffer:
-                        v = self._recvbuffer.find('version_code=')
-                        self._engine_version_code = int(self._recvbuffer[v+13:v+20])
-
-                    if 'key=' in self._recvbuffer:
-                        self._request_key_begin = self._recvbuffer.find('key=')
-                        self._request_key = self._recvbuffer[self._request_key_begin + 4:self._request_key_begin + 14]
-                        self._write(AceMessage.request.READY_key(self._request_key, self._product_key))
+                    try: params = dict(x.split('=') for x in self._recvbuffer.partition(' ')[2].split())
+                    except: logger.error("Can't parse HELLOTS"); params = {}
+                    if 'version_code' in params: self._engine_version_code = params['version_code']
+                    if 'key' in params:
+                        self._write(AceMessage.request.READY_key(params['key'], self._product_key))
                         self._request_key = None
                     else: self._write(AceMessage.request.READY_nokey)
                 # NOTREADY
                 elif self._recvbuffer.startswith(AceMessage.response.NOTREADY):
                     self._auth = None
                     self._authevent.set()
-                    logger.error("Ace engine is not ready. Wrong auth?")
+                    logger.error("AceEngine is not ready. Wrong auth?")
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
                     _contentinfo = json.loads(requests.utils.unquote(' '.join(self._recvbuffer.split()[2:])).decode('utf8'))
                     if _contentinfo.get('status') == 100:
-                        logger.error("LOADASYNC returned error with message: %s" % _contentinfo.get('message'))
+                        logger.error('LOADASYNC returned error with message: %s' % _contentinfo.get('message'))
                         self._result.set(False)
-                    else: self._result.set(_contentinfo); #logger.debug("Content info: %s", _contentinfo)
+                    else: self._result.set(_contentinfo)
                 # START
                 elif self._recvbuffer.startswith(AceMessage.response.START):
                     if not self._seekback or self._started_again or not self._recvbuffer.endswith(' stream=1'):
@@ -348,12 +342,12 @@ class AceClient(object):
                             self._urlresult.set(self._recvbuffer.split()[1])
                             self._resumeevent.set()
                         except IndexError as e: self._url = None
-                    else: logger.debug("START received. Waiting for %s." % AceMessage.response.LIVEPOS)
+                    else: logger.debug('START received. Waiting for %s.' % AceMessage.response.LIVEPOS)
                 # STOP
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
-                    self._socket.close(); logger.debug("AceClient destroyed")
+                    self._socket.close(); logger.debug('AceClient destroyed')
                     return
                 # AUTH
                 elif self._recvbuffer.startswith(AceMessage.response.AUTH):
@@ -365,50 +359,33 @@ class AceClient(object):
                     self._authevent.set()
                 # GETUSERDATA
                 elif self._recvbuffer.startswith(AceMessage.response.GETUSERDATA):
-                    raise AceException("You should init me first!")
+                    raise AceException('You should init me first!')
                 # LIVEPOS
                 elif self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
-                    self._position = self._recvbuffer.split()
-                    self._position_last = self._position[2].split('=')[1]
-                    self._position_buf = self._position[9].split('=')[1]
-                    self._position = self._position[4].split('=')[1]
-
                     if self._seekback and not self._started_again:
-                        self._write(AceMessage.request.LIVESEEK(str(int(self._position_last) - self._seekback)))
-                        logger.debug('Seeking back')
-                        self._started_again = True
-                # DOWNLOADSTOP
-                elif self._recvbuffer.startswith(AceMessage.response.DOWNLOADSTOP):
-                    self._state = self._recvbuffer.split()[1]
+                        try:
+                             params = dict(x.split('=') for x in self._recvbuffer.partition('livepos ')[2].split())
+                             self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
+                             logger.debug('Seeking back.....')
+                             self._started_again = True
+                        except: logger.error("Can't parse %s" % AceMessage.response.LIVEPOS)
+                #DOWNLOADSTOP
+                elif self._recvbuffer.startswith(AceMessage.response.DOWNLOADSTOP): pass
                 # STATE
-                elif self._recvbuffer.startswith(AceMessage.response.STATE):
-                    self._state = self._recvbuffer.split()[1]
+                elif self._recvbuffer.startswith(AceMessage.response.STATE): self._state = self._recvbuffer.split()[1]
                 # INFO
-                elif self._recvbuffer.startswith(AceMessage.response.INFO):
-                    self._state = self._recvbuffer.split()[1]
+                elif self._recvbuffer.startswith(AceMessage.response.INFO): pass
                 # STATUS
                 elif self._recvbuffer.startswith(AceMessage.response.STATUS):
-                    self._tempstatus = self._recvbuffer.split()[1].split(';')[0]
-                    if self._tempstatus != self._status:
-                        self._status = self._tempstatus
-                        #logger.debug("STATUS changed to %s" % self._status)
+                    self._status = self._recvbuffer.split()[1].split(';')[0]
                     if self._status == 'main:err':
-                        logger.error(self._status + ' with message ' + self._recvbuffer.split(';')[2])
-                        self._result.set_exception(
-                            AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
-                        self._urlresult.set_exception(
-                            AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
-                    elif self._status == 'main:starting': self._result.set(True)
-                    elif self._status == 'main:idle': self._result.set(True)
+                       logger.error(self._status + ' with message ' + self._recvbuffer.split(';')[2])
+                       self._result.set_exception(AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
+                       self._urlresult.set_exception(AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
+                    elif self._status in ('main:idle', 'main:starting'): self._result.set(True)
                 # PAUSE
-                elif self._recvbuffer.startswith(AceMessage.response.PAUSE):
-                    self._resumeevent.clear()
-                    #logger.debug("PAUSE event")
+                elif self._recvbuffer.startswith(AceMessage.response.PAUSE): self._resumeevent.clear()
                 # RESUME
-                elif self._recvbuffer.startswith(AceMessage.response.RESUME):
-                    self._resumeevent.set()
-                    #logger.debug("RESUME event")
+                elif self._recvbuffer.startswith(AceMessage.response.RESUME): self._resumeevent.set()
                 # CID
-                elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0:
-                    self._cidresult.set(self._recvbuffer)
-                    #logger.debug("CID: %s" %self._recvbuffer)
+                elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0: self._cidresult.set(self._recvbuffer)
