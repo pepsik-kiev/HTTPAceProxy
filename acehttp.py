@@ -183,14 +183,23 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         #End list with parameters
 
         self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-        CID, NAME = self.getCID(self.reqtype, self.path_unquoted, int(self.params[0]))
-        if not CID: CID = self.path_unquoted
-        if NAME and not channelName: channelName = NAME
-        elif not channelName: channelName = CID
+        CID = self.getCID(self.reqtype, self.path_unquoted) if self.reqtype == 'torrent' and CID else self.path_unquoted
+        if not channelName and self.reqtype in ('pid', 'torrent', 'infohash'):
+           try:
+               if self.reqtype == 'pid': _req = 'content_id'
+               elif self.reqtype == 'torrent': _req = 'url'
+               elif self.reqtype == 'infohash': _req = 'infohash'
+               if not AceConfig.acehost: AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
+               headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+               _url = 'http://%s:%s/server/api?method=get_media_files&%s=%s' % (AceConfig.acehost, AceConfig.aceHTTPport, _req, self.path_unquoted)
+               with requests.get(_url, headers=headers, timeout=5) as r: channelName = r.json()['result'][str(self.params[0])]
+           except: channelName = CID
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
+        # Create client
         self.client = Client(CID, self, channelName, channelIcon)
+
         try:
-            # If there is no existing broadcast
+            # If there is no existing broadcast we create it
             if AceStuff.clientcounter.add(CID, self.client) == 1:
                 logger.warning('Create a broadcast "%s"' % self.client.channelName)
                 # Send commands to AceEngine
@@ -240,17 +249,24 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
               self.client.destroy()
               return
 
-    def getCID(self, reqtype, url, file_idx):
-        infohash = name = None
-        try:
-            with AceStuff.clientcounter.lock:
-               if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-               contentinfo = AceStuff.clientcounter.idleace.GETCONTENTINFO(reqtype, url)
-               if contentinfo.get('status') in (1, 2):
-                  infohash = contentinfo.get('infohash')
-                  name = contentinfo.get('files')[file_idx][0]
-        except: logging.error("Failed to get Infohash from engine")
-        return (None, None) if not infohash else (infohash, name)
+    def getCID(self, reqtype, url):
+        cid = None
+        if url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
+            try:
+                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
+                with requests.get(url, headers=headers, stream = True, timeout=5) as r: data = b64encode(r.raw.read())
+                headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+                with requests.post('http://api.torrentstream.net/upload/raw', data=data, headers=headers, timeout=5) as r: cid = r.json()['content_id']
+            except: pass
+            if not cid:
+                logging.debug("Failed to get ContentID from WEB API")
+                try:
+                    with AceStuff.clientcounter.lock:
+                        if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+                        cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
+                except: logging.error("Failed to get Infohash from engine")
+
+        return None if not cid else cid
 
 class Client:
 

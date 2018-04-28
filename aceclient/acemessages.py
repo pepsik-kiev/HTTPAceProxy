@@ -42,10 +42,14 @@ class AceMessage(object):
         # API Version
         HELLO = 'HELLOBG version=' + str(AceConst.APIVERSION)  # Hello
         READY_nokey = 'READY'  # Sent when ready
-        PAUSE = 'EVENT pause'
-        PLAY  = 'EVENT play'
-        STOP  = 'STOP'
         SHUTDOWN = 'SHUTDOWN'
+        SETOPTIONS = 'SETOPTIONS use_stop_notifications=1'
+        STOP = 'STOP'
+        # Events form client to engine
+        PAUSEEVENT = 'EVENT pause'
+        PLAYEVENT  = 'EVENT play'
+        STOPEVENT  = 'EVENT stop'
+        SEEKEVENT  = 'EVENT seek'
 
         @staticmethod
         def READY_key(request_key, product_key):
@@ -72,7 +76,7 @@ class AceMessage(object):
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
                     str(params_dict.get('zone_id', '0'))
 
-            elif command == "PID":
+            elif command == 'PID':
                 return 'LOADASYNC ' + str(request_id) + ' PID ' + str(params_dict.get('content_id'))
         # End LOADASYNC
 

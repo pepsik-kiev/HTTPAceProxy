@@ -42,6 +42,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Ace Stream Engine authentication result & API port answers timeout
     aceresulttimeout = 10
     # Ace Stream Engine stream type hls or http
+    # Support if AceEngine version_code >= 3010500
     # !!!! Note ! If you want use hls you need to install ffmpeg !!!!
     streamtype = 'http'
     # ----------------------------------------------------
