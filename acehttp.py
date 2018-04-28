@@ -183,7 +183,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         #End list with parameters
 
         self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-        CID = self.getCID(self.reqtype, self.path_unquoted) if self.reqtype == 'torrent' and CID else self.path_unquoted
+        if self.reqtype == 'torrent': content_id = self.getCID(self.reqtype, self.path_unquoted)
+        CID = content_id if content_id else self.path_unquoted
         if not channelName and self.reqtype in ('pid', 'torrent', 'infohash'):
            try:
                if self.reqtype == 'pid': _req = 'content_id'
