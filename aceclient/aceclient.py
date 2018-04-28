@@ -183,7 +183,7 @@ class AceClient(object):
         return self._getResult()
 
     def GETCONTENTINFO(self, datatype, value):
-        dict = {'torrent': 'url', 'infohash':'infohash', 'raw':'data', 'content_id':'content_id'}
+        dict = {'torrent': 'url', 'infohash':'infohash', 'raw':'data', 'pid':'content_id'}
         paramsdict = {dict[datatype]:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
         return self.LOADASYNC(datatype, paramsdict)
 
