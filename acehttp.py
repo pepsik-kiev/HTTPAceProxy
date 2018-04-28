@@ -181,9 +181,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
            try: self.params.append(int(self.splittedpath[i]))
            except (IndexError, ValueError): self.params.append('0')
         #End list with parameters
-
         self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-        if self.reqtype == 'torrent': content_id = self.getCID(self.reqtype, self.path_unquoted)
+        content_id = self.getCID(self.reqtype, self.path_unquoted)
         CID = content_id if content_id else self.path_unquoted
         if not channelName and self.reqtype in ('pid', 'torrent', 'infohash'):
            try:
@@ -252,7 +251,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def getCID(self, reqtype, url):
         cid = None
-        if url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
+        if reqtype == 'torrent' and url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
                 with requests.get(url, headers=headers, stream = True, timeout=5) as r: data = b64encode(r.raw.read())
