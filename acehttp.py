@@ -190,9 +190,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                elif self.reqtype == 'torrent': _req = 'url'
                elif self.reqtype == 'infohash': _req = 'infohash'
                if not AceConfig.acehost: AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
-               headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
-               _url = 'http://%s:%s/server/api?method=get_media_files&%s=%s' % (AceConfig.acehost, AceConfig.aceHTTPport, _req, self.path_unquoted)
-               with requests.get(_url, headers=headers, timeout=5) as r: channelName = r.json()['result'][str(self.params[0])]
+               params = {'method': 'get_media_files', _req: self.path_unquoted}
+               headers = {'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+               _url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
+               channelName = requests.get(_url, headers=headers, params=params, timeout=5).json()['result'][str(self.params[0])]
            except: channelName = CID
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
