@@ -254,9 +254,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if reqtype == 'torrent' and url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
-                with requests.get(url, headers=headers, stream = True, timeout=5) as r: data = b64encode(r.raw.read())
-                headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
-                with requests.post('http://api.torrentstream.net/upload/raw', data=data, headers=headers, timeout=5) as r: cid = r.json()['content_id']
+                with requests.get(url, headers=headers, stream = True, timeout=5) as r:
+                   headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+                   cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
             except: pass
             if not cid:
                 logging.debug("Failed to get ContentID from WEB API")
