@@ -58,7 +58,7 @@ class AceMessage(object):
 
         @staticmethod
         def LOADASYNC(command, request_id, params_dict):
-            if command == 'TORRENT':
+            if command == 'URL':
                 return 'LOADASYNC ' + str(request_id) + ' TORRENT ' + str(params_dict.get('url')) + ' ' +  \
                     str(params_dict.get('developer_id', '0')) + ' ' + \
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
@@ -70,19 +70,19 @@ class AceMessage(object):
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
                     str(params_dict.get('zone_id', '0'))
 
-            elif command == 'RAW':
+            elif command == 'DATA':
                 return 'LOADASYNC ' + str(request_id) + ' RAW ' + str(params_dict.get('data')) + ' ' + \
                     str(params_dict.get('developer_id', '0')) + ' ' + \
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
                     str(params_dict.get('zone_id', '0'))
 
-            elif command == 'PID':
+            elif command == 'CONTENT_ID':
                 return 'LOADASYNC ' + str(request_id) + ' PID ' + str(params_dict.get('content_id'))
         # End LOADASYNC
 
         @staticmethod
         def START(command, params_dict, stream_type):
-            if command == 'TORRENT':
+            if command == 'URL':
                 return 'START TORRENT ' + str(params_dict.get('url')) + ' ' + \
                     str(params_dict.get('file_indexes', '0')) + ' ' + \
                     str(params_dict.get('developer_id', '0')) + ' ' + \
@@ -97,25 +97,25 @@ class AceMessage(object):
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
                     str(params_dict.get('zone_id', '0')) + ' ' + stream_type
 
-            elif command == 'PID':
+            elif command == 'CONTENT_ID':
                 return 'START PID ' + str(params_dict.get('content_id')) + ' ' + \
                     str(params_dict.get('file_indexes', '0')) + ' ' + stream_type
 
-            elif command == 'RAW':
+            elif command == 'DATA':
                 return 'START RAW ' + str(params_dict.get('data')) + ' ' + \
                     str(params_dict.get('file_indexes', '0')) + ' ' + \
                     str(params_dict.get('developer_id', '0')) + ' ' + \
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
                     str(params_dict.get('zone_id', '0')) + ' ' + stream_type
 
-            elif command == 'URL':
+            elif command == 'DIRECT_URL':
                 return 'START URL ' + str(params_dict.get('direct_url')) + ' ' + \
                     str(params_dict.get('file_indexes', '0')) + ' ' + \
                     str(params_dict.get('developer_id', '0')) + ' ' + \
                     str(params_dict.get('affiliate_id', '0')) + ' ' + \
                     str(params_dict.get('zone_id', '0')) + ' ' + stream_type
 
-            elif command == 'EFILE':
+            elif command == 'EFILE_URL':
                 return 'START EFILE ' + str(params_dict.get('efile_url')) + ' ' + stream_type
         # End START
 

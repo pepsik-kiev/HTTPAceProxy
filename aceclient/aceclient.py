@@ -183,8 +183,7 @@ class AceClient(object):
         return self._getResult()
 
     def GETCONTENTINFO(self, datatype, value):
-        dict = {'torrent': 'url', 'infohash':'infohash', 'raw':'data', 'pid':'content_id'}
-        paramsdict = {dict[datatype]:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
+        paramsdict = {datatype:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
         return self.LOADASYNC(datatype, paramsdict)
 
     def GETCID(self, datatype, url):
@@ -224,9 +223,9 @@ class AceClient(object):
               if url.endswith('.m3u8'):
                   self._streamReaderConnection.headers = {'Content-Type':'application/octet-stream','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
                   popen_params = { "bufsize": AceConfig.readchunksize,
-                                 "stdout" : PIPE,
-                                 "stderr" : None,
-                                 "shell"  : False }
+                                   "stdout" : PIPE,
+                                   "stderr" : None,
+                                   "shell"  : False }
 
                   if AceConfig.osplatform == 'Windows':
                        ffmpeg_cmd = 'ffmpeg.exe '

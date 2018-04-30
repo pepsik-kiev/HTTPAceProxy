@@ -87,10 +87,10 @@ class P2pproxy(AceProxyPlugin):
                         break
 
                 if stream_type == 'torrent':
-                    stream_url = re.sub('^(http.+)$', lambda match: '/torrent/' +
+                    stream_url = re.sub('^(http.+)$', lambda match: '/url/' +
                                         requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
                 elif stream_type == 'contentid':
-                    stream_url = re.sub('^([0-9a-f]{40})', lambda match: '/pid/' +
+                    stream_url = re.sub('^([0-9a-f]{40})', lambda match: '/content_id/' +
                                         requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
                 connection.path = stream_url
                 connection.splittedpath = stream_url.split('/')
@@ -275,10 +275,10 @@ class P2pproxy(AceProxyPlugin):
                 stream_type, stream = self.api.archive_stream_source(record_id)
 
                 if stream_type == 'torrent':
-                    stream_url = re.sub('^(http.+)$', lambda match: '/torrent/' +
+                    stream_url = re.sub('^(http.+)$', lambda match: '/url/' +
                                         requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
                 elif stream_type == 'contentid':
-                    stream_url = re.sub('^([0-9a-f]{40})', lambda match: '/pid/' +
+                    stream_url = re.sub('^([0-9a-f]{40})', lambda match: '/content_id/' +
                                         requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
                 connection.path = stream_url
                 connection.splittedpath = stream_url.split('/')

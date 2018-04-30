@@ -114,9 +114,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
-            # If first parameter is 'pid','torrent', 'infohash'.... etc or it should be handled
+            # If first parameter is 'content_id','url','infohash' .... etc or it should be handled
             # by plugin
-            if not (self.reqtype in ('pid','torrent','infohash','url','raw','efile') or self.reqtype in AceStuff.pluginshandlers):
+            if not (self.reqtype in ('content_id','url','infohash','direct_url','data','efile_url') or self.reqtype in AceStuff.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
                 return
         except IndexError:
@@ -127,7 +127,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
             except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                 #logger.error(traceback.format_exc())
+                #logger.error(traceback.format_exc())
             finally: return
 
         self.handleRequest(headers_only)
@@ -146,7 +146,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
            self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
            return
 
-        # Check if third parameter exists…/pid/blablablablabla/video.mpg
+        # Check if third parameter exists…/self.reqtype/blablablablabla/video.mpg
         #                                                     |_________|
         # And if it ends with regular video extension
         try:
@@ -174,26 +174,24 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Check is AceStream engine alive before start streaming
         if self.connection: checkAce()
 
-        # Make list with parameters
+        # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
-        self.params = list()
+        paramsdict = dict()
         for i in xrange(3, 8):
-           try: self.params.append(int(self.splittedpath[i]))
-           except (IndexError, ValueError): self.params.append('0')
-        #End list with parameters
-        self.path_unquoted = requests.utils.unquote(self.splittedpath[2])
-        content_id = self.getCID(self.reqtype, self.path_unquoted)
-        CID = content_id if content_id else self.path_unquoted
-        if not channelName and self.reqtype in ('pid', 'torrent', 'infohash'):
+            try: paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = int(self.splittedpath[i])
+            except (IndexError, ValueError): paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = '0'
+        paramsdict[self.reqtype] = requests.utils.unquote(self.splittedpath[2]) #self.path_unquoted
+        #End parameters dict
+
+        content_id = self.getCID(self.reqtype, paramsdict[self.reqtype])
+        CID = content_id if content_id else paramsdict[self.reqtype]
+        if not channelName and self.reqtype in ('content_id', 'url', 'infohash'):
            try:
-               if self.reqtype == 'pid': _req = 'content_id'
-               elif self.reqtype == 'torrent': _req = 'url'
-               elif self.reqtype == 'infohash': _req = 'infohash'
                if not AceConfig.acehost: AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
-               params = {'method': 'get_media_files', _req: self.path_unquoted}
                headers = {'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
-               _url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
-               channelName = requests.get(_url, headers=headers, params=params, timeout=5).json()['result'][str(self.params[0])]
+               url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
+               params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
+               channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][str(paramsdict['file_indexes'])]
            except: channelName = CID
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
@@ -203,31 +201,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.add(CID, self.client) == 1:
                 logger.warning('Create a broadcast "%s"' % self.client.channelName)
-                # Send commands to AceEngine
-                if self.reqtype == 'pid':
-                    self.client.ace.START(self.reqtype, {'content_id': self.path_unquoted, 'file_indexes': self.params[0]}, AceConfig.streamtype)
-                elif self.reqtype == 'torrent':
-                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
-                    paramsdict['url'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'infohash':
-                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
-                    paramsdict['infohash'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'url':
-                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
-                    paramsdict['direct_url'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'raw':
-                    paramsdict = { k:v for k,v in zip(aceclient.acemessages.AceConst.START_PARAMS, self.params) }
-                    paramsdict['data'] = self.path_unquoted
-                    self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                elif self.reqtype == 'efile':
-                    self.client.ace.START(self.reqtype, {'efile_url':self.path_unquoted}, AceConfig.streamtype)
-
+                # Send START commands to AceEngine
+                self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 # Getting URL from engine
-                self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'torrent', 'raw') else self.client.ace.getUrl(AceConfig.videotimeout)
-
+                self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'url', 'data') else self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
                 p = requests.utils.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                 self.url = requests.utils.urlunparse(p)
@@ -252,7 +229,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def getCID(self, reqtype, url):
         cid = None
-        if reqtype == 'torrent' and url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
+        if reqtype == 'url' and url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
                 with requests.get(url, headers=headers, stream = True, timeout=5) as r:
@@ -554,7 +531,7 @@ if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport
     sys.exit(1)
 
 logger.info("Ace Stream HTTP Proxy server starting .....")
-logger.debug("Using python %s" % sys.version.split(' ')[0])
+logger.debug("Using python %s" % sys.version.split()[0])
 logger.debug("Using gevent %s" % gevent.__version__)
 logger.debug("Using psutil %s" % psutil.__version__)
 logger.debug("Using requests %s" % requests.__version__)

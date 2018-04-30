@@ -75,6 +75,7 @@ class Torrenttv(AceProxyPlugin):
         except requests.exceptions.ConnectionError:
             self.logger.error("Can't download TTV playlist!")
             return False
+        except: logger.error(traceback.format_exc()); return False
 
         if self.updatelogos:
             try:
@@ -118,11 +119,11 @@ class Torrenttv(AceProxyPlugin):
                 if not url:
                     connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
                 elif url.startswith('acestream://'):
-                    connection.path = '/pid/%s/stream.mp4' % url.split('/')[2]
+                    connection.path = '/content_id/%s/stream.mp4' % url.split('/')[2]
                 elif url.startswith('infohash://'):
                     connection.path = '/infohash/%s/stream.mp4' % url.split('/')[2]
                 elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                    connection.path = '/torrent/%s/stream.mp4' % requests.utils.quote(url, '')
+                    connection.path = '/url/%s/stream.mp4' % requests.utils.quote(url, '')
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 play = True

@@ -68,10 +68,10 @@ class PlaylistGenerator(object):
 
             if process_url:
                 # For .acelive and .torrent
-                item['url'] = re.sub('^(http.+)$', lambda match: 'http://' + hostport + path + '/torrent/' + \
+                item['url'] = re.sub('^(http.+)$', lambda match: 'http://' + hostport + path + '/url/' + \
                                  requests.utils.quote(match.group(0), '') + '/stream.mp4', url, flags=re.MULTILINE)
                 if url == item['url']:  # For PIDs
-                    item['url'] = re.sub('^(acestream://)?(?P<pid>[0-9a-f]{40})$', 'http://' + hostport + path + '/pid/\\g<pid>/stream.mp4',
+                    item['url'] = re.sub('^(acestream://)?(?P<pid>[0-9a-f]{40})$', 'http://' + hostport + path + '/content_id/\\g<pid>/stream.mp4',
                                         url, flags=re.MULTILINE)
                 if url == item['url']:  # For INFOHASHes
                     item['url'] = re.sub('^(infohash://)?(?P<infohash>[0-9a-f]{40})$', 'http://' + hostport + path + '/infohash/\\g<infohash>/stream.mp4',
