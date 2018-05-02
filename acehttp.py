@@ -72,7 +72,7 @@ class ThreadedPoolHTTPServer(ThreadPoolMixIn, BaseHTTPServer.HTTPServer):
     Handle requests in a pool of separate threads.
     """
     # default threads value if max_workers=None - cpu_num() * 5 for custom value max_workers=N
-    pool = ThreadPoolExecutor(max_workers=None, thread_name_prefix='PoolHTTPServerThread')
+    pool = ThreadPoolExecutor(max_workers=AceConfig.maxconns, thread_name_prefix='PoolHTTPServerThread')
 
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
@@ -178,8 +178,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict = dict()
         for i in xrange(3, 8):
-            try: paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = int(self.splittedpath[i])
-            except (IndexError, ValueError): paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = '0'
+            try: paramsdict.update({aceclient.acemessages.AceConst.START_PARAMS[i-3]: int(self.splittedpath[i])})
+            except (IndexError, ValueError): paramsdict.update({aceclient.acemessages.AceConst.START_PARAMS[i-3]: '0'})
         paramsdict[self.reqtype] = requests.utils.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 

@@ -251,6 +251,7 @@ class AceClient(object):
               while True:
                   data = None
                   clients = counter.getClients(cid)
+                  self.getPlayEvent()  # Wait for PlayEvent (stops sending data to client, should prevent annoying buffering)
                   try: data = out.read(AceConfig.readchunksize)
                   except: pass
 
