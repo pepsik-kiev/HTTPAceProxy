@@ -117,7 +117,7 @@ class AceClient(object):
     def _write(self, message):
         try:
             logger = logging.getLogger('AceClient_write')
-            logger.debug(message)
+            logger.debug('>>> %s' % message)
             self._socket.write('%s\r\n' % message )
         except EOFError as e: raise AceException('Write error! %s' % repr(e))
 
@@ -251,7 +251,7 @@ class AceClient(object):
               while True:
                   data = None
                   clients = counter.getClients(cid)
-                  self.getPlayEvent()  # Wait for PlayEvent (stops sending data to client, should prevent annoying buffering)
+                  self.getPlayEvent()  # Wait for PlayEvent (stop/resume sending data to videobuffer)
                   try: data = out.read(AceConfig.readchunksize)
                   except: pass
 
@@ -387,9 +387,9 @@ class AceClient(object):
                 # INFO
                 elif self._recvbuffer.startswith(AceMessage.response.INFO): pass
                 # PAUSE
-                elif self._recvbuffer.startswith(AceMessage.response.PAUSE): self._resumeevent.clear()
+                elif self._recvbuffer.startswith(AceMessage.response.PAUSE): self.pause_event(); self._resumeevent.clear()
                 # RESUME
-                elif self._recvbuffer.startswith(AceMessage.response.RESUME): self._resumeevent.set()
+                elif self._recvbuffer.startswith(AceMessage.response.RESUME): self.play_event(); self._resumeevent.set()
                 # STOP
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
