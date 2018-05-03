@@ -105,7 +105,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
         logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
-
+        self.requrl = requests.utils.urlparse(self.path)
+        self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         # If firewall enabled
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
