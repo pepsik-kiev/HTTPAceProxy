@@ -135,18 +135,21 @@ class AceMessage(object):
 
     class response(object):
         # Responses (from acestream to client)
-        HELLO = 'HELLOTS'  # Just the beginning
+        HELLO = 'HELLOTS'
         NOTREADY = 'NOTREADY'
         START = 'START'
         STOP = 'STOP'
+        PAUSE = 'PAUSE'
+        RESUME = 'RESUME'
+        LOADRESP = 'LOADRESP'
         SHUTDOWN = 'SHUTDOWN'
+        # Events (from AceEngine to client)
         AUTH = 'AUTH'
         GETUSERDATA = 'EVENT getuserdata'
         LIVEPOS = 'EVENT livepos'
         DOWNLOADSTOP = 'EVENT download_stopped'
+        SHOWURL = 'EVENT showurl'
+        CANSAVE = 'EVENT cansave'
         STATE = 'STATE'
         STATUS = 'STATUS'
         INFO = 'INFO'
-        PAUSE = 'PAUSE'
-        RESUME = 'RESUME'
-        LOADRESP = 'LOADRESP'
