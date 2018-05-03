@@ -214,8 +214,6 @@ class AceClient(object):
 
         with requests.get(url, headers=req_headers, stream=True) as self._streamReaderConnection:
           try:
-              self.play_event()
-
               if self._streamReaderConnection.status_code  not in (200, 206):
                   logger.error('Failed to open video stream %s' % url)
                   return None
@@ -248,13 +246,12 @@ class AceClient(object):
 
           else:
               with self._lock: self._streamReaderState = 2; self._lock.notifyAll()
+              self.play_event()
               while True:
-                  data = None
+                  self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data to videobuffer
                   clients = counter.getClients(cid)
-                  self.getPlayEvent()  # Wait for PlayEvent (stop/resume sending data to videobuffer)
                   try: data = out.read(AceConfig.readchunksize)
-                  except: pass
-
+                  except: data = None
                   if data and clients:
                       with self._lock:
                           if len(self._streamReaderQueue) == AceConfig.readcachesize:
@@ -262,8 +259,7 @@ class AceClient(object):
                           self._streamReaderQueue.append(data)
 
                       for c in clients:
-                          try:
-                              c.addChunk(data, 5.0)
+                          try: c.addChunk(data, 5.0)
                           except Queue.Full:
                               if len(clients) > 1:
                                   logger.debug('Disconnecting client: %s' % c.clientip)
@@ -386,6 +382,10 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.DOWNLOADSTOP): pass
                 # INFO
                 elif self._recvbuffer.startswith(AceMessage.response.INFO): pass
+                # SHOWURL
+                elif self._recvbuffer.startswith(AceMessage.response.SHOWURL): pass
+                # CANSAVE
+                elif self._recvbuffer.startswith(AceMessage.response.CANSAVE): pass
                 # PAUSE
                 elif self._recvbuffer.startswith(AceMessage.response.PAUSE): self.pause_event(); self._resumeevent.clear()
                 # RESUME
