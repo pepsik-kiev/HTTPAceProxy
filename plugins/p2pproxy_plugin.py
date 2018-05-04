@@ -44,9 +44,7 @@ class P2pproxy(AceProxyPlugin):
         P2pproxy.logger.debug('Handling request')
 
         hostport = connection.headers['Host']
-
-        query = requests.utils.urlparse(connection.path).query
-        self.params = parse_qs(query)
+        self.params = parse_qs(connection.query)
         # /channels/ branch
         if connection.reqtype in ('channels', 'channels.m3u'):
             # /channels/play?id=[id]

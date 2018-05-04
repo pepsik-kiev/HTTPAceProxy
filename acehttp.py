@@ -106,6 +106,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
         self.requrl = requests.utils.urlparse(self.path)
+        self.query = self.requrl.query
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         # If firewall enabled
         if AceConfig.firewall and not checkFirewall(self.clientip):
