@@ -103,10 +103,8 @@ class Torrenttv(AceProxyPlugin):
                 if not self.downloadPlaylist():
                     connection.dieWithError()
                     return
-
-            url = requests.utils.urlparse(connection.path)
-            path = url.path[0:-1] if url.path.endswith('/') else url.path
-            params = parse_qs(url.query)
+            path = connection.path
+            params = parse_qs(connection.query)
             fmt = params['fmt'][0] if 'fmt' in params else None
 
             if path.startswith('/torrenttv/channel/'):

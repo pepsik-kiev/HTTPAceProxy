@@ -62,8 +62,7 @@ class Allfon(AceProxyPlugin):
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
         for match in matches: playlistgen.addItem(match.groupdict())
         Allfon.logger.info('AllFon playlist created')
-        query = requests.utils.urlparse(connection.path).query
-        params = parse_qs(query)
+        params = parse_qs(connection.query)
         fmt = params['fmt'][0] if 'fmt' in params else None
         header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)
 

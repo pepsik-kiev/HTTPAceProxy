@@ -49,8 +49,7 @@ class Torrenttelik(AceProxyPlugin):
             connection.end_headers()
             return
 
-        query = requests.utils.urlparse(connection.path).query
-        self.params = parse_qs(query)
+        self.params = parse_qs(connection.query)
 
         url = None
         list_type = self.getparam('type')

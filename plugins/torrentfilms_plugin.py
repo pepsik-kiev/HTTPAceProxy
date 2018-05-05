@@ -17,7 +17,7 @@ from aceconfig import AceConfig
 
 class Torrentfilms(AceProxyPlugin):
 
-    handlers = ('films','proxyfilms')
+    handlers = ('films', 'proxyfilms')
 
     def __init__(self, AceConfig, AceStuff):
         self.logger = logging.getLogger('plugin_TorrentFilms')
@@ -102,8 +102,8 @@ class Torrentfilms(AceProxyPlugin):
                connection.send_header('Connection', 'close')
                connection.end_headers()
                return
-            url = urlparse(connection.path)
-            params = parse_qs(url.query)
+
+            params = parse_qs(connection.query)
             fmt = params['fmt'][0] if 'fmt' in params else None
 
             exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, fmt).encode('utf-8')
