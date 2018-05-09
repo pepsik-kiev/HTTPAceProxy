@@ -198,7 +198,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
         self.client = Client(CID, self, channelName, channelIcon)
-
         try:
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.add(CID, self.client) == 1:
@@ -218,16 +217,16 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
-               if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
-               # streaming to client
-               logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
-               self.client.handle(fmt)
-               logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
+            if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
+            # streaming to client
+            logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
+            self.client.handle(fmt)
+            logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
         finally:
-              if AceStuff.clientcounter.delete(CID, self.client) == 0:
+            if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
-              self.client.destroy()
-              return
+            self.client.destroy()
+            return
 
     def getCID(self, reqtype, url):
         cid = None
@@ -319,11 +318,13 @@ class Client:
             transcoder = None
             out = self.handler.wfile
         try:
-            while self.handler.connection:
+            while self.handler.connection and self.ace._streamReaderState == 2:
                 try:
                     data = self.getChunk(60.0)
-                    try: out.write(data)
-                    except: break
+                    if data:
+                       try: out.write(data)
+                       except: break
+                    else: break
                 except Queue.Empty: logger.warning("No data received in 60 seconds - disconnecting"); break
         finally:
             if transcoder:
@@ -334,10 +335,9 @@ class Client:
     def addChunk(self, chunk, timeout):
         start = time.time()
         with self.lock:
-            while(self.handler.connection and (len(self.queue) == AceConfig.readcachesize)):
-                remaining = start + timeout + time.time()
-                if remaining > 0:
-                    self.lock.wait(remaining)
+            while len(self.queue) == AceConfig.readcachesize:
+                remaining = start + timeout - time.time()
+                if remaining > 0: self.lock.wait(remaining)
                 else: raise Queue.Full
             if self.handler.connection:
                 self.queue.append(chunk)
@@ -346,10 +346,9 @@ class Client:
     def getChunk(self, timeout):
         start = time.time()
         with self.lock:
-            while(self.handler.connection and (len(self.queue) == 0)):
+            while len(self.queue) == 0:
                 remaining = start + timeout - time.time()
-                if remaining > 0:
-                    self.lock.wait(remaining)
+                if remaining > 0: self.lock.wait(remaining)
                 else: raise Queue.Empty
             if self.handler.connection:
                 chunk = self.queue.popleft()

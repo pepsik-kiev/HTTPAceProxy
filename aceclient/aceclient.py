@@ -212,65 +212,65 @@ class AceClient(object):
         if 'range' in req_headers: del req_headers['range']
         logger.debug('Get headers from client: %s' % req_headers)
 
-        try:
-            self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True)
-            if self._streamReaderConnection.status_code  not in (200, 206):
+        with requests.get(url, headers=req_headers, stream=True, timeout=(5, None)) as self._streamReaderConnection:
+          try:
+              if self._streamReaderConnection.status_code  not in (200, 206):
                 logger.error('Failed to open video stream %s' % url)
                 return None
 
-            if url.endswith('.m3u8'):
-                self._streamReaderConnection.headers = {'Content-Type':'application/octet-stream','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
-                popen_params = { "bufsize": AceConfig.readchunksize,
-                                 "stdout" : PIPE,
-                                 "stderr" : None,
-                                 "shell"  : False }
+              if url.endswith('.m3u8'):
+                  self._streamReaderConnection.headers = {'Content-Type':'application/octet-stream','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
+                  popen_params = { "bufsize": AceConfig.readchunksize,
+                                   "stdout" : PIPE,
+                                   "stderr" : None,
+                                   "shell"  : False }
 
-                if AceConfig.osplatform == 'Windows':
-                     ffmpeg_cmd = 'ffmpeg.exe '
-                     CREATE_NO_WINDOW = 0x08000000
-                     CREATE_NEW_PROCESS_GROUP = 0x00000200
-                     DETACHED_PROCESS = 0x00000008
-                     popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                else: ffmpeg_cmd = 'ffmpeg '
+                  if AceConfig.osplatform == 'Windows':
+                       ffmpeg_cmd = 'ffmpeg.exe '
+                       CREATE_NO_WINDOW = 0x08000000
+                       CREATE_NEW_PROCESS_GROUP = 0x00000200
+                       DETACHED_PROCESS = 0x00000008
+                       popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                  else: ffmpeg_cmd = 'ffmpeg '
 
-                ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
-                transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
-                out = transcoder.stdout
-                logger.warning('HLS stream detected. Ffmpeg transcoding started')
-            else: out = self._streamReaderConnection.raw
+                  ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+                  transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
+                  out = transcoder.stdout
+                  logger.warning('HLS stream detected. Ffmpeg transcoding started')
+              else: out = self._streamReaderConnection.raw
 
-        except requests.exceptions.RequestException:
-            logger.error('Failed to open video stream')
-            logger.error(traceback.format_exc())
-        except: logger.error(traceback.format_exc())
+          except requests.exceptions.RequestException:
+              logger.error('Failed to open video stream')
+              logger.error(traceback.format_exc())
+          except: logger.error(traceback.format_exc())
 
-        else:
-            with self._lock: self._streamReaderState = 2; self._lock.notifyAll()
-            self.play_event()
-            while True:
-                self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data to videobuffer
-                clients = counter.getClients(cid)
-                try: data = out.read(AceConfig.readchunksize)
-                except: data = None
-                if data and clients:
-                    with self._lock:
-                        if len(self._streamReaderQueue) == AceConfig.readcachesize:
-                            self._streamReaderQueue.popleft()
-                        self._streamReaderQueue.append(data)
+          else:
+              with self._lock: self._streamReaderState = 2; self._lock.notifyAll()
+              self.play_event()
+              while True:
+                  self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
+                  clients = counter.getClients(cid)
+                  try: data = out.read(AceConfig.readchunksize)
+                  except: data = None
+                  if data and clients:
+                      with self._lock:
+                          if len(self._streamReaderQueue) == AceConfig.readcachesize:
+                              self._streamReaderQueue.popleft()
+                          self._streamReaderQueue.append(data)
 
-                    for c in clients:
-                        try: c.addChunk(data, 5.0)
-                        except Queue.Full:
-                            if len(clients) > 1:
-                                logger.debug('Disconnecting client: %s' % c.clientip)
-                                c.destroy()
-                elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
-                else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
-        finally:
-            with self._lock: self._streamReaderState = 3; self._lock.notifyAll()
-            if transcoder:
-               try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-               except: pass
+                      for c in clients:
+                          try: c.addChunk(data, 5.0)
+                          except Queue.Full:
+                              if len(clients) > 1:
+                                  logger.debug('Disconnecting client: %s' % c.clientip)
+                                  c.destroy()
+                  elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
+                  else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
+          finally:
+              with self._lock: self._streamReaderState = None; self._lock.notifyAll()
+              if transcoder:
+                 try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+                 except: pass
 
     def closeStreamReader(self):
         logger = logging.getLogger('StreamReader')
