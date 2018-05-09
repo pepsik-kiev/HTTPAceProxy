@@ -273,7 +273,7 @@ class Client:
                     self.handler.dieWithError(500, 'Video stream not opened in 5 seconds - disconnecting')
                     return
             if self.handler.connection and self.ace._streamReaderState != 2:
-                self.handler.dieWithError(500, 'No video stream found', logging.WARNING)
+                self.handler.dieWithError(500, 'No video stream received from AceEngine', logging.WARNING)
                 return
 
         # Sending client headers to videostream
@@ -321,10 +321,8 @@ class Client:
             while self.handler.connection and self.ace._streamReaderState == 2:
                 try:
                     data = self.getChunk(60.0)
-                    if data:
-                       try: out.write(data)
-                       except: break
-                    else: break
+                    try: out.write(data)
+                    except: break
                 except Queue.Empty: logger.warning("No data received in 60 seconds - disconnecting"); break
         finally:
             if transcoder:
@@ -335,7 +333,7 @@ class Client:
     def addChunk(self, chunk, timeout):
         start = time.time()
         with self.lock:
-            while len(self.queue) == AceConfig.readcachesize:
+            while self.handler.connection and len(self.queue) == AceConfig.readcachesize:
                 remaining = start + timeout - time.time()
                 if remaining > 0: self.lock.wait(remaining)
                 else: raise Queue.Full
@@ -346,7 +344,7 @@ class Client:
     def getChunk(self, timeout):
         start = time.time()
         with self.lock:
-            while len(self.queue) == 0:
+            while self.handler.connection and len(self.queue) == 0:
                 remaining = start + timeout - time.time()
                 if remaining > 0: self.lock.wait(remaining)
                 else: raise Queue.Empty
