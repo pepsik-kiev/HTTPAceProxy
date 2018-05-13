@@ -551,12 +551,12 @@ if not ace_pid and AceConfig.acespawn:
    if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
        ace_pid = AceStuff.ace.pid
        AceStuff.ace = psutil.Process(ace_pid)
-       AceConfig.acehostslist[0][0] = '127.0.0.1'
+       AceConfig.acehostslist[0][0] = AceConfig.httphost
        AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
        logger.info('Ace Stream engine spawned with pid %s' % AceStuff.ace.pid)
 elif ace_pid:
    logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
-   AceConfig.acehostslist[0][0] = '127.0.0.1'
+   AceConfig.acehostslist[0][0] = AceConfig.httphost
    AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
    AceConfig.acespawn = False
 else:
