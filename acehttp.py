@@ -127,9 +127,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e:
-               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-               logger.error(traceback.format_exc())
+            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+               # logger.error(traceback.format_exc())
             finally: return
 
         self.handleRequest(headers_only)

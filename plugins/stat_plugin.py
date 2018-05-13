@@ -110,12 +110,8 @@ class Stat(AceProxyPlugin):
                 if c.channelIcon: connection.wfile.write('<img src="' + c.channelIcon + '" width="40" height="16"/>&nbsp;')
                 if c.channelName: connection.wfile.write(c.channelName.encode('UTF8'))
                 else: connection.wfile.write(i)
-
-                #connection.wfile.write('<div style="position: relative; width: 200px; height: 10px; background-color: #ccc;"><div style="position: absolute;left: 0;top: 0;width: 52%;height: 100%;background-color: #80AFCA;"></div></div>')
-
                 connection.wfile.write('</td><td>' + c.handler.clientip + '</td>')
                 clientinrange = any(map(lambda i: ipaddr.IPAddress(c.handler.clientip) in ipaddr.IPNetwork(i),localnetranges))
-
                 if clientinrange: connection.wfile.write('<td>' + self.mac_lookup(c.handler.clientip).encode('UTF8').strip() + '</td>')
                 else:
                     geo_ip_info = self.geo_ip_lookup(c.handler.clientip)
