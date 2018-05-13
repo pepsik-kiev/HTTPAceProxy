@@ -188,7 +188,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         CID = content_id if content_id else paramsdict[self.reqtype]
         if not channelName and self.reqtype in ('content_id', 'url', 'infohash'):
            try:
-               if not AceConfig.acehost: AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
                headers = {'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
                url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
                params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
@@ -305,8 +304,7 @@ class Client:
                                  "stdin"  : PIPE,
                                  "stdout" : self.handler.wfile,
                                  "stderr" : stderr,
-                                 "shell"  : False,
-                                 "close_fds" : True }
+                                 "shell"  : False }
 
                 transcoder = Popen(AceConfig.transcodecmd[fmt], **popen_params)
                 gevent.sleep()
@@ -393,6 +391,7 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 # Spawning procedures
 def spawnAce(cmd, delay=0.1):
     if AceConfig.osplatform == 'Windows':
+        import _winreg
         reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
         try:
             key = _winreg.OpenKey(reg, 'Software\AceStream')
@@ -404,7 +403,7 @@ def spawnAce(cmd, delay=0.1):
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
-        AceStuff.ace = Popen(cmd, stdout=DEVNULL, stderr=DEVNULL, close_fds=True)
+        AceStuff.ace = Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
         gevent.sleep(delay)
         return True
     except: return False
@@ -447,38 +446,36 @@ def detectPort():
     else:
         engine = _winreg.QueryValueEx(key, 'EnginePath')
         AceStuff.acedir = os.path.dirname(engine[0])
-    try:
-        AceConfig.acehostslist[0][1] = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
-        logger.info("Detected ace port: %s" % AceConfig.acehostslist[0][1])
-    except IOError:
-        logger.error("Couldn't detect port! acestream.port file doesn't exist?")
-        clean_proc()
-        sys.exit(1)
+        try:
+            AceConfig.acehostslist[0][1] = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
+            logger.info("Detected ace port: %s" % AceConfig.acehostslist[0][1])
+        except IOError:
+            logger.error("Couldn't detect port! acestream.port file doesn't exist?")
+            clean_proc()
+            sys.exit(1)
 
 def isRunning(process):
-    if psutil.version_info[0] >= 2:
-        if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
-            return True
-    else:  # for older versions of psutil
-        if process.is_running() and process.status != psutil.STATUS_ZOMBIE:
-            return True
-    return False
+    return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
 
 def findProcess(name):
     proc = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]
     return proc[0]['pid'] if proc else None
 
+def on_terminate(proc):
+    logger.debug('AceStream Engine with pid %s terminated' % proc.pid)
+
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        logger.info('AceStream terminate.....')
         with AceStuff.clientcounter.lock:
             if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
             gevent.sleep(1)
-        AceStuff.ace.terminate()
-        gevent.sleep(1)
-        if isRunning(AceStuff.ace): AceStuff.ace.kill(); logger.warning('AceStream kill.....')
-        # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
+        procs = psutil.Process().children()
+        for p in procs:
+             p.terminate()
+        gone, alive = psutil.wait_procs(procs, timeout=3, callback=on_terminate)
+        for p in alive:
+             p.kill()
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try: os.remove(AceStuff.acedir + '\\acestream.port')
             except: pass
@@ -547,22 +544,32 @@ except AttributeError: pass  # not available on Windows
 AceStuff.clientcounter = ClientCounter()
 
 #### AceEngine startup
-name = 'ace_engine.exe' if AceConfig.osplatform == 'Windows' else 'acestreamengine'
+name = 'ace_engine.exe' if AceConfig.osplatform == 'Windows' else os.path.basename(AceConfig.acecmd)
 ace_pid = findProcess(name)
 if not ace_pid and AceConfig.acespawn:
-   if AceConfig.osplatform == 'Windows':
-       import _winreg
-       AceStuff.aceProc = ""
-   else:
-       AceStuff.aceProc = AceConfig.acecmd.split()
+   AceStuff.aceProc = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
    if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
        ace_pid = AceStuff.ace.pid
        AceStuff.ace = psutil.Process(ace_pid)
-       logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
+       AceConfig.acehostslist[0][0] = '127.0.0.1'
+       AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
+       logger.info('Ace Stream engine spawned with pid %s' % AceStuff.ace.pid)
+elif ace_pid:
+   logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
+   AceConfig.acehostslist[0][0] = '127.0.0.1'
+   AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
+   AceConfig.acespawn = False
 else:
-      AceStuff.ace = psutil.Process(ace_pid)
-      AceConfig.acespawn = False
-      logger.info("Ace Stream engine found with pid %s" % AceStuff.ace.pid)
+   Engine_found = False
+   for engine in AceConfig.acehostslist:
+     try:
+          if requests.get('http://%s:%s' % (engine[0],engine[2]), timeout=5).status_code in (200, 500):
+             logger.info('Remote Ace Stream engine found on %s:%s' % (engine[0],engine[2]))
+             AceConfig.acehost, AceConfig.aceHTTPport = engine[0], engine[2]
+             Engine_found = True
+             break
+     except requests.ConnectionError: pass
+   if not Engine_found: logger.error('Not found any Ace Stream engine ! EXIT !'); sys.exit(1)
 
 # Refreshes the acestream.port file .....
 if ace_pid and AceConfig.osplatform == 'Windows': detectPort()

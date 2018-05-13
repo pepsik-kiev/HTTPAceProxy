@@ -222,8 +222,7 @@ class AceClient(object):
                   popen_params = { "bufsize": AceConfig.readchunksize,
                                    "stdout" : PIPE,
                                    "stderr" : None,
-                                   "shell"  : False,
-                                   "close_fds" : True }
+                                   "shell"  : False }
 
                   if AceConfig.osplatform == 'Windows':
                        ffmpeg_cmd = 'ffmpeg.exe '
