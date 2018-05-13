@@ -6,12 +6,12 @@ To use it, go to http://127.0.0.1:8000/stat
 from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
-from subprocess import PIPE
+from gevent.subprocess import Popen, PIPE
+import psutil
 import time
 import logging, re
 import requests
 import ipaddr
-import psutil
 
 localnetranges = (
         '192.168.0.0/16',
@@ -33,7 +33,8 @@ class Stat(AceProxyPlugin):
     def geo_ip_lookup(self, ip_address):
         lookup_url = 'http://freegeoip.net/json/%s'
         Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
-        response = requests.get(lookup_url % ip_address, headers={'User-Agent':'Magic Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=5).json()
+        headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}
+        response = requests.get(lookup_url % ip_address, headers=headers, timeout=5).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
                 'country'      : '' if not response['country_name'] else response['country_name'] ,
@@ -42,17 +43,18 @@ class Stat(AceProxyPlugin):
     def mac_lookup(self,ip_address):
 
         if AceConfig.osplatform != 'Windows':
-           psutil.Popen(["ping", "-c 1", ip_address], stdout = PIPE, shell=False)
-           pid = psutil.Popen(["arp", "-n", ip_address], stdout = PIPE, shell=False)
+           Popen(["ping", "-c 1", ip_address], stdout = PIPE, shell=False, close_fds=True)
+           pid = Popen(["arp", "-n", ip_address], stdout = PIPE, shell=False, close_fds=True)
         else:
            popen_params = { "stdout" : PIPE,
-                            "shell"  : False }
+                            "shell"  : False,
+                            "close_fds" : True }
            CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
            CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
            DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
            popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
-           psutil.Popen(["ping", "-n 1", ip_address], **popen_params)
-           pid = psutil.Popen(["arp", "-a", ip_address], **popen_params)
+           Popen(["ping", "-n 1", ip_address], **popen_params)
+           pid = Popen(["arp", "-a", ip_address], **popen_params)
 
         s = pid.communicate()[0]
         mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", s)
@@ -61,7 +63,8 @@ class Stat(AceProxyPlugin):
            mac_address = mac_address.groups()[0]
            lookup_url = 'http://macvendors.co/api/vendorname/%s'
            try:
-              response = requests.get(lookup_url % mac_address, headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}, timeout=5).text
+              headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}
+              response = requests.get(lookup_url % mac_address, headers=headers, timeout=5).text
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
         else: Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)
 
@@ -100,6 +103,7 @@ class Stat(AceProxyPlugin):
         connection.wfile.write('<table  border="2" cellspacing="0" cellpadding="3">')
         connection.wfile.write('<tr align=CENTER valign=BASELINE BGCOLOR="#eeeee5"><td>Channel name</td><td>Client IP</td><td>Client/Location</td><td>Start time</td><td>Duration</td></tr>')
 
+
         for i in self.stuff.clientcounter.clients:
             for c in self.stuff.clientcounter.clients[i]:
                 connection.wfile.write('<tr><td>')
@@ -107,13 +111,15 @@ class Stat(AceProxyPlugin):
                 if c.channelName: connection.wfile.write(c.channelName.encode('UTF8'))
                 else: connection.wfile.write(i)
 
+                #connection.wfile.write('<div style="position: relative; width: 200px; height: 10px; background-color: #ccc;"><div style="position: absolute;left: 0;top: 0;width: 52%;height: 100%;background-color: #80AFCA;"></div></div>')
+
                 connection.wfile.write('</td><td>' + c.handler.clientip + '</td>')
                 clientinrange = any(map(lambda i: ipaddr.IPAddress(c.handler.clientip) in ipaddr.IPNetwork(i),localnetranges))
 
                 if clientinrange: connection.wfile.write('<td>' + self.mac_lookup(c.handler.clientip).encode('UTF8').strip() + '</td>')
                 else:
                     geo_ip_info = self.geo_ip_lookup(c.handler.clientip)
-                    connection.wfile.write('<td>' + geo_ip_info.get('country').encode('UTF8') + ', ' +                                                                                                             geo_ip_info.get('city').encode('UTF8') + '&nbsp;<i class="flag ' + geo_ip_info.get('country_code').encode('UTF8').lower() + '"></i>&nbsp;</td>')
+                    connection.wfile.write('<td>' + geo_ip_info.get('country').encode('UTF8') + ', ' + geo_ip_info.get('city').encode('UTF8') + '&nbsp;<i class="flag ' + geo_ip_info.get('country_code').encode('UTF8').lower() + '"></i>&nbsp;</td>')
                 connection.wfile.write('<td>' + time.strftime('%c', time.localtime(c.connectionTime)) + '</td>')
                 connection.wfile.write('<td align="center">' + time.strftime("%H:%M:%S",  time.gmtime(current_time-c.connectionTime)) + '</td></tr>')
         connection.wfile.write('</table></div>')

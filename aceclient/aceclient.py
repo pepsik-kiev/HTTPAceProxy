@@ -4,6 +4,7 @@ from acemessages import *
 import gevent
 from gevent.event import AsyncResult
 from gevent.event import Event
+from gevent.subprocess import Popen, PIPE
 import telnetlib
 import logging
 import requests
@@ -12,9 +13,7 @@ import time
 import threading
 import traceback
 import random
-import psutil
 import Queue
-from subprocess import PIPE
 from collections import deque
 
 
@@ -223,7 +222,8 @@ class AceClient(object):
                   popen_params = { "bufsize": AceConfig.readchunksize,
                                    "stdout" : PIPE,
                                    "stderr" : None,
-                                   "shell"  : False }
+                                   "shell"  : False,
+                                   "close_fds" : True }
 
                   if AceConfig.osplatform == 'Windows':
                        ffmpeg_cmd = 'ffmpeg.exe '
@@ -234,7 +234,7 @@ class AceClient(object):
                   else: ffmpeg_cmd = 'ffmpeg '
 
                   ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
-                  transcoder = psutil.Popen(ffmpeg_cmd.split(), **popen_params)
+                  transcoder = Popen(ffmpeg_cmd.split(), **popen_params)
                   out = transcoder.stdout
                   logger.warning('HLS stream detected. Ffmpeg transcoding started')
               else: out = self._streamReaderConnection.raw
@@ -299,7 +299,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while self._socket:
+        while True:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()

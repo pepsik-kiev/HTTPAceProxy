@@ -7,7 +7,7 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
-
+from gevent.subprocess import Popen, PIPE
 import os, sys
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
@@ -27,7 +27,6 @@ import glob
 import signal
 import logging
 import psutil
-from subprocess import PIPE
 from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
 from collections import deque
@@ -128,8 +127,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                #logger.error(traceback.format_exc())
+            except Exception as e:
+               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+               logger.error(traceback.format_exc())
             finally: return
 
         self.handleRequest(headers_only)
@@ -306,9 +306,11 @@ class Client:
                                  "stdin"  : PIPE,
                                  "stdout" : self.handler.wfile,
                                  "stderr" : stderr,
-                                 "shell"  : False }
+                                 "shell"  : False,
+                                 "close_fds" : True }
 
-                transcoder = psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                transcoder = Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                gevent.sleep()
                 out = transcoder.stdin
                 logger.warning("Ffmpeg transcoding started")
             else:
@@ -403,7 +405,7 @@ def spawnAce(cmd, delay=0.1):
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
-        AceStuff.ace = psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        AceStuff.ace = Popen(cmd, stdout=DEVNULL, stderr=DEVNULL, close_fds=True)
         gevent.sleep(delay)
         return True
     except: return False
@@ -417,10 +419,8 @@ def checkAce():
     if AceConfig.acespawn and not isRunning(AceStuff.ace):
         AceStuff.clientcounter.destroyIdle()
         if hasattr(AceStuff, 'ace'): del AceStuff.ace
-        if spawnAce(AceStuff.aceProc, 1):
+        if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
             logger.error("Ace Stream died, respawned it with pid %s" % AceStuff.ace.pid)
-            # Wait some time for ace engine sturtup .....
-            gevent.sleep(AceConfig.acestartuptimeout)
             # refresh the acestream.port file for Windows only after full loading...
             if AceConfig.osplatform == 'Windows': detectPort()
         else:
@@ -466,14 +466,8 @@ def isRunning(process):
     return False
 
 def findProcess(name):
-    for proc in psutil.process_iter():
-        try:
-            pinfo = proc.as_dict(attrs=['pid', 'name'])
-            if pinfo['name'] == name:
-                return pinfo['pid']
-        except psutil.AccessDenied: pass # System process
-        except psutil.NoSuchProcess: pass # Process terminated
-    return None
+    proc = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]
+    return proc[0]['pid'] if proc else None
 
 def clean_proc():
     # Trying to close all spawned processes gracefully
@@ -556,25 +550,23 @@ AceStuff.clientcounter = ClientCounter()
 #### AceEngine startup
 name = 'ace_engine.exe' if AceConfig.osplatform == 'Windows' else 'acestreamengine'
 ace_pid = findProcess(name)
-AceStuff.ace = None
-if not ace_pid:
-    if AceConfig.acespawn:
-        if AceConfig.osplatform == 'Windows':
-            import _winreg
-            AceStuff.aceProc = ""
-        else:
-            AceStuff.aceProc = AceConfig.acecmd.split()
-        if spawnAce(AceStuff.aceProc, 1):
-            ace_pid = AceStuff.ace.pid
-            AceStuff.ace = psutil.Process(ace_pid)
-else: AceStuff.ace = psutil.Process(ace_pid)
+if not ace_pid and AceConfig.acespawn:
+   if AceConfig.osplatform == 'Windows':
+       import _winreg
+       AceStuff.aceProc = ""
+   else:
+       AceStuff.aceProc = AceConfig.acecmd.split()
+   if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
+       ace_pid = AceStuff.ace.pid
+       AceStuff.ace = psutil.Process(ace_pid)
+       logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
+else:
+      AceStuff.ace = psutil.Process(ace_pid)
+      AceConfig.acespawn = False
+      logger.info("Ace Stream engine found with pid %s" % AceStuff.ace.pid)
 
-# Wait some time for ace engine sturtup .....
-if ace_pid :
-    gevent.sleep(AceConfig.acestartuptimeout)
-    logger.info("Ace Stream engine spawned with pid %s" % AceStuff.ace.pid)
-    # refresh the acestream.port file for Windows only after full loading...
-    if AceConfig.osplatform == 'Windows': detectPort()
+# Refreshes the acestream.port file .....
+if ace_pid and AceConfig.osplatform == 'Windows': detectPort()
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
