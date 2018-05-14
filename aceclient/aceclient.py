@@ -70,7 +70,7 @@ class AceClient(object):
         self._lock = threading.Condition(threading.Lock())
         self._streamReaderConnection = None
         self._streamReaderState = None
-        self._streamReaderQueue = deque()
+        self._streamReaderQueue = deque(maxlen=AceConfig.readcachesize)
         self._engine_version_code = 0
 
         # Logger
@@ -252,11 +252,7 @@ class AceClient(object):
                   try: data = out.read(AceConfig.readchunksize)
                   except: data = None
                   if data and clients:
-                      with self._lock:
-                          if len(self._streamReaderQueue) == AceConfig.readcachesize:
-                              self._streamReaderQueue.popleft()
-                          self._streamReaderQueue.append(data)
-
+                      with self._lock: self._streamReaderQueue.appendleft(data)
                       for c in clients:
                           try: c.addChunk(data, 5.0)
                           except Queue.Full:

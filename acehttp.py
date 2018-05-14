@@ -337,7 +337,7 @@ class Client:
                 if remaining > 0: self.lock.wait(remaining)
                 else: raise Queue.Full
             if self.handler.connection:
-                self.queue.append(chunk)
+                self.queue.appendleft(chunk)
                 self.lock.notifyAll()
 
     def getChunk(self, timeout):
@@ -347,11 +347,9 @@ class Client:
                 remaining = start + timeout - time.time()
                 if remaining > 0: self.lock.wait(remaining)
                 else: raise Queue.Empty
-            if self.handler.connection:
-                chunk = self.queue.popleft()
-                self.lock.notifyAll()
-                return chunk
-            else: return None
+            chunk = self.queue.pop()
+            self.lock.notifyAll()
+            return chunk if self.handler.connection else None
 
     def destroy(self):
         with self.lock:
@@ -393,11 +391,8 @@ def spawnAce(cmd, delay=0.1):
     if AceConfig.osplatform == 'Windows':
         import _winreg
         reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
-        try:
-            key = _winreg.OpenKey(reg, 'Software\AceStream')
-        except:
-            logger.error("Can't find acestream!")
-            sys.exit(1)
+        try: key = _winreg.OpenKey(reg, 'Software\AceStream')
+        except: logger.error("Can't find acestream!"); sys.exit(1)
         else:
             engine = _winreg.QueryValueEx(key, 'EnginePath')
             AceStuff.acedir = os.path.dirname(engine[0])
@@ -438,11 +433,8 @@ def detectPort():
         sys.exit(1)
     import _winreg
     reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
-    try:
-        key = _winreg.OpenKey(reg, 'Software\AceStream')
-    except:
-        logger.error("Can't find AceStream!")
-        sys.exit(1)
+    try: key = _winreg.OpenKey(reg, 'Software\AceStream')
+    except: logger.error("Can't find AceStream!"); sys.exit(1)
     else:
         engine = _winreg.QueryValueEx(key, 'EnginePath')
         AceStuff.acedir = os.path.dirname(engine[0])
@@ -461,21 +453,13 @@ def findProcess(name):
     proc = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]
     return proc[0]['pid'] if proc else None
 
-def on_terminate(proc):
-    logger.debug('AceStream Engine with pid %s terminated' % proc.pid)
-
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        with AceStuff.clientcounter.lock:
-            if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
-            gevent.sleep(1)
-        procs = psutil.Process().children()
-        for p in procs:
-             p.terminate()
-        gone, alive = psutil.wait_procs(procs, timeout=3, callback=on_terminate)
-        for p in alive:
-             p.kill()
+        logger.info('AceStream Engine with pid %s terminate .....' % AceStuff.ace.pid)
+        AceStuff.ace.terminate(); gevent.sleep(1)
+        if isRunning(AceStuff.ace): AceStuff.ace.kill()
+        # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try: os.remove(AceStuff.acedir + '\\acestream.port')
             except: pass
@@ -505,8 +489,7 @@ def _reloadconfig(signum=None, frame=None):
     from aceconfig import AceConfig
     logger.info('Ace Stream HTTP Proxy config reloaded')
 
-logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile,
-                    format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
+logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
@@ -568,7 +551,7 @@ else:
              AceConfig.acehost, AceConfig.aceHTTPport = engine[0], engine[2]
              Engine_found = True
              break
-     except requests.ConnectionError: pass
+     except requests.exceptions.ConnectionError: pass
    if not Engine_found: logger.error('Not found any Ace Stream engine ! EXIT !'); sys.exit(1)
 
 # Refreshes the acestream.port file .....
