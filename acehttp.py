@@ -296,8 +296,10 @@ class Client:
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 
-        if AceConfig.transcode and AceConfig.osplatform != 'Windows':
-            if not fmt or not fmt in AceConfig.transcodecmd: fmt = 'default'
+        transcoder = None
+        out = self.handler.wfile
+
+        if AceConfig.transcode and fmt and AceConfig.osplatform != 'Windows':
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
                 popen_params = { "bufsize": AceConfig.readchunksize,
@@ -309,13 +311,9 @@ class Client:
                 transcoder = Popen(AceConfig.transcodecmd[fmt], **popen_params)
                 gevent.sleep()
                 out = transcoder.stdin
-                logger.warning("Ffmpeg transcoding started")
+                logger.warning('Ffmpeg transcoding started')
             else:
-                transcoder = None
-                out = self.handler.wfile
-        else:
-            transcoder = None
-            out = self.handler.wfile
+                logger.error("Can't found fmt key. Ffmpeg transcoding not started !")
         try:
             while self.handler.connection and self.ace._streamReaderState == 2:
                 try:
