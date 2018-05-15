@@ -396,7 +396,7 @@ def spawnAce(cmd, delay=0.1):
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
-        AceStuff.ace = Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        AceStuff.ace = psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
         gevent.sleep(delay)
         return True
     except: return False
@@ -458,8 +458,8 @@ def clean_proc():
         with AceStuff.clientcounter.lock:
             if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
             gevent.sleep(1)
-        AceStuff.ace.terminate(); gevent.sleep(1)
-        if isRunning(AceStuff.ace): AceStuff.ace.kill()
+        for proc in psutil.process_iter():
+           if proc.name() == name: proc.terminate(); gevent.sleep(1)
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try: os.remove(AceStuff.acedir + '\\acestream.port')
