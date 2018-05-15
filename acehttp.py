@@ -136,7 +136,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
         self.requrl = requests.utils.urlparse(self.path)
-        self.reqparams = parse_qs(self.requrl.query)
+        self.reqparams = parse_qs(self.query)
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
                                  '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
