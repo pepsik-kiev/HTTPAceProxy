@@ -457,6 +457,9 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         logger.info('AceStream Engine with pid %s terminate .....' % AceStuff.ace.pid)
+        with AceStuff.clientcounter.lock:
+            if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
+            gevent.sleep(1)
         AceStuff.ace.terminate(); gevent.sleep(1)
         if isRunning(AceStuff.ace): AceStuff.ace.kill()
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
@@ -539,6 +542,7 @@ if not ace_pid and AceConfig.acespawn:
        logger.info('Ace Stream engine spawned with pid %s' % AceStuff.ace.pid)
 elif ace_pid:
    logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
+   AceStuff.ace = psutil.Process(ace_pid)
    AceConfig.acehostslist[0][0] = AceConfig.httphost
    AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
    AceConfig.acespawn = False
