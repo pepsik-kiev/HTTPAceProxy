@@ -1,8 +1,8 @@
 HTTPAceProxy
 ===========================================
 HTTPAceProxy allows you to watch [Ace Stream](http://acestream.org/) live streams or BitTorrent files over HTTP.
-It's written in Python and work on any OS where a python >=2.7.10 with required dependencies 
-gevent and psutil are installed. Installed ffmpeg is an optional, but highly recommended, 
+It's written in Python and work on any OS where a python (>=2.7.10) with required dependencies 
+gevent (>=1.2.2) and psutil (>= 5.3.0) are installed. Installed ffmpeg is an optional, but highly recommended, 
 for fine tuning for yourself.
 
 HTTPAceProxy supports Ace Stream Content-ID hashes (PIDs), .acelive files, infohash, usual torrent files
