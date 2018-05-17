@@ -396,7 +396,7 @@ def spawnAce(cmd, delay=0.1):
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
-        AceStuff.ace = psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        AceStuff.ace = Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
         gevent.sleep(delay)
         return True
     except: return False
@@ -496,8 +496,8 @@ logger = logging.getLogger('HTTPServer')
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':
-   AceConfig.httphost = [(s.connect(('1.1.1.1', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
-   logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
+    AceConfig.httphost = [(s.connect(('1.1.1.1', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+    logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
     logger.error("Cannot bind to port %s without root privileges" % AceConfig.httpport)
