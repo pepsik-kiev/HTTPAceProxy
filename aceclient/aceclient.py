@@ -70,7 +70,7 @@ class AceClient(object):
         self._lock = threading.Condition(threading.Lock())
         self._streamReaderConnection = None
         self._streamReaderState = None
-        self._streamReaderQueue = deque(maxlen=AceConfig.readcachesize)
+        self._streamReaderQueue = deque(maxlen=AceConfig.readcachesize) # Ring buffer
         self._engine_version_code = 0
 
         # Logger
@@ -294,15 +294,17 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while True:
+        while self._socket:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
                 logger.debug('<<< %s' % requests.utils.unquote(self._recvbuffer).decode('utf8'))
             except:
                 # If something happened during read, abandon reader.
-                logger.error('Exception at socket read')
-                if not self._shuttingDown.isSet(): self._shuttingDown.set(); return
+                logger.error('Exception at socket read. AceClient destroyed')
+                if not self._shuttingDown.isSet(): self._shuttingDown.set()
+                self._socket.close()
+                return
             else:
                 # Parsing everything only if the string is not empty
 
