@@ -13,9 +13,7 @@ import time
 import threading
 import traceback
 import random
-import Queue
 from collections import deque
-
 
 class AceException(Exception):
     '''
@@ -252,10 +250,10 @@ class AceClient(object):
                   try: data = out.read(AceConfig.readchunksize)
                   except: data = None
                   if data and clients:
-                      with self._lock: self._streamReaderQueue.appendleft(data)
+                      self._streamReaderQueue.appendleft(data) # https://bugs.python.org/msg199368
                       for c in clients:
                           try: c.addChunk(data, 5.0)
-                          except Queue.Full:
+                          except IndexError:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
                               if len(clients) > 1:
                                   logger.debug('Disconnecting client: %s' % c.clientip)
                                   c.destroy()

@@ -35,7 +35,6 @@ from itertools import izip as zip
 import time
 import threading
 import requests
-import Queue
 from bencode import __version__ as bencode_version__
 import ipaddr
 from urlparse import parse_qs
@@ -320,7 +319,7 @@ class Client:
                     data = self.getChunk(60.0)
                     try: out.write(data)
                     except: break
-                except Queue.Empty: logger.warning("No data received in 60 seconds - disconnecting"); break
+                except IndexError: logger.warning("No data received in 60 seconds - disconnecting"); break #Queue.Empty
         finally:
             if transcoder:
                try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
@@ -330,13 +329,12 @@ class Client:
     def addChunk(self, chunk, timeout):
         start = time.time()
         with self.lock:
-            while self.handler.connection and len(self.queue) == AceConfig.readcachesize:
+            while self.handler.connection and len(self.queue) >= AceConfig.readcachesize:
                 remaining = start + timeout - time.time()
                 if remaining > 0: self.lock.wait(remaining)
-                else: raise Queue.Full
-            if self.handler.connection:
-                self.queue.appendleft(chunk)
-                self.lock.notifyAll()
+                else: raise IndexError #Queue.Full
+            if self.handler.connection: self.queue.appendleft(chunk)
+            self.lock.notifyAll()
 
     def getChunk(self, timeout):
         start = time.time()
@@ -344,7 +342,7 @@ class Client:
             while self.handler.connection and len(self.queue) == 0:
                 remaining = start + timeout - time.time()
                 if remaining > 0: self.lock.wait(remaining)
-                else: raise Queue.Empty
+                else: raise IndexError #Queue.Empty
             chunk = self.queue.pop()
             self.lock.notifyAll()
             return chunk if self.handler.connection else None
@@ -448,8 +446,13 @@ def isRunning(process):
     return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
 
 def findProcess(name):
-    proc = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]
-    return proc[0]['pid'] if proc else None
+    for proc in psutil.process_iter():
+        try:
+            pinfo = proc.as_dict(attrs=['pid', 'name'])
+            if pinfo['name'] == name: return pinfo['pid']
+        except psutil.AccessDenied: pass # System process pass
+        except psutil.NoSuchProcess: pass # # Process terminated
+    return None
 
 def clean_proc():
     # Trying to close all spawned processes gracefully

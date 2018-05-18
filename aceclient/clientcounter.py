@@ -2,10 +2,10 @@
 '''
 Simple Client Counter for VLC VLM
 '''
+import gevent
 import threading
 import logging
 import time
-import gevent
 from aceconfig import AceConfig
 from aceclient import AceClient
 
@@ -39,8 +39,7 @@ class ClientCounter(object):
             clients = self.clients.get(cid)
             if clients:
                 client.ace = clients[0].ace
-                with client.ace._lock:
-                    client.queue.extend(client.ace._streamReaderQueue)
+                with client.ace._lock: client.queue.extend(client.ace._streamReaderQueue)
                 clients.append(client)
             else:
                 if self.idleace:
