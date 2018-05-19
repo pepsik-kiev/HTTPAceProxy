@@ -548,7 +548,7 @@ else:
              Engine_found = True
              break
      except requests.exceptions.ConnectionError: pass
-   if not Engine_found: logger.error('Not found any Ace Stream engine ! EXIT !'); sys.exit(1)
+   if not Engine_found: logger.error('Not found any Ace Stream engine!')
 
 # Refreshes the acestream.port file .....
 if ace_pid and AceConfig.osplatform == 'Windows': detectPort()
