@@ -67,11 +67,7 @@ class Torrenttelik(AceProxyPlugin):
             Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))
             return
 
-        add_ts = False
-        try:
-            if connection.splittedpath[2].lower() == 'ts': add_ts = True
-        except: pass
-
+        add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator()
 
         for channel in channels:

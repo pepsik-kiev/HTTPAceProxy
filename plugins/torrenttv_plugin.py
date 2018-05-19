@@ -129,7 +129,7 @@ class Torrenttv(AceProxyPlugin):
             else:
                 hostport = connection.headers['Host']
                 path = '' if len(self.channels) == 0 else '/torrenttv/channel'
-                add_ts = True if path.endswith('/ts') else False
+                add_ts = True if connection.path.endswith('/ts') else False
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
                 exported = self.playlist.exportm3u(hostport, path, add_ts=add_ts, header=header, fmt=fmt)
 

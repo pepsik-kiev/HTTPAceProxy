@@ -51,15 +51,12 @@ class Allfon(AceProxyPlugin):
             if not self.downloadPlaylist():
                 connection.dieWithError()
                 return
-
-        matches = re.finditer(r'\#EXTINF\:0\,(?P<name>\S.+)\n.+\n.+\n(?P<url>^acestream.+$)', Allfon.playlist, re.MULTILINE)
-        add_ts = False
-        try:
-            if connection.splittedpath[2].lower() == 'ts': add_ts = True
-        except: pass
-
+        add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
-        for match in matches: playlistgen.addItem(match.groupdict())
+
+        pattern = re.compile(r',(?P<name>\S.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
+        for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
+
         Allfon.logger.info('AllFon playlist created')
         params = parse_qs(connection.query)
         fmt = params['fmt'][0] if 'fmt' in params else None
