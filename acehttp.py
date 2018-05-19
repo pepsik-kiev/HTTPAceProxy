@@ -8,22 +8,17 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.subprocess import Popen, PIPE
-import os, sys
+import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
-wheels_dir = os.path.join(base_dir, 'modules/wheels')
-wheels_list = filter(lambda x: x.endswith('.whl'), os.listdir(wheels_dir))
-for filename in wheels_list: sys.path.insert(0, wheels_dir + '/' + filename)
-
-modules_dir = os.path.join(base_dir, 'modules')
-sys.path.insert(0, modules_dir)
+sys.path.insert(0, os.path.join(base_dir, 'modules'))
+for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
 import aceclient
 import aceconfig
 from aceconfig import AceConfig
 from aceclient.clientcounter import ClientCounter
 import traceback
-import glob
 import signal
 import logging
 import psutil
@@ -31,7 +26,6 @@ from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
 from collections import deque
 from base64 import b64encode
-from itertools import izip as zip
 import time
 import threading
 import requests
@@ -63,7 +57,6 @@ class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
     def handle_error(self, request, client_address):
         logging.debug(traceback.format_exc())
         pass
-
 
 class ThreadedPoolHTTPServer(ThreadPoolMixIn, BaseHTTPServer.HTTPServer):
     """
@@ -100,7 +93,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
 
         # Connected client IP address
-        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.request.getpeername()[0]
+        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
         self.requrl = requests.utils.urlparse(self.path)
@@ -264,8 +257,7 @@ class Client:
             start = time.time()
             while self.handler.connection and self.ace._streamReaderState == 1:
                 remaining = start + 5.0 - time.time()
-                if remaining > 0:
-                    self.ace._lock.wait(remaining)
+                if remaining > 0: self.ace._lock.wait(remaining)
                 else:
                     self.handler.dieWithError(500, 'Video stream not opened in 5 seconds - disconnecting')
                     return
@@ -449,7 +441,7 @@ def findProcess(name):
     for proc in psutil.process_iter():
         try:
             pinfo = proc.as_dict(attrs=['pid', 'name'])
-            if pinfo['name'] == name: return pinfo['pid']
+            if name in pinfo['name']: return pinfo['pid']
         except psutil.AccessDenied: pass # System process pass
         except psutil.NoSuchProcess: pass # # Process terminated
     return None
@@ -459,8 +451,7 @@ def clean_proc():
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         logger.info('AceStream Engine with pid %s terminate .....' % AceStuff.ace.pid)
         with AceStuff.clientcounter.lock:
-            if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
-            gevent.sleep(1)
+            if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy(); gevent.sleep(1)
         for proc in psutil.process_iter():
            if proc.name() == name: proc.terminate(); gevent.sleep(1)
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
@@ -472,7 +463,7 @@ def clean_proc():
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     for connection in server.requestlist:
-        try: logger.debug("Kill a connection from %s" % connection.getpeername()[0]); connection.shutdown(SHUT_RDWR)
+        try: logger.debug("Destroy connection from %s" % connection.getpeername()[0]); connection.shutdown(SHUT_RDWR)
         except: logger.warning("Cannot kill a connection from %s" % connection.getpeername()[0])
     clean_proc()
     server.pool.shutdown()
@@ -570,15 +561,12 @@ except: pass
 AceStuff.pluginshandlers = dict()
 # And a list with plugin instances
 AceStuff.pluginlist = list()
-pluginsmatch = glob.glob('plugins/*_plugin.py')
 sys.path.insert(0, 'plugins')
-pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in pluginsmatch]
 logger.info("Load Ace Stream HTTP Proxy plugins .....")
-for i in pluginslist:
+for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]:
     plugin = __import__(i)
     plugname = i.split('_')[0].capitalize()
-    try:
-        plugininstance = getattr(plugin, plugname)(AceConfig, AceStuff)
+    try: plugininstance = getattr(plugin, plugname)(AceConfig, AceStuff)
     except Exception as e:
         logger.error("Cannot load plugin %s: %s" % (plugname, repr(e)))
         continue
