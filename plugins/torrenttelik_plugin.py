@@ -25,10 +25,10 @@ class Torrenttelik(AceProxyPlugin):
 
     def downloadPlaylist(self, url):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
+        proxies = {}; timeout = 5
+        if config.useproxy: proxies=config.proxies; timeout=30
         try:
-            if config.useproxy:
-                  Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30)
-            else: Torrenttelik.playlist = requests.get(url, headers=headers, timeout=5)
+            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
 

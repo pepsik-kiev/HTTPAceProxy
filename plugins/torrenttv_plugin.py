@@ -32,21 +32,19 @@ class Torrenttv(AceProxyPlugin):
         self.logomap = config.logomap
         self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
 
-        if config.updateevery:
-            gevent.spawn(self.playlistTimedDownloader)
+        if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
     def playlistTimedDownloader(self):
         while True:
-            time.sleep(10)
             with self.lock: self.downloadPlaylist()
             gevent.sleep(config.updateevery * 60)
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
+        proxies = {}; timeout = 5
+        if config.useproxy: proxies = config.proxies; timeout = 30
         try:
-            if config.useproxy:
-                  origin = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text
-            else: origin = requests.get(config.url, headers=headers, timeout=5).text
+            origin = requests.get(config.url, headers=headers, proxies=proxies, timeout=timeout).text.encode('utf-8')
 
             self.logger.info('TTV playlist ' + config.url + ' downloaded')
             self.playlisttime = int(time.time())
@@ -55,10 +53,10 @@ class Torrenttv(AceProxyPlugin):
             m = hashlib.md5()
             pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
 
-            for match in pattern.finditer(origin.encode('UTF-8'), re.MULTILINE):
+            for match in pattern.finditer(origin, re.MULTILINE):
                 itemdict = match.groupdict()
                 encname = itemdict.get('name')
-                name = encname.decode('UTF-8')
+                name = encname.decode('utf-8')
                 logo = self.logomap.get(name)
                 url = itemdict['url']
                 if logo: itemdict['logo'] = logo
@@ -72,10 +70,8 @@ class Torrenttv(AceProxyPlugin):
 
             self.etag = '"' + m.hexdigest() + '"'
 
-        except requests.exceptions.ConnectionError:
-            self.logger.error("Can't download TTV playlist!")
-            return False
-        except: logger.error(traceback.format_exc()); return False
+        except requests.exceptions.ConnectionError: self.logger.error("Can't download TTV playlist!"); return False
+        except: self.logger.error(traceback.format_exc()); return False
 
         if self.updatelogos:
             try:
@@ -100,9 +96,8 @@ class Torrenttv(AceProxyPlugin):
             # 30 minutes cache
             if not self.playlist or (int(time.time()) - self.playlisttime > 30 * 60):
                 self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
-                if not self.downloadPlaylist():
-                    connection.dieWithError()
-                    return
+                if not self.downloadPlaylist(): connection.dieWithError(); return
+
             path = connection.path
             params = parse_qs(connection.query)
             fmt = params['fmt'][0] if 'fmt' in params else None

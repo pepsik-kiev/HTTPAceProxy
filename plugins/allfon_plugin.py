@@ -25,10 +25,10 @@ class Allfon(AceProxyPlugin):
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
+        proxies = {}; timeout = 5
+        if config.useproxy: proxies = config.proxies; timeout = 30
         try:
-            if config.useproxy:
-                  Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text.encode('UTF-8')
-            else: Allfon.playlist = requests.get(config.url, headers=headers, timeout=5).text.encode('UTF-8')
+            Allfon.playlist = requests.get(config.url, headers=headers, proxies=proxies, timeout=timeout).text.encode('UTF-8')
             Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
         except requests.exceptions.ConnectionError:
@@ -52,8 +52,7 @@ class Allfon(AceProxyPlugin):
                 connection.dieWithError()
                 return
 
-        matches = re.finditer(r'\#EXTINF\:0\,(?P<name>\S.+)\n.+\n.+\n(?P<url>^acestream.+$)',
-                              Allfon.playlist, re.MULTILINE)
+        matches = re.finditer(r'\#EXTINF\:0\,(?P<name>\S.+)\n.+\n.+\n(?P<url>^acestream.+$)', Allfon.playlist, re.MULTILINE)
         add_ts = False
         try:
             if connection.splittedpath[2].lower() == 'ts': add_ts = True
