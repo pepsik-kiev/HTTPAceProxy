@@ -261,7 +261,7 @@ class AceClient(object):
                   elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
                   else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
           finally:
-              with self._lock: self._streamReaderState = None; self._lock.notifyAll
+              with self._lock: self._streamReaderState = None; self._lock.notifyAll()
               if transcoder:
                  try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                  except: pass
