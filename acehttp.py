@@ -8,6 +8,8 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.subprocess import Popen, PIPE
+from gevent.queue import Queue
+
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
@@ -24,7 +26,6 @@ import logging
 import psutil
 from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
-from collections import deque
 from base64 import b64encode
 import time
 import threading
@@ -122,7 +123,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                # logger.error(traceback.format_exc())
             finally: return
-
         self.handleRequest(headers_only)
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
@@ -245,9 +245,8 @@ class Client:
         self.channelName = channelName
         self.channelIcon = channelIcon
         self.ace = None
-        self.lock = threading.Condition(threading.Lock())
         self.connectionTime = time.time()
-        self.queue = deque()
+        self.queue = Queue(maxsize=AceConfig.readcachesize)
 
     def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
@@ -308,41 +307,17 @@ class Client:
         try:
             while self.handler.connection and self.ace._streamReaderState == 2:
                 try:
-                    data = self.getChunk(60.0)
+                    data = self.queue.get(timeout=60)
                     try: out.write(data)
                     except: break
-                except IndexError: logger.warning("No data received in 60 seconds - disconnecting"); break #Queue.Empty
+                except gevent.queue.Empty: logger.warning('No data received in 60 seconds - disconnecting'); break
         finally:
             if transcoder:
-               try: transcoder.kill(); logger.warning("Ffmpeg transcoding stoped")
+               try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
             return
 
-    def addChunk(self, chunk, timeout):
-        start = time.time()
-        with self.lock:
-            while self.handler.connection and len(self.queue) >= AceConfig.readcachesize:
-                remaining = start + timeout - time.time()
-                if remaining > 0: self.lock.wait(remaining)
-                else: raise IndexError #Queue.Full
-            if self.handler.connection: self.queue.appendleft(chunk)
-            self.lock.notifyAll()
-
-    def getChunk(self, timeout):
-        start = time.time()
-        with self.lock:
-            while self.handler.connection and len(self.queue) == 0:
-                remaining = start + timeout - time.time()
-                if remaining > 0: self.lock.wait(remaining)
-                else: raise IndexError #Queue.Empty
-            chunk = self.queue.pop()
-            self.lock.notifyAll()
-            return chunk if self.handler.connection else None
-
-    def destroy(self):
-        with self.lock:
-             self.queue.clear()
-             self.lock.notifyAll()
+    def destroy(self): self.queue.queue.clear()
 
 class AceStuff(object):
     '''
@@ -406,19 +381,15 @@ def checkAce():
             if AceConfig.osplatform == 'Windows': detectPort()
         else:
             logger.error("Can't spawn Ace Stream!")
-            clean_proc()
-            sys.exit(1)
 
 def detectPort():
     try:
         if not isRunning(AceStuff.ace):
             logger.error("Couldn't detect port! Ace Engine is not running?")
-            clean_proc()
-            sys.exit(1)
+            clean_proc(); sys.exit(1)
     except AttributeError:
         logger.error("Ace Engine is not running!")
-        clean_proc()
-        sys.exit(1)
+        clean_proc(); sys.exit(1)
     import _winreg
     reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
     try: key = _winreg.OpenKey(reg, 'Software\AceStream')
@@ -431,8 +402,7 @@ def detectPort():
             logger.info("Detected ace port: %s" % AceConfig.acehostslist[0][1])
         except IOError:
             logger.error("Couldn't detect port! acestream.port file doesn't exist?")
-            clean_proc()
-            sys.exit(1)
+            clean_proc(); sys.exit(1)
 
 def isRunning(process):
     return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False

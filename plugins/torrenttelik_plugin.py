@@ -31,12 +31,10 @@ class Torrenttelik(AceProxyPlugin):
             Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
-
         except requests.exceptions.ConnectionError:
             Torrenttelik.logger.error("Can't download Torrent-telik playlist!")
             return False
-
-        return True
+        else: return True
 
     def handle(self, connection, headers_only=False):
 
@@ -59,20 +57,18 @@ class Torrenttelik(AceProxyPlugin):
 
         # 15 minutes cache
         if not Torrenttelik.playlist or (int(time.time()) - Torrenttelik.playlisttime > 15 * 60):
-            if not self.downloadPlaylist(url):
-                connection.dieWithError()
-                return
-        try: channels = Torrenttelik.playlist.json()['channels']
-        except Exception as e:
-            Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))
-            return
+            if not self.downloadPlaylist(url): connection.dieWithError(); return
 
         add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator()
 
-        for channel in channels:
-            channel['group'] = channel.get('cat', '')
-            playlistgen.addItem(channel)
+        try:
+            for channel in Torrenttelik.playlist.json()['channels']:
+                channel['group'] = channel.get('cat', '')
+                playlistgen.addItem(channel)
+        except Exception as e:
+            Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))
+            return
 
         header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)
         exported = playlistgen.exportm3u(hostport, header=header, add_ts=add_ts, fmt=self.getparam('fmt')).encode('utf-8')

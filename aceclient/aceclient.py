@@ -5,6 +5,7 @@ import gevent
 from gevent.event import AsyncResult
 from gevent.event import Event
 from gevent.subprocess import Popen, PIPE
+from gevent.queue import Queue
 import telnetlib
 import logging
 import requests
@@ -13,7 +14,6 @@ import time
 import threading
 import traceback
 import random
-from collections import deque
 
 class AceException(Exception):
     '''
@@ -65,10 +65,10 @@ class AceClient(object):
         self._started_again = False
 
         self._idleSince = time.time()
-        self._lock = threading.Condition(threading.Lock())
         self._streamReaderConnection = None
         self._streamReaderState = None
-        self._streamReaderQueue = deque(maxlen=AceConfig.readcachesize) # Ring buffer
+        self._lock = threading.Condition(threading.Lock())
+        self._streamReaderQueue = Queue(maxsize=AceConfig.readcachesize) # Ring buffer
         self._engine_version_code = 0
 
         # Logger
@@ -250,17 +250,18 @@ class AceClient(object):
                   try: data = out.read(AceConfig.readchunksize)
                   except: data = None
                   if data and clients:
-                      self._streamReaderQueue.appendleft(data) # https://bugs.python.org/msg199368
+                      if self._streamReaderQueue.full(): self._streamReaderQueue.get()
+                      self._streamReaderQueue.put(data)
                       for c in clients:
-                          try: c.addChunk(data, 5.0)
-                          except IndexError:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
+                          try: c.queue.put(data, timeout=5)
+                          except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
                               if len(clients) > 1:
-                                  logger.debug('Disconnecting client: %s' % c.clientip)
+                                  logger.debug('Disconnecting client: %s' % c.handler.clientip)
                                   c.destroy()
                   elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
                   else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
           finally:
-              with self._lock: self._streamReaderState = None; self._lock.notifyAll()
+              with self._lock: self._streamReaderState = None; self._lock.notifyAll
               if transcoder:
                  try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                  except: pass
@@ -272,7 +273,7 @@ class AceClient(object):
            logger.debug('Close video stream: %s' % c.url)
            c.close()
            self._streamReaderConnection = None
-        self._streamReaderQueue.clear()
+        self._streamReaderQueue.queue.clear()
 
     def getPlayEvent(self, timeout=None):
         '''

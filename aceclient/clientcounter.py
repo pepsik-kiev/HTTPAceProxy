@@ -39,7 +39,7 @@ class ClientCounter(object):
             clients = self.clients.get(cid)
             if clients:
                 client.ace = clients[0].ace
-                with client.ace._lock: client.queue.extend(client.ace._streamReaderQueue)
+                client.queue = client.ace._streamReaderQueue.copy()
                 clients.append(client)
             else:
                 if self.idleace:

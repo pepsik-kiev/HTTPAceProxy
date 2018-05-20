@@ -11,7 +11,6 @@ from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.allfon as config
 
-
 class Allfon(AceProxyPlugin):
 
     # ttvplaylist handler is obsolete
@@ -34,7 +33,7 @@ class Allfon(AceProxyPlugin):
         except requests.exceptions.ConnectionError:
             Allfon.logger.error("Can't download AllFonTV playlist!")
             return False
-        return True
+        else: return True
 
     def handle(self, connection, headers_only=False):
 
@@ -48,9 +47,8 @@ class Allfon(AceProxyPlugin):
 
         # 15 minutes cache
         if not Allfon.playlist or (int(time.time()) - Allfon.playlisttime > 15 * 60):
-            if not self.downloadPlaylist():
-                connection.dieWithError()
-                return
+            if not self.downloadPlaylist(): connection.dieWithError(); return
+
         add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
 
