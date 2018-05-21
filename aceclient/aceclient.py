@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 from aceconfig import AceConfig
 from acemessages import *
-import gevent
+import gevent, gevent.queue
 from gevent.event import AsyncResult
 from gevent.event import Event
 from gevent.subprocess import Popen, PIPE
-from gevent.queue import Queue
 import telnetlib
 import logging
 import requests
@@ -68,7 +67,7 @@ class AceClient(object):
         self._streamReaderConnection = None
         self._streamReaderState = None
         self._lock = threading.Condition(threading.Lock())
-        self._streamReaderQueue = Queue(maxsize=AceConfig.readcachesize) # Ring buffer
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=AceConfig.readcachesize) # Ring buffer
         self._engine_version_code = 0
 
         # Logger
@@ -237,14 +236,14 @@ class AceClient(object):
               else: out = self._streamReaderConnection.raw
 
           except requests.exceptions.RequestException:
-              logger.error('Failed to open video stream')
+              logger.error('Failed to open video stream %s' % url)
               logger.error(traceback.format_exc())
           except: logger.error(traceback.format_exc())
 
           else:
               with self._lock: self._streamReaderState = 2; self._lock.notifyAll()
               self.play_event()
-              while True:
+              while self._streamReaderConnection:
                   self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                   clients = counter.getClients(cid)
                   try: data = out.read(AceConfig.readchunksize)

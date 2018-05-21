@@ -73,7 +73,6 @@ class AceConfig(acedefconfig.AceDefConfig):
     # HTTP Server port
     httpport = 8000
     # Read the video input stream in chunks of the following size
-    # Don't set more then 8192 -  https://hg.python.org/cpython/file/84cd07899baf/Objects/fileobject.c#l2313
     readchunksize = 8192
     # Cache the following number of the tailing chunks
     readcachesize = 1024

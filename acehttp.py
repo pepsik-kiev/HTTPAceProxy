@@ -8,7 +8,7 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.subprocess import Popen, PIPE
-from gevent.queue import Queue
+import gevent.queue
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -28,7 +28,6 @@ from socket import error as SocketException
 from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
 import time
-import threading
 import requests
 from bencode import __version__ as bencode_version__
 import ipaddr
@@ -246,7 +245,7 @@ class Client:
         self.channelIcon = channelIcon
         self.ace = None
         self.connectionTime = time.time()
-        self.queue = Queue(maxsize=AceConfig.readcachesize)
+        self.queue = gevent.queue.Queue(maxsize=AceConfig.readcachesize)
 
     def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
