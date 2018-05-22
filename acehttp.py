@@ -25,7 +25,7 @@ import signal
 import logging
 import psutil
 from socket import error as SocketException
-from socket import SHUT_RDWR, socket, AF_INET, SOCK_DGRAM
+from socket import socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
 import time
 import requests
@@ -38,7 +38,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
     allow_reuse_address = daemon_threads = True
-    requestlist = []
 
     def process_request_thread(self, request, client_address):
         try:
@@ -48,10 +47,8 @@ class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
         except Exception:
             self.handle_error(request, client_address)
             self.close_request(request)
-        finally: self.requestlist.remove(request)
 
     def process_request(self, request, client_address):
-        self.requestlist.append(request)
         self.pool.submit(self.process_request_thread, request, client_address)
 
     def handle_error(self, request, client_address):
@@ -431,9 +428,6 @@ def clean_proc():
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
-    for connection in server.requestlist:
-        try: logger.debug("Destroy connection from %s" % connection.getpeername()[0]); connection.shutdown(SHUT_RDWR)
-        except: logger.warning("Cannot kill a connection from %s" % connection.getpeername()[0])
     clean_proc()
     server.pool.shutdown()
     server.shutdown()

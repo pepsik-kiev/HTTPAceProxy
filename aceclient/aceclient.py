@@ -6,6 +6,7 @@ from gevent.event import AsyncResult
 from gevent.event import Event
 from gevent.subprocess import Popen, PIPE
 import telnetlib
+from socket import SHUT_WR
 import logging
 import requests
 import json
@@ -301,7 +302,6 @@ class AceClient(object):
                 # If something happened during read, abandon reader.
                 logger.error('Exception at socket read. AceClient destroyed')
                 if not self._shuttingDown.isSet(): self._shuttingDown.set()
-                self._socket.close()
                 return
             else:
                 # Parsing everything only if the string is not empty
@@ -389,5 +389,8 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
-                    self._socket.close(); logger.debug('AceClient destroyed')
+                    self._socket.get_socket().shutdown(SHUT_WR)
+                    self._recvbuffer = self._socket.read_all()
+                    self._socket.close()
+                    logger.debug('AceClient destroyed')
                     return
