@@ -49,6 +49,7 @@ class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
             self.close_request(request)
 
     def process_request(self, request, client_address):
+        checkAce() # Check is AceStream engine alive
         self.pool.submit(self.process_request_thread, request, client_address)
 
     def handle_error(self, request, client_address):
@@ -159,9 +160,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_header("Connection", "Close")
             self.end_headers()
             return
-
-        # Check is AceStream engine alive before start streaming
-        if self.connection: checkAce()
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
@@ -306,7 +304,7 @@ class Client:
                     data = self.queue.get(timeout=60)
                     try: out.write(data)
                     except: break
-                except gevent.queue.Empty: logger.warning('No data received in 60 seconds - disconnecting'); break
+                except gevent.queue.Empty: logger.warning('No data received in 60 seconds - disconnecting "%s"' % self.channelName); break
         finally:
             if transcoder:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
@@ -357,7 +355,7 @@ def spawnAce(cmd, delay=0.1):
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
-        AceStuff.ace = Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
+        AceStuff.ace = psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
         gevent.sleep(delay)
         return True
     except: return False
