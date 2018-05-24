@@ -88,6 +88,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         GET request handler
         '''
         logger = logging.getLogger('do_GET')
+        self.server_version = 'HTTPAceProxy'
         if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
 
         # Connected client IP address
@@ -261,22 +262,14 @@ class Client:
         # Sending client headers to videostream
         if self.handler.connection:
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
-            FORWARD_HEADERS = ['Connection',
-                               'Keep-Alive',
-                               'Content-Range',
-                               'Content-Type',
-                               'X-Content-Duration',
-                               'Content-Length',
-                               ]
+            FORWARD_HEADERS = ['Connection', 'Keep-Alive', 'Content-Range', 'Content-Type', 'X-Content-Duration', 'Content-Length']
             SKIP_HEADERS = ['Server', 'Date', 'Transfer-Encoding', 'Accept-Ranges']
-            response_headers={}
-            for k in self.ace._streamReaderConnection.headers:
-                if k.split(':')[0] not in (FORWARD_HEADERS + SKIP_HEADERS):
-                    logger.error('NEW HEADERS FOUND: %s' % k.split(':')[0])
-            for h in FORWARD_HEADERS:
-                if self.ace._streamReaderConnection.headers.get(h):
-                    response_headers[h] = self.ace._streamReaderConnection.headers.get(h)
-                    self.handler.send_header(h, response_headers[h])
+
+            new_headers = {k:v for (k, v) in self.ace._streamReaderConnection.headers.items() if k not in (FORWARD_HEADERS + SKIP_HEADERS)}
+            if new_headers: logger.error('NEW HEADERS FOUND: %s' % new_headers)
+
+            response_headers = {k:v for (k, v) in self.ace._streamReaderConnection.headers.items() if k not in SKIP_HEADERS}
+            for h in response_headers: self.handler.send_header(h, response_headers[h])
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 
