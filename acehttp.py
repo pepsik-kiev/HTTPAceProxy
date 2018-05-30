@@ -106,6 +106,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
+            # backward compatibility
+            old2newUrlParts = {'torrent': 'url', 'pid': 'content_id'}
+            if self.reqtype in old2newUrlParts:
+                self.reqtype = old2newUrlParts[self.reqtype]
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled
             # by plugin
             if not (self.reqtype in ('content_id','url','infohash','direct_url','data','efile_url') or self.reqtype in AceStuff.pluginshandlers):
