@@ -70,6 +70,8 @@ class AceConfig(acedefconfig.AceDefConfig):
     # HTTP AceProxy configuration
     # ----------------------------------------------------
     #
+    # Bind host. 0.0.0.0 - listen on all addresses, change to whatever IP you want to listen on this IP only
+    httphost = "0.0.0.0"
     # HTTP Server port
     httpport = 8000
     # Read the video input stream in chunks of the following size
