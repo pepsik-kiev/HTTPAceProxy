@@ -43,11 +43,12 @@ class Stat(AceProxyPlugin):
     def mac_lookup(self,ip_address):
 
         if AceConfig.osplatform != 'Windows':
-           Popen(["ping", "-c 1", ip_address], stdout = PIPE, shell=False)
-           pid = Popen(["arp", "-n", ip_address], stdout = PIPE, shell=False)
+           Popen(['ping', '-c 1', ip_address], stdout = PIPE, shell=False)
+           try: pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
+           except: Stat.logger.error("Can't execute arp! Install net-tools"); return "Local IP address "
         else:
-           popen_params = { "stdout" : PIPE,
-                            "shell"  : False }
+           popen_params = { 'stdout' : PIPE,
+                            'shell'  : False }
            CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
            CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
            DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
