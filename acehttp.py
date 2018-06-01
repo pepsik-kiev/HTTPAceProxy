@@ -106,6 +106,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
+            # backward compatibility
+            old2newUrlParts = {'torrent': 'url', 'pid': 'content_id'}
+            if self.reqtype in old2newUrlParts:
+                self.reqtype = old2newUrlParts[self.reqtype]
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled
             # by plugin
             if not (self.reqtype in ('content_id','url','infohash','direct_url','data','efile_url') or self.reqtype in AceStuff.pluginshandlers):
@@ -443,9 +447,7 @@ logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
 #### Initial settings for AceHTTPproxy host IP
-if AceConfig.httphost == '0.0.0.0':
-    AceConfig.httphost = [(s.connect(('1.1.1.1', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
-    logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
+logger.debug('Ace Stream HTTP Proxy server IP: %s' % AceConfig.httphost)
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
     logger.error("Cannot bind to port %s without root privileges" % AceConfig.httpport)
