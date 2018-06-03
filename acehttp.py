@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/local/bin/python2
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -17,9 +17,9 @@ sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
 import aceclient
+from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
-from aceclient.clientcounter import ClientCounter
 import traceback
 import signal
 import logging
@@ -106,9 +106,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
+            # backward compatibility
+            old2newUrlParts = {'torrent': 'url', 'pid': 'content_id'}
+            if self.reqtype in old2newUrlParts: self.reqtype = old2newUrlParts[self.reqtype]
+
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled
             # by plugin
-            if not (self.reqtype in ('content_id','url','infohash','direct_url','data','efile_url') or self.reqtype in AceStuff.pluginshandlers):
+            if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceStuff.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
                 return
         except IndexError:
@@ -128,9 +132,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.requrl = requests.utils.urlparse(self.path)
         self.reqparams = parse_qs(self.query)
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
-        self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
-                                 '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
-                                 '.ogx','.qt','.rm','.swf','.ts','.vob','.wmv','.wav','.webm')
+        self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
+                                 '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
+                                 '.ogx', '.qt', '.rm', '.swf', '.ts', '.vob', '.wmv', '.wav', '.webm')
 
         # If firewall enabled
         if AceConfig.firewall and not checkFirewall(self.clientip):
@@ -154,11 +158,11 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.reqparams, self.headers):
             # Return 200 and exit
-            if headers_only: logger.debug("Sending headers and closing connection")
-            else: logger.debug("Fake request - closing connection")
+            if headers_only: logger.debug('Sending headers and closing connection')
+            else: logger.debug('Fake request - closing connection')
             self.send_response(200)
-            self.send_header("Content-Type", "video/mpeg")
-            self.send_header("Connection", "Close")
+            self.send_header('Content-Type', 'video/mpeg')
+            self.send_header('Connection', 'Close')
             self.end_headers()
             return
 
@@ -215,11 +219,11 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def getCID(self, reqtype, url):
         cid = None
-        if reqtype == 'url' and url.endswith(('.acelive', '.acestream', '.acemedia' ,'.torrent')):
+        if reqtype == 'url' and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
             try:
                 headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
                 with requests.get(url, headers=headers, stream = True, timeout=5) as r:
-                   headers={'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
+                   headers={'User-Agent': 'Python-urllib/2.7', 'Content-Type': 'application/octet-stream', 'Connection': 'close'}
                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
             except: pass
             if not cid:
@@ -529,7 +533,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-server = ThreadedPoolHTTPServer((AceConfig.httphost, AceConfig.httpport),HTTPHandler)
-logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost ,AceConfig.httpport))
+server = ThreadedPoolHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
+logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()
