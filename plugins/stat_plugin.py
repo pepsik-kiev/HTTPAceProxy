@@ -33,7 +33,7 @@ class Stat(AceProxyPlugin):
     def geo_ip_lookup(self, ip_address):
         lookup_url = 'http://freegeoip.net/json/%s'
         Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
-        headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}
+        headers={'User-Agent':'API Browser'}
         response = requests.get(lookup_url % ip_address, headers=headers, timeout=5).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
@@ -63,7 +63,7 @@ class Stat(AceProxyPlugin):
            mac_address = mac_address.groups()[0]
            lookup_url = 'http://macvendors.co/api/vendorname/%s'
            try:
-              headers={'User-Agent':'API Browser','Accept-Encoding':'gzip, deflate','Connection':'close'}
+              headers={'User-Agent':'API Browser'}
               response = requests.get(lookup_url % mac_address, headers=headers, timeout=5).text
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
         else: Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)

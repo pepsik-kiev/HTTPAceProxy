@@ -24,7 +24,7 @@ class Torrenttelik(AceProxyPlugin):
     playlisttime = None
 
     def downloadPlaylist(self, url):
-        headers = {'User-Agent': 'Magic Browser', 'Accept-Encoding': 'gzip,deflate', 'Connection': 'close'}
+        headers = {'User-Agent': 'Magic Browser'}
         proxies = {}; timeout = 5
         if config.useproxy: proxies=config.proxies; timeout=30
         try:

@@ -42,11 +42,11 @@ class TorrentTvApi(object):
     def __init__(self, email, password):
         self.email = email
         self.password = password
-        self.session = self.guid = None
-        self.allTranslations = None
+        self.allTranslations = self.session = self.guid = None
         self.lock = threading.RLock()
         self.log = logging.getLogger("TTV API")
         self.conf = ConfigParser.RawConfigParser()
+        self.headers = {'User-Agent': 'Magic Browser'} # headers for connection to the TTV API
 
     def get_mac(self):
         mac = hex(getnode()).replace('0x', '')
@@ -78,9 +78,8 @@ class TorrentTvApi(object):
             if not self.session:
                self.log.debug('Creating new session')
                url = TorrentTvApi.API_URL + 'auth.php'
-               headers = {'User-Agent': 'Magic Browser','Connection': 'close'}
                params = {'typeresult': 'json', 'username':self.email, 'password': self.password, 'application': 'tsproxy', 'guid': self.guid}
-               result = self._jsoncheck(requests.get(url, params=params, headers=headers, timeout=5).json())
+               result = self._jsoncheck(requests.get(url, params=params, headers=self.headers, timeout=5).json())
                self.session = result['session']
                self.log.debug("New session created: %s" % self.session)
                # Store session detales to config file
@@ -109,11 +108,10 @@ class TorrentTvApi(object):
             try:
                 res = self._xmlresult(request, params)
                 self._checkxml(res)
-                return res
             except TorrentTvApiException:
                 res = self._xmlresult(request, params)
                 self._checkxml(res)
-                return res
+            finally: return res
         else:
             res = self._checkedxmlresult(request, params)
             return res.getElementsByTagName('channel')
@@ -134,11 +132,10 @@ class TorrentTvApi(object):
             try:
                 res = self._xmlresult(request, params)
                 self._checkxml(res)
-                return res
             except TorrentTvApiException:
                 res = self._xmlresult(request, params)
                 self._checkxml(res)
-                return res
+            finally: return res
         else:
             res = self._checkedxmlresult(request, params)
             return res.getElementsByTagName('channel')
@@ -157,11 +154,10 @@ class TorrentTvApi(object):
             try:
                 res = self._xmlresult(request, params)
                 self._checkxml(res)
-                return res
             except TorrentTvApiException:
                 res = self._xmlresult(request, params)
                 self._checkxml(res)
-                return res
+            finally: return res
         else:
             res = self._checkedxmlresult(request, params)
             return res.getElementsByTagName('channel')
@@ -255,9 +251,8 @@ class TorrentTvApi(object):
         try:
             url = TorrentTvApi.API_URL + request
             params.update({'session': self.auth(), 'typeresult': 'json'})
-            headers = {'User-Agent': 'Magic Browser', 'Connection': 'close'}
             #self.log.debug(url)
-            return requests.get(url, headers=headers, params=params, timeout=5).json()
+            return requests.get(url, params=params, headers=self.headers, timeout=5).json()
         except requests.exceptions.ConnectionError as e:
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
@@ -272,16 +267,14 @@ class TorrentTvApi(object):
         try:
             url = TorrentTvApi.API_URL + request
             params.update({'session': self.auth(), 'typeresult': 'xml'})
-            headers = {'User-Agent': 'Magic Browser', 'Connection': 'close'}
             #self.log.debug(url)
-            return requests.get(url, headers=headers, params=params, timeout=5).content
+            return requests.get(url, params=params, headers=self.headers, timeout=5).content
         except requests.exceptions.ConnectionError as e:
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
     def _resetSession(self):
         with self.lock:
-            self.session = None
-            self.allTranslations = None
+            self.allTranslations = self.session = None
             try: self.conf.read('.aceconfig')
             except: pass
             if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
