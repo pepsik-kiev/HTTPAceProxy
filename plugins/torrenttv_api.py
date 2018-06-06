@@ -65,32 +65,31 @@ class TorrentTvApi(object):
         try: self.conf.read('.aceconfig')
         except: self.session = None; self.guid = self.get_mac()
         else:
-           try: self.session = self.conf.get("torrenttv_api", "session")
+           try: self.session = self.conf.get('torrenttv_api', 'session')
            except: self.session = None
-           try: self.guid = self.conf.get("torrenttv_api", "guid")
+           try: self.guid = self.conf.get('torrenttv_api', 'guid')
            except: self.guid = self.get_mac()
-           try: self.conf.get("torrenttv_api", "email")
+           try: self.conf.get('torrenttv_api', 'email')
            except: self.session = None
            else:
-               if self.conf.get("torrenttv_api", "email") != self.email: self.session = None
+               if self.conf.get('torrenttv_api', 'email') != self.email: self.session = None
 
         with self.lock:
-            if self.session:
-                self.log.debug("Reusing saved session: %s" % self.session)
-                return self.session
-
-            self.log.debug("Creating new session")
-            headers = {'User-Agent':'Magic Browser','Connection':'close'}
-            params = {'typeresult':'json','username':self.email,'password':self.password,'application':'tsproxy','guid':self.guid}
-            result = self._jsoncheck(requests.get(TorrentTvApi.API_URL+'auth.php', params=params, headers=headers, timeout=5).json())
-            self.session = result['session']
-            self.log.debug("New session created: %s" % self.session)
-            # Store session detales to config file
-            if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
-            self.conf.set('torrenttv_api', 'email', self.email)
-            self.conf.set('torrenttv_api', 'session', self.session)
-            self.conf.set('torrenttv_api', 'guid', self.guid)
-            with open('.aceconfig', 'w+') as config: self.conf.write(config)
+            if not self.session:
+               self.log.debug('Creating new session')
+               url = TorrentTvApi.API_URL + 'auth.php'
+               headers = {'User-Agent': 'Magic Browser','Connection': 'close'}
+               params = {'typeresult': 'json', 'username':self.email, 'password': self.password, 'application': 'tsproxy', 'guid': self.guid}
+               result = self._jsoncheck(requests.get(url, params=params, headers=headers, timeout=5).json())
+               self.session = result['session']
+               self.log.debug("New session created: %s" % self.session)
+               # Store session detales to config file
+               if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
+               self.conf.set('torrenttv_api', 'email', self.email)
+               self.conf.set('torrenttv_api', 'session', self.session)
+               self.conf.set('torrenttv_api', 'guid', self.guid)
+               with open('.aceconfig', 'w+') as config: self.conf.write(config)
+            else: self.log.debug('Reusing saved session: %s' % self.session)
 
             return self.session
 
@@ -104,20 +103,19 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: translations list
         """
-
-        query = '&type=' + translation_type
-
+        request = 'translation_list.php'
+        params = {'type': translation_type}
         if raw:
             try:
-                res = self._xmlresult('translation_list.php', query)
+                res = self._xmlresult(request, params)
                 self._checkxml(res)
                 return res
             except TorrentTvApiException:
-                res = self._xmlresult('translation_list.php', query)
+                res = self._xmlresult(request, params)
                 self._checkxml(res)
                 return res
         else:
-            res = self._checkedxmlresult('translation_list.php', query)
+            res = self._checkedxmlresult(request, params)
             return res.getElementsByTagName('channel')
 
     def records(self, channel_id, date, raw=False):
@@ -130,19 +128,19 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: records list
         """
-        date = date.replace('-0', '-')
-
+        request = 'arc_records.php'
+        params = {'epg_id': channel_id, 'date': date.replace('-0', '-')}
         if raw:
             try:
-                res = self._xmlresult('arc_records.php', '&epg_id=' + channel_id + '&date=' + date)
+                res = self._xmlresult(request, params)
                 self._checkxml(res)
                 return res
             except TorrentTvApiException:
-                res = self._xmlresult('arc_records.php', '&epg_id=' + channel_id + '&date=' + date)
+                res = self._xmlresult(request, params)
                 self._checkxml(res)
                 return res
         else:
-            res = self._checkedxmlresult('arc_records.php', '&epg_id=' + channel_id + '&date=' + date)
+            res = self._checkedxmlresult(request, params)
             return res.getElementsByTagName('channel')
 
     def archive_channels(self, raw=False):
@@ -153,18 +151,19 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: archive channels list
         """
-
+        request = 'arc_list.php'
+        params = {}
         if raw:
             try:
-                res = self._xmlresult('arc_list.php', '')
+                res = self._xmlresult(request, params)
                 self._checkxml(res)
                 return res
             except TorrentTvApiException:
-                res = self._xmlresult('arc_list.php', '')
+                res = self._xmlresult(request, params)
                 self._checkxml(res)
                 return res
         else:
-            res = self._checkedxmlresult('arc_list.php', '')
+            res = self._checkedxmlresult(request, params)
             return res.getElementsByTagName('channel')
 
     def stream_source(self, channel_id):
@@ -175,8 +174,10 @@ class TorrentTvApi(object):
         :param channel_id: id of channel in translations list (see translations() method)
         :return: type of stream and source and translation list
         """
+        request = 'translation_stream.php'
+        params = {'channel_id': channel_id}
 
-        res = self._checkedjsonresult('translation_stream.php', '&channel_id=' + channel_id)
+        res = self._checkedjsonresult(request, params)
         stream_type = res['type']
         source = res['source']
         allTranslations = self.allTranslations
@@ -192,8 +193,10 @@ class TorrentTvApi(object):
         :param record_id: id of record in records list (see records() method)
         :return: type of stream and source
         """
+        request = 'arc_stream.php'
+        params = {'record_id': record_id}
 
-        res = self._checkedjsonresult('arc_stream.php', '&record_id=' + record_id)
+        res = self._checkedjsonresult(request, params)
         stream_type = res['type']
         source = res['source']
         return stream_type.encode('utf-8'), source.encode('utf-8')
@@ -250,9 +253,11 @@ class TorrentTvApi(object):
         :raise: TorrentTvApiException
         """
         try:
-            url = TorrentTvApi.API_URL + request + '?session=' + self.auth() + '&typeresult=json' + params
-            self.log.debug(url)
-            return requests.get(url, headers={'User-Agent':'Magic Browser','Connection':'close'}, timeout=5).json()
+            url = TorrentTvApi.API_URL + request
+            params.update({'session': self.auth(), 'typeresult': 'json'})
+            headers = {'User-Agent': 'Magic Browser', 'Connection': 'close'}
+            #self.log.debug(url)
+            return requests.get(url, headers=headers, params=params, timeout=5).json()
         except requests.exceptions.ConnectionError as e:
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
@@ -265,9 +270,11 @@ class TorrentTvApi(object):
         :raise: TorrentTvApiException
         """
         try:
-            url = TorrentTvApi.API_URL + request + '?session=' + self.auth() + '&typeresult=xml' + params
-            self.log.debug(url)
-            return requests.get(url, headers={'User-Agent':'Magic Browser','Connection':'close'}, timeout=5).content
+            url = TorrentTvApi.API_URL + request
+            params.update({'session': self.auth(), 'typeresult': 'xml'})
+            headers = {'User-Agent': 'Magic Browser', 'Connection': 'close'}
+            #self.log.debug(url)
+            return requests.get(url, headers=headers, params=params, timeout=5).content
         except requests.exceptions.ConnectionError as e:
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
