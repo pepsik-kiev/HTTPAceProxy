@@ -46,7 +46,7 @@ class Torrenttv(AceProxyPlugin):
         try:
             origin = requests.get(config.url, headers=headers, proxies=proxies, timeout=timeout).text.encode('utf-8')
 
-            self.logger.info('TTV playlist ' + config.url + ' downloaded')
+            self.logger.info('TTV playlist %s downloaded' % config.url)
             self.playlisttime = int(time.time())
             self.playlist = PlaylistGenerator()
             self.channels = dict()

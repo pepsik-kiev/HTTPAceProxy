@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/local/bin/python2
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -179,8 +179,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         CID = content_id if content_id else paramsdict[self.reqtype]
         if not channelName and self.reqtype in ('content_id', 'url', 'infohash'):
            try:
-               headers = {'User-Agent': 'Python-urllib/2.7','Content-Type': 'application/octet-stream', 'Connection': 'close'}
                url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
+               headers = {'User-Agent': 'Magic Browser'}
                params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
                channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][str(paramsdict['file_indexes'])]
            except: channelName = CID
@@ -221,7 +221,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         cid = None
         if reqtype == 'url' and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
             try:
-                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5','Range': 'bytes=0-','Connection': 'close','Icy-MetaData': '1'}
+                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5', 'Range': 'bytes=0-', 'Connection': 'close', 'Icy-MetaData': '1'}
                 with requests.get(url, headers=headers, stream = True, timeout=5) as r:
                    headers={'User-Agent': 'Python-urllib/2.7', 'Content-Type': 'application/octet-stream', 'Connection': 'close'}
                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
