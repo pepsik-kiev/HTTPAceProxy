@@ -18,7 +18,7 @@ What is this plugin for?
 """
 __author__ = 'miltador'
 
-import logging, re
+import logging
 import requests
 from urlparse import parse_qs
 from aceconfig import AceConfig
@@ -59,7 +59,7 @@ class P2pproxy(AceProxyPlugin):
                         connection.send_header('Access-Control-Allow-Origin', '*')
                         connection.send_header('Connection', 'close')
                         connection.send_header('Content-Type', 'text/plain;charset=utf-8')
-                        connection.send_header('Server', 'P2pProxy/1.0.4.4 AceProxy')
+                        connection.send_header('Server', 'P2pProxy/1.0.4.4 HTTPAceProxy')
                         connection.wfile.write('\r\n')
                         return
                     else:
@@ -72,7 +72,6 @@ class P2pproxy(AceProxyPlugin):
                     connection.end_headers()
                     return
 
-                stream_url = None
                 stream_type, stream, translations_list = self.api.stream_source(channel_id)
                 name=logo=''
 
@@ -84,14 +83,12 @@ class P2pproxy(AceProxyPlugin):
                             logo = P2pproxy.TTVU + logo
                         break
 
-                if stream_type == 'torrent':
-                    stream_url = re.sub('^(http.+)$', lambda match: '/url/' +
-                                        requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
-                elif stream_type == 'contentid':
-                    stream_url = re.sub('^([0-9a-f]{40})', lambda match: '/content_id/' +
-                                        requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
-                connection.path = stream_url
-                connection.splittedpath = stream_url.split('/')
+                if stream_type not in ('torrent', 'contentid'):
+                    connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.utils.quote(stream, '')
+                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+
+                connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 connection.handleRequest(headers_only, name, logo, fmt=self.get_param('fmt'))
             # /channels/?filter=[filter]&group=[group]&type=m3u
@@ -181,7 +178,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.wfile.write(translations_list)
         # /archive/ branch
         elif connection.reqtype == 'archive':
-            if len(connection.splittedpath) >= 3 and (connection.splittedpath[2] == 'dates' or connection.splittedpath[2] == 'dates.m3u'):  # /archive/dates.m3u
+            if len(connection.splittedpath) >= 3 and connection.splittedpath[2] in ('dates', 'dates.m3u'):  # /archive/dates.m3u
                 d = date.today()
                 delta = timedelta(days=1)
                 playlistgen = PlaylistGenerator()
@@ -200,7 +197,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.end_headers()
                 connection.wfile.write(exported)
                 return
-            elif len(connection.splittedpath) >= 3 and (connection.splittedpath[2] == 'playlist' or connection.splittedpath[2] == 'playlist.m3u'):  # /archive/playlist.m3u
+            elif len(connection.splittedpath) >= 3 and connection.splittedpath[2] in ('playlist', 'playlist.m3u'):  # /archive/playlist.m3u
                 dates = list()
 
                 if 'date' in self.params:
@@ -269,17 +266,14 @@ class P2pproxy(AceProxyPlugin):
                     connection.end_headers()
                     return
 
-                stream_url = None
                 stream_type, stream = self.api.archive_stream_source(record_id)
 
-                if stream_type == 'torrent':
-                    stream_url = re.sub('^(http.+)$', lambda match: '/url/' +
-                                        requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
-                elif stream_type == 'contentid':
-                    stream_url = re.sub('^([0-9a-f]{40})', lambda match: '/content_id/' +
-                                        requests.utils.quote(match.group(0), '') + '/stream.mp4', stream)
-                connection.path = stream_url
-                connection.splittedpath = stream_url.split('/')
+                if stream_type not in ('torrent', 'contentid'):
+                    connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.utils.quote(stream, '')
+                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+
+                connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 connection.handleRequest(headers_only, fmt=self.get_param('fmt'))
             # /archive/?type=m3u&date=[param_date]&channel_id=[param_channel]
