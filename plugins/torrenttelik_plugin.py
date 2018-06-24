@@ -28,7 +28,7 @@ class Torrenttelik(AceProxyPlugin):
         proxies = {}; timeout = 5
         if config.useproxy: proxies=config.proxies; timeout=30
         try:
-            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
+            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=timeout).json()
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
         except requests.exceptions.ConnectionError:
@@ -63,8 +63,9 @@ class Torrenttelik(AceProxyPlugin):
         playlistgen = PlaylistGenerator()
 
         try:
-            for channel in Torrenttelik.playlist.json()['channels']:
+            for channel in Torrenttelik.playlist['channels']:
                 channel['group'] = channel.get('cat', '')
+                channel['url'] = 'acestream://%s' % channel.get('url', '')
                 playlistgen.addItem(channel)
         except Exception as e:
             Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))

@@ -4,7 +4,7 @@ Playlist Generator
 This module can generate .m3u playlists with tv guide
 and groups
 '''
-import re, requests
+import requests
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
@@ -64,18 +64,16 @@ class PlaylistGenerator(object):
         for item in items:
             item['name'] = item['name'].replace('"', "'").replace(',', '.')
             url = item['url']
-            if process_url:
+            if process_url and url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
                    item['url'] = 'http://%s%s/url/%s/stream.mp4' % (hostport, path, requests.utils.quote(url))
                 elif url.startswith('infohash://'): # For INFOHASHes
                    item['url'] = 'http://%s%s/infohash/%s/stream.mp4' % (hostport, path, url.split('/')[2])
                 elif url.startswith('acestream://'): # For PIDs
                    item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url.split('/')[2])
-                elif re.match('[0-9a-f]{%s}$' % len(url), url): # For PIDs from json
-                   item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url)
-                elif not archive and re.match('^[0-9]+$', url): # For channel id's
+                elif not archive and all([c in '0123456789' for c in url]): # For channel id's
                    item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
-                elif archive and re.match('^[0-9]+$', url): # For archive channel id's
+                elif archive and all([c in '0123456789' for c in url]): # For archive channel id's
                    item['url'] = 'http://%s%s/archive/play?id=%s' % (hostport, path, url)
                 else: # For channel name
                    item['url'] = 'http://%s%s/%s' % (hostport, path, url)
