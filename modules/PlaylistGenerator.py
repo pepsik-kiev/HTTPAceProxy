@@ -61,30 +61,24 @@ class PlaylistGenerator(object):
         self._changeItems()
         items = sorted(self.itemlist, cmp=self.comparator) if self.comparator else self.itemlist
 
-        for i in items:
-            item = i.copy()
+        for item in items:
             item['name'] = item['name'].replace('"', "'").replace(',', '.')
-            url = item['url'];
-
+            url = item['url']
             if process_url:
-                # For .acelive and .torrent
-                item['url'] = re.sub('^(http.+)$', lambda match: 'http://' + hostport + path + '/url/' + \
-                                 requests.utils.quote(match.group(0), '') + '/stream.mp4', url, flags=re.MULTILINE)
-                if url == item['url']:  # For PIDs
-                    item['url'] = re.sub('^(acestream://)?(?P<pid>[0-9a-f]{40})$', 'http://' + hostport + path + '/content_id/\\g<pid>/stream.mp4',
-                                        url, flags=re.MULTILINE)
-                if url == item['url']:  # For INFOHASHes
-                    item['url'] = re.sub('^(infohash://)?(?P<infohash>[0-9a-f]{40})$', 'http://' + hostport + path + '/infohash/\\g<infohash>/stream.mp4',
-                                        url, flags=re.MULTILINE)
-                if archive and url == item['url']:  # For archive channel id's
-                    item['url'] = re.sub('^([0-9]+)$', lambda match: 'http://' + hostport + path + '/archive/play?id=' + match.group(0),
-                                        url, flags=re.MULTILINE)
-                if not archive and url == item['url']:  # For channel id's
-                    item['url'] = re.sub('^([0-9]+)$', lambda match: 'http://' + hostport + path + '/channels/play?id=' + match.group(0),
-                                            url, flags=re.MULTILINE)
-                if url == item['url']:  # For channel names
-                    item['url'] = re.sub('^([^/]+)$', lambda match: 'http://' + hostport + path + '/' + match.group(0),
-                                            url, flags=re.MULTILINE)
+                if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
+                   item['url'] = 'http://%s%s/url/%s/stream.mp4' % (hostport, path, requests.utils.quote(url))
+                elif url.startswith('infohash://'): # For INFOHASHes
+                   item['url'] = 'http://%s%s/infohash/%s/stream.mp4' % (hostport, path, url.split('/')[2])
+                elif url.startswith('acestream://'): # For PIDs
+                   item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url.split('/')[2])
+                elif re.match('[0-9a-f]{40}$', url): # For PIDs from json
+                   item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url)
+                elif not archive and re.match('^[0-9]+$', url): # For channel id's
+                   item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
+                elif archive and re.match('^[0-9]+$', url): # For archive channel id's
+                   item['url'] = 'http://%s%s/archive/play?id=%s' % (hostport, path, url)
+                else: # For channel name
+                   item['url'] = 'http://%s%s/%s' % (hostport, path, url)
             if fmt:
                 if '?' in item['url']: item['url'] = item['url'] + '&fmt=' + fmt
                 else: item['url'] = item['url'] + '/?fmt=' + fmt
