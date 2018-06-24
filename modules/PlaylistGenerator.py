@@ -71,7 +71,7 @@ class PlaylistGenerator(object):
                    item['url'] = 'http://%s%s/infohash/%s/stream.mp4' % (hostport, path, url.split('/')[2])
                 elif url.startswith('acestream://'): # For PIDs
                    item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url.split('/')[2])
-                elif re.match('[0-9a-f]{40}$', url): # For PIDs from json
+                elif re.match('[0-9a-f]{%s}$' % len(url), url): # For PIDs from json
                    item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url)
                 elif not archive and re.match('^[0-9]+$', url): # For channel id's
                    item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
@@ -80,8 +80,7 @@ class PlaylistGenerator(object):
                 else: # For channel name
                    item['url'] = 'http://%s%s/%s' % (hostport, path, url)
             if fmt:
-                if '?' in item['url']: item['url'] = item['url'] + '&fmt=' + fmt
-                else: item['url'] = item['url'] + '/?fmt=' + fmt
+                item['url'] += '&fmt='+fmt if '?' in item['url'] else '/?fmt='+fmt
 
             itemlist += self._generatem3uline(item)
 
