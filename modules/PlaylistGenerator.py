@@ -71,14 +71,14 @@ class PlaylistGenerator(object):
                    item['url'] = 'http://%s%s/infohash/%s/stream.mp4' % (hostport, path, url.split('/')[2])
                 elif url.startswith('acestream://'): # For PIDs
                    item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url.split('/')[2])
-                elif not archive and all([c in '0123456789' for c in url]): # For channel id's
-                   item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
-                elif archive and all([c in '0123456789' for c in url]): # For archive channel id's
+                elif archive and url.isdigit(): # For archive channel id's
                    item['url'] = 'http://%s%s/archive/play?id=%s' % (hostport, path, url)
+                elif not archive and url.isdigit(): # For channel id's
+                   item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
                 else: # For channel name
                    item['url'] = 'http://%s%s/%s' % (hostport, path, url)
             if fmt:
-                item['url'] += '&fmt='+fmt if '?' in item['url'] else '/?fmt='+fmt
+                item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
 
             itemlist += self._generatem3uline(item)
 
@@ -89,7 +89,7 @@ class PlaylistGenerator(object):
         try:
             chans = ''
             for i in self.itemlist:
-                i['hostport'] = 'http://' + hostport + path
+                i['hostport'] = 'http://%s%s' % (hostport, path)
                 try:
                     if i['type'] == 'channel': chans += config.xml_channel_template % i
                     else: chans += config.xml_stream_template % i
