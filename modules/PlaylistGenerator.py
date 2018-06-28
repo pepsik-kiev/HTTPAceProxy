@@ -77,9 +77,8 @@ class PlaylistGenerator(object):
                    item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
                 else: # For channel name
                    item['url'] = 'http://%s%s/%s' % (hostport, path, url)
-            if fmt:
-                item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
 
+            if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
             itemlist += self._generatem3uline(item)
 
         return itemlist

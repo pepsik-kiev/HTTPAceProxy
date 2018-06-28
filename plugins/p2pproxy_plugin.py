@@ -79,8 +79,7 @@ class P2pproxy(AceProxyPlugin):
                     if channel.getAttribute('id') == channel_id:
                         name = channel.getAttribute('name')
                         logo = channel.getAttribute('logo')
-                        if config.fullpathlogo:
-                            logo = P2pproxy.TTVU + logo
+                        if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
                         break
 
                 if stream_type not in ('torrent', 'contentid'):
@@ -122,7 +121,7 @@ class P2pproxy(AceProxyPlugin):
                     group = TorrentTvApi.CATEGORIES[int(group_id)].decode('UTF-8')
                     cid = channel.getAttribute('id')
                     logo = channel.getAttribute('logo')
-                    if config.fullpathlogo: logo = P2pproxy.TTVU + logo
+                    if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
 
                     fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo}
                     fields['tvgid'] = config.tvgid % fields
@@ -299,14 +298,13 @@ class P2pproxy(AceProxyPlugin):
                                 records_list = self.api.records(channel_id, d)
                                 channel_name = channel.getAttribute('name')
                                 logo = channel.getAttribute('logo')
-                                if logo != '' and config.fullpathlogo:
-                                    logo = P2pproxy.TTVU + logo
+                                if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
 
                                 for record in records_list:
                                     name = record.getAttribute('name')
                                     record_id = record.getAttribute('record_id')
                                     playlistgen.addItem({'group': channel_name, 'tvg': '',
-                                        'name': name, 'url': record_id, 'logo': logo})
+                                                         'name': name, 'url': record_id, 'logo': logo})
                             except: P2pproxy.logger.debug('Failed to load archive for %s' % channel_id)
 
                 else:
