@@ -98,12 +98,14 @@ class Torrenttv(AceProxyPlugin):
                 self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
                 if not self.downloadPlaylist(): connection.dieWithError(); return
 
+            url = requests.utils.urlparse(connection.path)
+            path = url.path[0:-1] if url.path.endswith('/') else url.path
             params = parse_qs(connection.query)
             fmt = params['fmt'][0] if 'fmt' in params else None
 
-            if connection.path.startswith('/torrenttv/channel/'):
-                if not connection.path.endswith('.mp4'):
-                    connection.dieWithError(404, 'Invalid path: ' + requests.utils.unquote(connection.path), logging.ERROR)
+            if path.startswith('/torrenttv/channel/'):
+                if not path.endswith('.mp4'):
+                    connection.dieWithError(404, 'Invalid path: ' + requests.utils.unquote(path), logging.ERROR)
                     return
 
                 name = requests.utils.unquote(connection.path[19:-4]).decode('UTF8')
@@ -127,10 +129,10 @@ class Torrenttv(AceProxyPlugin):
                 return
             else:
                 hostport = connection.headers['Host']
-                connection.path = '' if len(self.channels) == 0 else '/torrenttv/channel'
-                add_ts = True if connection.path.endswith('/ts') else False
+                path = '' if len(self.channels) == 0 else '/torrenttv/channel'
+                add_ts = True if path.endswith('/ts') else False
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
-                exported = self.playlist.exportm3u(hostport, connection.path, add_ts=add_ts, header=header, fmt=fmt)
+                exported = self.playlist.exportm3u(hostport, path, add_ts=add_ts, header=header, fmt=fmt)
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

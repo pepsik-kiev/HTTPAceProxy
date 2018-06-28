@@ -4,7 +4,7 @@ Playlist Generator
 This module can generate .m3u playlists with tv guide
 and groups
 '''
-import requests
+import requests, re
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
@@ -76,7 +76,9 @@ class PlaylistGenerator(object):
                 elif not archive and url.isdigit(): # For channel id's
                    item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
                 else: # For channel name
-                   item['url'] = 'http://%s%s/%s' % (hostport, path, url)
+#                   item['url'] = 'http://%s%s/%s' % (hostport, path, url)
+                    item['url'] = re.sub('^([^/]+)$', lambda match: 'http://' + hostport + path + '/' + match.group(0),
+                                            url, flags=re.MULTILINE)
 
             if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
             itemlist += self._generatem3uline(item)
