@@ -3,6 +3,9 @@
 Allfon.tv Playlist Downloader Plugin
 http://ip:port/allfon
 '''
+
+__author__ = 'miltador, Dorik1972'
+
 import logging, re
 from urlparse import parse_qs
 import requests
@@ -24,10 +27,9 @@ class Allfon(AceProxyPlugin):
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser'}
-        proxies = {}; timeout = 5
-        if config.useproxy: proxies = config.proxies; timeout = 30
+        proxies = config.proxies if config.useproxy else {}
         try:
-            Allfon.playlist = requests.get(config.url, headers=headers, proxies=proxies, timeout=timeout).text.encode('UTF-8')
+            Allfon.playlist = requests.get(config.url, headers=headers, proxies=proxies, timeout=30).text.encode('UTF-8')
             Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
         except requests.exceptions.ConnectionError:

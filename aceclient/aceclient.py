@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+__author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
+
 from aceconfig import AceConfig
 from acemessages import *
 import gevent, gevent.queue

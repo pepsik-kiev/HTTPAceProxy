@@ -3,7 +3,7 @@ class PlaylistConfig():
 
     # Default playlist format
     m3uemptyheader = '#EXTM3U\n'
-    m3uheader = '#EXTM3U url-tvg="http://1ttvapi.top/ttv.xmltv.xml.gz" deinterlace=1 m3uautoload=1 cache=1000\n'
+    m3uheader = '#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
     # If you need the #EXTGRP field put this #EXTGRP:%(group)s\n after %(name)s\n.
     m3uchanneltemplate = \
        '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-id="%(tvgid)s" tvg-logo="%(logo)s",%(name)s\n#EXTGRP:%(group)s\n%(url)s\n'

@@ -3,6 +3,9 @@
 Torrent-tv.ru Playlist Downloader Plugin
 http://ip:port/ttvplaylist
 '''
+
+__author__ = 'Dorik1972'
+
 import logging, re
 import time
 import gevent
@@ -38,10 +41,9 @@ class Torrenttv(AceProxyPlugin):
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser'}
-        proxies = {}; timeout = 5
-        if config.useproxy: proxies = config.proxies; timeout = 30
+        proxies = config.proxies if config.useproxy else {}
         try:
-            origin = requests.get(config.url, headers=headers, proxies=proxies, timeout=timeout).text.encode('utf-8')
+            origin = requests.get(config.url, headers=headers, proxies=proxies, timeout=30).text.encode('utf-8')
 
             self.logger.info('TTV playlist %s downloaded' % config.url)
             self.playlisttime = int(time.time())

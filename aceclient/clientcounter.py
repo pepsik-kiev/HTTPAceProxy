@@ -2,6 +2,8 @@
 '''
 Simple Client Counter for VLC VLM
 '''
+__author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
+
 import gevent
 import threading
 import logging

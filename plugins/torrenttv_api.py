@@ -3,7 +3,8 @@
 Torrent-TV API communication class
 Forms requests to API, checks result for errors and returns in desired form (lists or raw data)
 """
-__author__ = 'miltador'
+
+__author__ = 'miltador, Dorik1972'
 
 import requests
 import xml.dom.minidom as dom

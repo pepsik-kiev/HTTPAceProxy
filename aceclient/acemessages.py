@@ -2,6 +2,7 @@
 '''
 Minimal Ace Stream client library to use with HTTP Proxy
 '''
+__author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import hashlib
 

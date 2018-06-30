@@ -1,11 +1,20 @@
 # -*- coding: utf-8 -*- 
 '''
-Torrent-telik.com Playlist Downloader Plugin
-(based on ytv plugin by ValdikSS)
-http://ip:port/torrent-telik || http://ip:port/torrent-telik/?type=ttv = torrent-tv playlist
-http://ip:port/torrent-telik/?type=mob_ttv = torrent-tv mobile playlist
-http://ip:port/torrent-telik/?type=allfon = allfon playlist
+Downloader for json-based playlists
+Playlist format example:
+{"channels":[
+{"name":"Channel name 1","url":"blablablablablablablablablablablablablab","cat":"Group 1"},
+{"name":"Channel name 2","url":"blablablablablablablablablablablablablab","cat":"Group 2"},
+{"name":"Channel name 3","url":"blablablablablablablablablablablablablab","cat":"Group 3"},
+......
+...
+..
+.
+{"name":"Channel name N","url":"blablablablablablablablablablablablablab","cat":"Group N"}
+]}
 '''
+
+__author__ = 'miltador, Dorik1972'
 
 import logging
 from urlparse import parse_qs
@@ -25,10 +34,9 @@ class Torrenttelik(AceProxyPlugin):
 
     def downloadPlaylist(self, url):
         headers = {'User-Agent': 'Magic Browser'}
-        proxies = {}; timeout = 5
-        if config.useproxy: proxies=config.proxies; timeout=30
+        proxies=config.proxies if config.useproxy else {}
         try:
-            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=timeout).json()
+            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=30).json()
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
         except requests.exceptions.ConnectionError:
@@ -60,7 +68,7 @@ class Torrenttelik(AceProxyPlugin):
             if not self.downloadPlaylist(url): connection.dieWithError(); return
 
         add_ts = True if connection.path.endswith('/ts') else False
-        playlistgen = PlaylistGenerator()
+        playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
 
         try:
             for channel in Torrenttelik.playlist['channels']:

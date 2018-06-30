@@ -15,6 +15,9 @@ url_ttv = ''
 url_mob_ttv = ''
 url_allfon = ''
 
+# Channel template
+m3uchanneltemplate = '#EXTINF:-1 tvg-name="%(tvg)s",%(name)s\n%(url)s\n'
+
 # EPG urls & EPG timeshift
-tvgurl = ''
+tvgurl = 'http://www.teleguide.info/download/new3/jtv.zip'
 tvgshift = 0

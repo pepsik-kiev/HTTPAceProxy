@@ -1,8 +1,10 @@
-﻿# -*- coding: utf-8 -*-
-
+# -*- coding: utf-8 -*-
 '''
 Torrent-tv.ru Playlist Downloader Plugin configuration file
 '''
+
+__author__ = 'Dorik1972'
+
 # Proxy settings.
 # For example you can install tor browser and add in torrc SOCKSPort 9050
 # proxies = {'http' : 'socks5h://127.0.0.1:9050','https' : 'socks5h://127.0.0.1:9050'}

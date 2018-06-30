@@ -4,6 +4,8 @@ Playlist Generator
 This module can generate .m3u playlists with tv guide
 and groups
 '''
+__author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
+
 import requests
 from playlist import PlaylistConfig as config
 
