@@ -1,4 +1,3 @@
-__author__ = 'miltador'
 '''
 Torrent-telik.com Playlist Downloader Plugin configuration file
 '''
