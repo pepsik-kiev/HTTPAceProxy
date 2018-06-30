@@ -24,11 +24,8 @@ class Torrenttv(AceProxyPlugin):
     def __init__(self, AceConfig, AceStuff):
         self.logger = logging.getLogger('plugin_torrenttv')
         self.lock = threading.Lock()
-        self.channels = None
-        self.playlist = None
-        self.playlisttime = None
+        self.channels = self.playlist = self.playlisttime = self.etag = self.tvgid = None
 
-        self.etag = None
         self.logomap = config.logomap
         self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
 
@@ -49,22 +46,43 @@ class Torrenttv(AceProxyPlugin):
             self.logger.info('TTV playlist %s downloaded' % config.url)
             self.playlisttime = int(time.time())
             self.playlist = PlaylistGenerator()
-            self.channels = dict()
+            self.channels = self.tvgid = dict()
             m = hashlib.md5()
             pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
+
+            if self.updatelogos:
+                try:
+                    api = TorrentTvApi(p2pconfig.email, p2pconfig.password)
+                    translations = api.translations('all')
+
+                    for channel in translations:
+                        name = channel.getAttribute('name')
+                        logo = channel.getAttribute('logo').encode('utf-8')
+                        if not name in self.tvgid and channel.getAttribute('epg_id').encode('utf-8') != '0':
+                           self.tvgid[name] = channel.getAttribute('id').encode('utf-8')
+                        if not name in self.logomap: self.logomap[name] = config.logobase + logo
+
+                    self.logger.debug("Logos updated")
+                    self.updatelogos = False
+                except: self.updatelogos = False # p2pproxy plugin seems not configured
 
             for match in pattern.finditer(origin, re.MULTILINE):
                 itemdict = match.groupdict()
                 encname = itemdict.get('name')
                 name = encname.decode('utf-8')
+
                 logo = self.logomap.get(name)
-                url = itemdict['url']
                 if logo: itemdict['logo'] = logo
 
+                tvgid = self.tvgid.get(name)
+                if tvgid: itemdict['tvgid'] = 'ttv%s' % tvgid
+
+                url = itemdict['url']
                 if url.startswith(('acestream://', 'infohash://')) \
                       or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                     self.channels[name] = url
                     itemdict['url'] = requests.utils.quote(encname, '') + '.mp4'
+
                 self.playlist.addItem(itemdict)
                 m.update(encname)
 
@@ -73,21 +91,6 @@ class Torrenttv(AceProxyPlugin):
         except requests.exceptions.ConnectionError: self.logger.error("Can't download TTV playlist!"); return False
         except: self.logger.error(traceback.format_exc()); return False
 
-        if self.updatelogos:
-            try:
-                api = TorrentTvApi(p2pconfig.email, p2pconfig.password)
-                translations = api.translations('all')
-                logos = dict()
-
-                for channel in translations:
-                    name = channel.getAttribute('name').encode('utf-8')
-                    logo = channel.getAttribute('logo').encode('utf-8')
-                    logos[name] = config.logobase + logo
-
-                self.logomap = logos
-                self.logger.debug("Logos updated")
-                self.updatelogos = False
-            except: self.updatelogos = False # p2pproxy plugin seems not configured
         return True
 
     def handle(self, connection, headers_only=False):
@@ -132,7 +135,7 @@ class Torrenttv(AceProxyPlugin):
                 path = '' if len(self.channels) == 0 else '/torrenttv/channel'
                 add_ts = True if path.endswith('/ts') else False
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
-                exported = self.playlist.exportm3u(hostport, path, add_ts=add_ts, header=header, fmt=fmt)
+                exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=header, fmt=fmt)
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

@@ -124,7 +124,7 @@ class P2pproxy(AceProxyPlugin):
                     if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
 
                     fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo}
-                    fields['tvgid'] = config.tvgid % fields
+                    if channel.getAttribute('epg_id') != '0': fields['tvgid'] = config.tvgid % fields
                     playlistgen.addItem(fields)
 
                 P2pproxy.logger.debug('Exporting')
