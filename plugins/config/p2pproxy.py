@@ -12,7 +12,6 @@ What is this plugin for?
 
 !!! It requires some changes in aceconfig.py:
     set the httpport to 8081
-    set the vlcoutport to some other port (8082 for example)
 '''
 # Insert your email on torrent-tv.ru here
 email = 're.place@me'

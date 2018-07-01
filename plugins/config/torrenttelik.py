@@ -1,5 +1,5 @@
 '''
-Torrent-telik.com Playlist Downloader Plugin configuration file
+Torrent-telik.com. Configuration file for json-based playlists downloader
 '''
 # Proxy settings.
 # For example you can install tor browser and add in torrc SOCKSPort 9050
@@ -10,9 +10,7 @@ proxies = {'http' : 'socks5h://127.0.0.1:9050',
            'https' : 'socks5h://127.0.0.1:9050'}
 
 # Channels urls
-url_ttv = ''
-url_mob_ttv = ''
-url_allfon = ''
+url = ''
 
 # Channel template
 m3uchanneltemplate = '#EXTINF:-1 tvg-name="%(tvg)s",%(name)s\n%(url)s\n'

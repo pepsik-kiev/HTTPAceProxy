@@ -57,15 +57,9 @@ class Torrenttelik(AceProxyPlugin):
 
         self.params = parse_qs(connection.query)
 
-        url = None
-        list_type = self.getparam('type')
-        if not list_type or list_type.startswith('ttv'): url = config.url_ttv
-        elif list_type.startswith('mob_ttv'): url = config.url_mob_ttv
-        elif list_type.startswith('allfon'): url = config.url_allfon
-
         # 15 minutes cache
         if not Torrenttelik.playlist or (int(time.time()) - Torrenttelik.playlisttime > 15 * 60):
-            if not self.downloadPlaylist(url): connection.dieWithError(); return
+            if not self.downloadPlaylist(config.url): connection.dieWithError(); return
 
         add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)

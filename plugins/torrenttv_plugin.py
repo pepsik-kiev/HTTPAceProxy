@@ -4,7 +4,7 @@ Torrent-tv.ru Playlist Downloader Plugin
 http://ip:port/ttvplaylist
 '''
 
-__author__ = 'Dorik1972'
+__author__ = 'AndreyPavlenko, Dorik1972'
 
 import logging, re
 import time
@@ -50,7 +50,6 @@ class Torrenttv(AceProxyPlugin):
             self.playlist = PlaylistGenerator()
             self.channels = self.tvgid = dict()
             m = hashlib.md5()
-            pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
 
             if self.updatelogos:
                 try:
@@ -67,6 +66,8 @@ class Torrenttv(AceProxyPlugin):
                     self.logger.debug("Logos updated")
                     self.updatelogos = False
                 except: self.updatelogos = False # p2pproxy plugin seems not configured
+
+            pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
 
             for match in pattern.finditer(origin, re.MULTILINE):
                 itemdict = match.groupdict()
