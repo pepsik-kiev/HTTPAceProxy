@@ -53,9 +53,7 @@ class Torrenttv(AceProxyPlugin):
 
             if self.updatelogos:
                 try:
-                    api = TorrentTvApi(p2pconfig.email, p2pconfig.password)
-                    translations = api.translations('all')
-
+                    translations = TorrentTvApi(p2pconfig.email, p2pconfig.password).translations('all')
                     for channel in translations:
                         name = channel.getAttribute('name')
                         logo = channel.getAttribute('logo').encode('utf-8')
@@ -67,6 +65,7 @@ class Torrenttv(AceProxyPlugin):
                     self.updatelogos = False
                 except: self.updatelogos = False # p2pproxy plugin seems not configured
 
+            self.logger.debug('Generating requested m3u playlist')
             pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
 
             for match in pattern.finditer(origin, re.MULTILINE):
@@ -84,7 +83,7 @@ class Torrenttv(AceProxyPlugin):
                 if url.startswith(('acestream://', 'infohash://')) \
                       or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                     self.channels[name] = url
-                    itemdict['url'] = requests.utils.quote(encname, '') + '.mp4'
+                    itemdict['url'] = requests.compat.quote(encname, '') + '.mp4'
 
                 self.playlist.addItem(itemdict)
                 m.update(encname)
@@ -104,17 +103,17 @@ class Torrenttv(AceProxyPlugin):
                 self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
                 if not self.downloadPlaylist(): connection.dieWithError(); return
 
-            url = requests.utils.urlparse(connection.path)
+            url = requests.compat.urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
             params = parse_qs(connection.query)
             fmt = params['fmt'][0] if 'fmt' in params else None
 
             if path.startswith('/torrenttv/channel/'):
                 if not path.endswith('.mp4'):
-                    connection.dieWithError(404, 'Invalid path: ' + requests.utils.unquote(path), logging.ERROR)
+                    connection.dieWithError(404, 'Invalid path: ' + requests.compat.unquote(path), logging.ERROR)
                     return
 
-                name = requests.utils.unquote(connection.path[19:-4]).decode('UTF8')
+                name = requests.compat.unquote(connection.path[19:-4]).decode('UTF8')
                 url = self.channels.get(name)
                 if not url:
                     connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
@@ -123,7 +122,7 @@ class Torrenttv(AceProxyPlugin):
                 elif url.startswith('infohash://'):
                     connection.path = '/infohash/%s/stream.mp4' % url.split('/')[2]
                 elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                    connection.path = '/url/%s/stream.mp4' % requests.utils.quote(url, '')
+                    connection.path = '/url/%s/stream.mp4' % requests.compat.quote(url, '')
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 play = True
@@ -134,6 +133,7 @@ class Torrenttv(AceProxyPlugin):
                 connection.end_headers()
                 return
             else:
+                self.logger.debug('Exporting m3u playlist')
                 hostport = connection.headers['Host']
                 path = '' if len(self.channels) == 0 else '/torrenttv/channel'
                 add_ts = True if path.endswith('/ts') else False

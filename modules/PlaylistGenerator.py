@@ -69,7 +69,7 @@ class PlaylistGenerator(object):
             url = item['url']
             if process_url and url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                   item['url'] = 'http://%s%s/url/%s/stream.mp4' % (hostport, path, requests.utils.quote(url))
+                   item['url'] = 'http://%s%s/url/%s/stream.mp4' % (hostport, path, requests.compat.quote(url))
                 elif url.startswith('infohash://'): # For INFOHASHes
                    item['url'] = 'http://%s%s/infohash/%s/stream.mp4' % (hostport, path, url.split('/')[2])
                 elif url.startswith('acestream://'): # For PIDs

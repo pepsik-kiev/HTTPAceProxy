@@ -6,17 +6,17 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent
-# Monkeypatching and all the stuff
-from gevent import monkey; monkey.patch_all()
-from gevent.subprocess import Popen, PIPE
-import gevent.queue
-
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
+
+import gevent
+# Monkeypatching and all the stuff
+from gevent import monkey; monkey.patch_all()
+from gevent.subprocess import Popen, PIPE
+import gevent.queue
 
 import aceclient
 from aceclient.clientcounter import ClientCounter
@@ -32,7 +32,6 @@ from base64 import b64encode
 import time
 import requests
 from bencode import __version__ as bencode_version__
-import ipaddr
 from urlparse import parse_qs
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
@@ -68,9 +67,9 @@ class ThreadedPoolHTTPServer(ThreadPoolMixIn, BaseHTTPServer.HTTPServer):
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def log_message(self, format, *args): pass
-        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.utils.unquote(self.path).decode('utf8')))
+        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
     def log_request(self, code='-', size='-'): pass
-        #logger.debug('"%s" %s %s', requests.utils.unquote(self.requestline).decode('utf8'), str(code), str(size))
+        #logger.debug('"%s" %s %s', requests.compat.unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -95,9 +94,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
-        logger.info("Accepted connection from %s path %s" % (self.clientip, requests.utils.unquote(self.path)))
+        logger.info("Accepted connection from %s path %s" % (self.clientip, requests.compat.unquote(self.path)))
         logger.debug("Headers: %s" % self.headers.dict)
-        self.requrl = requests.utils.urlparse(self.path)
+        self.requrl = requests.compat.urlparse(self.path)
         self.query = self.requrl.query
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         # If firewall enabled
@@ -132,7 +131,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
-        self.requrl = requests.utils.urlparse(self.path)
+        self.requrl = requests.compat.urlparse(self.path)
         self.reqparams = parse_qs(self.query)
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
@@ -172,10 +171,10 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict = dict()
-        for i in xrange(3, 8):
+        for i in range(3, 8):
             try: paramsdict.update({aceclient.acemessages.AceConst.START_PARAMS[i-3]: int(self.splittedpath[i])})
             except (IndexError, ValueError): paramsdict.update({aceclient.acemessages.AceConst.START_PARAMS[i-3]: '0'})
-        paramsdict[self.reqtype] = requests.utils.unquote(self.splittedpath[2]) #self.path_unquoted
+        paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 
         content_id = self.getCID(self.reqtype, paramsdict[self.reqtype])
@@ -199,8 +198,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Getting URL from engine
                 self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'url', 'data') else self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
-                p = requests.utils.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
-                self.url = requests.utils.urlunparse(p)
+                p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
+                self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
                 gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
                 gevent.sleep()
@@ -272,10 +271,10 @@ class Client:
             FORWARD_HEADERS = ['Connection', 'Keep-Alive', 'Content-Range', 'Content-Type', 'X-Content-Duration', 'Content-Length']
             SKIP_HEADERS = ['Server', 'Date', 'Transfer-Encoding', 'Accept-Ranges']
 
-            new_headers = {k:v for (k, v) in self.ace._streamReaderConnection.headers.items() if k not in (FORWARD_HEADERS + SKIP_HEADERS)}
+            new_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in (FORWARD_HEADERS + SKIP_HEADERS)}
             if new_headers: logger.error('NEW HEADERS FOUND: %s' % new_headers)
 
-            response_headers = {k:v for (k, v) in self.ace._streamReaderConnection.headers.items() if k not in SKIP_HEADERS}
+            response_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS}
             for h in response_headers: self.handler.send_header(h, response_headers[h])
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
@@ -361,7 +360,8 @@ def spawnAce(cmd, delay=0.1):
     except: return False
 
 def checkFirewall(clientip):
-    clientinrange = any(map(lambda i: ipaddr.IPAddress(clientip) in ipaddr.IPNetwork(i), AceConfig.firewallnetranges))
+    try: clientinrange = any([requests.utils.address_in_network(clientip, i if '/' in i else i+'/0') for i in AceConfig.firewallnetranges])
+    except: logger.error('Check firewall netranges settings !'); return False
     if (AceConfig.firewallblacklistmode and clientinrange) or (not AceConfig.firewallblacklistmode and not clientinrange): return False
     return True
 

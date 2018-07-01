@@ -299,7 +299,7 @@ class AceClient(object):
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
-                logger.debug('<<< %s' % requests.utils.unquote(self._recvbuffer).decode('utf8'))
+                logger.debug('<<< %s' % requests.compat.unquote(self._recvbuffer).decode('utf8'))
             except:
                 # If something happened during read, abandon reader.
                 logger.error('Exception at socket read. AceClient destroyed')
@@ -334,7 +334,7 @@ class AceClient(object):
                     raise AceException('You should init me first!')
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
-                    _contentinfo = json.loads(requests.utils.unquote(' '.join(self._recvbuffer.split()[2:])).decode('utf8'))
+                    _contentinfo = json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:])).decode('utf8'))
                     if _contentinfo.get('status') == 100:
                         logger.error('LOADASYNC returned error with message: %s' % _contentinfo.get('message'))
                         self._result.set(False)

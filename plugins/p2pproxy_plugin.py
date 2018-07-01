@@ -84,7 +84,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.utils.quote(stream, '')
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream, '')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
@@ -127,7 +127,7 @@ class P2pproxy(AceProxyPlugin):
                     if channel.getAttribute('epg_id') != '0': fields['tvgid'] = config.tvgid % fields
                     playlistgen.addItem(fields)
 
-                P2pproxy.logger.debug('Exporting')
+                P2pproxy.logger.debug('Exporting m3u playlist')
                 header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
                 exported = playlistgen.exportm3u(hostport=hostport, header=header, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
@@ -150,7 +150,7 @@ class P2pproxy(AceProxyPlugin):
 
                 translations_list = self.api.translations(param_filter, True)
 
-                P2pproxy.logger.debug('Exporting')
+                P2pproxy.logger.debug('Exporting m3u playlist')
                 connection.send_response(200)
                 connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('Connection', 'close')
@@ -173,7 +173,7 @@ class P2pproxy(AceProxyPlugin):
                 translations_list = self.api.translations('all', True)
                 connection.send_header('Content-Length', str(len(translations_list)))
                 connection.end_headers()
-                P2pproxy.logger.debug('Exporting')
+                P2pproxy.logger.debug('Exporting m3u playlist')
                 connection.wfile.write(translations_list)
         # /archive/ branch
         elif connection.reqtype == 'archive':
@@ -247,7 +247,7 @@ class P2pproxy(AceProxyPlugin):
                 if headers_only: connection.end_headers()
                 else:
                     archive_channels = self.api.archive_channels(True)
-                    P2pproxy.logger.debug('Exporting')
+                    P2pproxy.logger.debug('Exporting m3u playlist')
                     connection.send_header('Content-Length', str(len(archive_channels)))
                     connection.end_headers()
                     connection.wfile.write(archive_channels)
@@ -269,7 +269,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.utils.quote(stream, '')
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream, '')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
@@ -329,7 +329,7 @@ class P2pproxy(AceProxyPlugin):
 
                         playlistgen.addItem({'group': channel_name, 'name': n, 'url': record_id, 'logo': logo, 'tvg': ''})
 
-                P2pproxy.logger.debug('Exporting')
+                P2pproxy.logger.debug('Exporting m3u playlist')
                 exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.get_param('fmt')).encode('utf-8')
 
                 connection.send_response(200)
@@ -361,7 +361,7 @@ class P2pproxy(AceProxyPlugin):
                 if headers_only: connection.end_headers()
                 else:
                     records_list = self.api.records(param_channel, d.strftime('%d-%m-%Y'), True)
-                    P2pproxy.logger.debug('Exporting')
+                    P2pproxy.logger.debug('Exporting m3u playlist')
                     connection.send_header('Content-Length', str(len(records_list)))
                     connection.end_headers()
                     connection.wfile.write(records_list)

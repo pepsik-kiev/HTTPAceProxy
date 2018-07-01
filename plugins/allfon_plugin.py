@@ -54,10 +54,11 @@ class Allfon(AceProxyPlugin):
         add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
 
+        Allfon.logger.debug('Generating requested m3u playlist')
         pattern = re.compile(r',(?P<name>\S.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
         for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
 
-        Allfon.logger.info('AllFon playlist created')
+        Allfon.logger.debug('Exporting m3u playlist')
         params = parse_qs(connection.query)
         fmt = params['fmt'][0] if 'fmt' in params else None
         header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)

@@ -63,6 +63,7 @@ class Torrenttelik(AceProxyPlugin):
 
         add_ts = True if connection.path.endswith('/ts') else False
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
+        Torrenttelik.logger.debug('Generating requested m3u playlist')
 
         try:
             for channel in Torrenttelik.playlist['channels']:
@@ -73,6 +74,7 @@ class Torrenttelik(AceProxyPlugin):
             Torrenttelik.logger.error("Can't parse JSON! %s" % repr(e))
             return
 
+        Torrenttelik.logger.debug('Exporting m3u playlist')
         header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)
         exported = playlistgen.exportm3u(hostport, header=header, add_ts=add_ts, fmt=self.getparam('fmt')).encode('utf-8')
 

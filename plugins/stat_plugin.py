@@ -11,7 +11,6 @@ import psutil
 import time
 import logging, re
 import requests
-import ipaddr
 
 localnetranges = (
         '192.168.0.0/16',
@@ -31,10 +30,10 @@ class Stat(AceProxyPlugin):
         self.stuff = AceStuff
 
     def geo_ip_lookup(self, ip_address):
-        lookup_url = 'http://freegeoip.net/json/%s'
         Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
+        lookup_url = 'http://freegeoip.net/json/%s' % ip_address
         headers={'User-Agent':'API Browser'}
-        response = requests.get(lookup_url % ip_address, headers=headers, timeout=5).json()
+        response = requests.get(lookup_url, headers=headers, timeout=5).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
                 'country'      : '' if not response['country_name'] else response['country_name'] ,
@@ -61,10 +60,10 @@ class Stat(AceProxyPlugin):
         response = None
         if mac_address != None:
            mac_address = mac_address.groups()[0]
-           lookup_url = 'http://macvendors.co/api/vendorname/%s'
+           lookup_url = 'http://macvendors.co/api/vendorname/%s' % mac_address
            try:
               headers={'User-Agent':'API Browser'}
-              response = requests.get(lookup_url % mac_address, headers=headers, timeout=5).text
+              response = requests.get(lookup_url, headers=headers, timeout=5).text
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
         else: Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)
 
@@ -111,7 +110,7 @@ class Stat(AceProxyPlugin):
                 if c.channelName: connection.wfile.write(c.channelName.encode('UTF8'))
                 else: connection.wfile.write(i)
                 connection.wfile.write('</td><td>' + c.handler.clientip + '</td>')
-                clientinrange = any(map(lambda i: ipaddr.IPAddress(c.handler.clientip) in ipaddr.IPNetwork(i),localnetranges))
+                clientinrange = any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges])
                 if clientinrange: connection.wfile.write('<td>' + self.mac_lookup(c.handler.clientip).encode('UTF8').strip() + '</td>')
                 else:
                     geo_ip_info = self.geo_ip_lookup(c.handler.clientip)
