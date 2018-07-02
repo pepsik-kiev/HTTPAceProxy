@@ -14,7 +14,6 @@ What is this plugin for?
 
 !!! It requires some changes in aceconfig.py:
     set the httpport to 8081
-    set the vlcoutport to some other port (8082 for example)
 """
 __author__ = 'miltador, Dorik1972'
 
@@ -103,11 +102,7 @@ class P2pproxy(AceProxyPlugin):
                 if not param_filter: param_filter = 'all'  # default filter
                 if param_group:
                     if 'all' in param_group: param_group = None
-                    else:
-                        tmp = []
-                        for g in param_group:
-                            tmp += g.split(',')
-                        param_group = tmp
+                    else: param_group = [ x for x in param_group[0].split(',') ]
 
                 translations_list = self.api.translations(param_filter)
 
