@@ -63,17 +63,12 @@ class TorrentTvApi(object):
         :param raw: if True returns unprocessed data
         :return: unique session string
         """
-        try: self.conf.read('.aceconfig')
+        try:
+             self.conf.read('.aceconfig')
+             self.session = self.conf.get('torrenttv_api', 'session')
+             self.guid = self.conf.get('torrenttv_api', 'guid')
+             if self.conf.get('torrenttv_api', 'email') != self.email: raise
         except: self.session = None; self.guid = self.get_mac()
-        else:
-           try: self.session = self.conf.get('torrenttv_api', 'session')
-           except: self.session = None
-           try: self.guid = self.conf.get('torrenttv_api', 'guid')
-           except: self.guid = self.get_mac()
-           try: self.conf.get('torrenttv_api', 'email')
-           except: self.session = None
-           else:
-               if self.conf.get('torrenttv_api', 'email') != self.email: self.session = None
 
         with self.lock:
             if not self.session:

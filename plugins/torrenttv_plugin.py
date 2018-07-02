@@ -28,8 +28,8 @@ class Torrenttv(AceProxyPlugin):
         self.logger = logging.getLogger('plugin_torrenttv')
         self.lock = threading.Lock()
         self.channels = self.playlist = self.playlisttime = self.etag = self.tvgid = None
-
         self.logomap = config.logomap
+        self.epg_id = { k:'' for k in self.logomap }
         self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
 
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
@@ -50,15 +50,14 @@ class Torrenttv(AceProxyPlugin):
             self.playlist = PlaylistGenerator()
             self.channels = dict()
             m = hashlib.md5()
-            epg_id = dict()
             if self.updatelogos:
                 try:
                     translations_list = TorrentTvApi(p2pconfig.email, p2pconfig.password).translations('all')
                     for channel in translations_list:
                         name = channel.getAttribute('name').encode('utf-8')
                         logo = channel.getAttribute('logo').encode('utf-8')
-                        if channel.getAttribute('epg_id') != '0' and not name in epg_id:
-                           epg_id[name] = ('ttv%s' % channel.getAttribute('id')).encode('utf-8')
+                        if channel.getAttribute('epg_id') != '0':
+                           self.epg_id[name] = ('ttv%s' % channel.getAttribute('id')).encode('utf-8')
                         if not name in self.logomap: self.logomap[name] = config.logobase + logo
 
                     self.logger.debug("Logos updated")
@@ -76,7 +75,7 @@ class Torrenttv(AceProxyPlugin):
                 logo = self.logomap.get(name)
                 if logo: itemdict['logo'] = logo
 
-                tvgid = epg_id.get(name)
+                tvgid = self.epg_id.get(name)
                 if tvgid: itemdict['tvgid'] = tvgid
 
                 url = itemdict['url']
