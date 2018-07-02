@@ -50,17 +50,15 @@ class Torrenttv(AceProxyPlugin):
             self.playlist = PlaylistGenerator()
             self.channels = dict()
             m = hashlib.md5()
-
+            epg_id = dict()
             if self.updatelogos:
                 try:
-                    epg_id = dict()
                     translations_list = TorrentTvApi(p2pconfig.email, p2pconfig.password).translations('all')
                     for channel in translations_list:
                         name = channel.getAttribute('name').encode('utf-8')
                         logo = channel.getAttribute('logo').encode('utf-8')
-                        cid = channel.getAttribute('id').encode('utf-8')
                         if channel.getAttribute('epg_id') != '0' and not name in epg_id:
-                           epg_id[name] = ('ttv%s' % cid).encode('utf-8')
+                           epg_id[name] = ('ttv%s' % channel.getAttribute('id')).encode('utf-8')
                         if not name in self.logomap: self.logomap[name] = config.logobase + logo
 
                     self.logger.debug("Logos updated")
