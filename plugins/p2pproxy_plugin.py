@@ -100,9 +100,7 @@ class P2pproxy(AceProxyPlugin):
                 param_group = self.params.get('group')
                 param_filter = self.get_param('filter')
                 if not param_filter: param_filter = 'all'  # default filter
-                if param_group:
-                    if 'all' in param_group: param_group = None
-                    else: param_group = [ x for x in param_group[0].split(',') ]
+                if param_group and 'all' in param_group[0]: param_group = None
 
                 translations_list = self.api.translations(param_filter)
 
@@ -110,7 +108,7 @@ class P2pproxy(AceProxyPlugin):
                 P2pproxy.logger.debug('Generating requested m3u playlist')
                 for channel in translations_list:
                     group_id = channel.getAttribute('group')
-                    if param_group and not group_id in param_group: continue # filter channels by group
+                    if param_group and not group_id in param_group[0]: continue # filter channels by &group=1,2,5...
 
                     name = channel.getAttribute('name')
                     group = TorrentTvApi.CATEGORIES[int(group_id)].decode('UTF-8')
