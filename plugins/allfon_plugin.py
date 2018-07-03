@@ -8,7 +8,7 @@ __author__ = 'miltador, Dorik1972'
 
 import logging, re
 from urlparse import parse_qs
-import requests
+import requests, socks
 import time
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
@@ -55,6 +55,7 @@ class Allfon(AceProxyPlugin):
         playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
 
         Allfon.logger.debug('Generating requested m3u playlist')
+
         pattern = re.compile(r',(?P<name>\S.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
         for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
 

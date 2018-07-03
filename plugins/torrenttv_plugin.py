@@ -12,7 +12,7 @@ import gevent
 from urlparse import parse_qs
 import hashlib
 import traceback, threading
-import requests
+import requests, socks
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
