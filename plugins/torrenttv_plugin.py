@@ -12,7 +12,7 @@ import gevent
 from urlparse import parse_qs
 import hashlib
 import traceback, threading
-import requests, socks
+import requests
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -82,7 +82,7 @@ class Torrenttv(AceProxyPlugin):
                 if url.startswith(('acestream://', 'infohash://')) \
                       or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                     self.channels[name] = url
-                    itemdict['url'] = requests.compat.quote(encname, '') + '.mp4'
+                    itemdict['url'] = requests.compat.quote(encname,'') + '.mp4'
 
                 self.playlist.addItem(itemdict)
                 m.update(encname)
@@ -121,7 +121,7 @@ class Torrenttv(AceProxyPlugin):
                 elif url.startswith('infohash://'):
                     connection.path = '/infohash/%s/stream.mp4' % url.split('/')[2]
                 elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                    connection.path = '/url/%s/stream.mp4' % requests.compat.quote(url, '')
+                    connection.path = '/url/%s/stream.mp4' % requests.compat.quote(url,'')
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 play = True

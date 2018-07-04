@@ -18,7 +18,7 @@ __author__ = 'miltador, Dorik1972'
 
 import logging
 from urlparse import parse_qs
-import requests, socks
+import requests
 import time
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator

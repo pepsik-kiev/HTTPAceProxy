@@ -17,7 +17,7 @@ localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
                    '240.0.0.0/5', '127.0.0.0/8', )
 
 class Stat(AceProxyPlugin):
-    handlers = ('stat', 'favicon.icon')
+    handlers = ('stat',)
     logger = logging.getLogger('STAT')
 
     def __init__(self, AceConfig, AceStuff):
@@ -25,10 +25,9 @@ class Stat(AceProxyPlugin):
         self.stuff = AceStuff
 
     def geo_ip_lookup(self, ip_address):
-        Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
-        lookup_url = 'https://freegeoip.lwan.ws/json/%s' % ip_address
-        headers={'User-Agent':'API Browser'}
-        response = requests.get(lookup_url, headers=headers, timeout=5, verify=True).json()
+        Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
+        headers = {'User-Agent':'API Browser'}
+        response = requests.get('https://freegeoip.lwan.ws/json/%s' % ip_address, headers=headers, timeout=5, verify=True).json()
 
         return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
                 'country'      : '' if not response['country_name'] else response['country_name'] ,
@@ -36,40 +35,32 @@ class Stat(AceProxyPlugin):
 
     def mac_lookup(self,ip_address):
 
-        if AceConfig.osplatform != 'Windows':
-           Popen(['ping', '-c 1', ip_address], stdout = PIPE, shell=False)
-           try: pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
-           except: Stat.logger.error("Can't execute arp! Install net-tools"); return "Local IP address "
-        else:
-           popen_params = { 'stdout' : PIPE,
-                            'shell'  : False }
-           CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
-           CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
-           DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
-           popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
-           Popen(["ping", "-n 1", ip_address], **popen_params)
-           pid = Popen(["arp", "-a", ip_address], **popen_params)
+        try:
+           if AceConfig.osplatform != 'Windows':
+              Popen(['ping', '-c 1', ip_address], stdout = PIPE, shell=False)
+              pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
+           else:
+              popen_params = { 'stdout' : PIPE, 'shell'  : False }
+              CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
+              CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
+              DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
+              popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
+              Popen(["ping", "-n 1", ip_address], **popen_params)
+              pid = Popen(["arp", "-a", ip_address], **popen_params)
 
-        s = pid.communicate()[0]
-        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", s)
-        response = None
-        if mac_address != None:
-           mac_address = mac_address.groups()[0]
-           lookup_url = 'http://macvendors.co/api/vendorname/%s' % mac_address
-           try:
-              headers={'User-Agent':'API Browser'}
-              response = requests.get(lookup_url, headers=headers, timeout=5).text
-           except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
-        else: Stat.logger.error("Can't obtain MAC address for Local IP:%s" % ip_address)
+        except: Stat.logger.error("Can't execute arp! Check if arp is installed!"); return "Local IP address "
 
-        return "Local IP address " if not response else response
+        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).group(0)
+        if mac_address:
+           headers = {'User-Agent':'API Browser'}
+           response = requests.get('http://macvendors.co/api/vendorname/%s' % mac_address, headers=headers, timeout=5)
+           if response.status_code == 200: return response.text
+           else: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
+        else: Stat.logger.error("Can't obtain MAC address for %s" % ip_address)
+        return "Local IP address "
 
     def handle(self, connection, headers_only=False):
         current_time = time.time()
-
-        if connection.reqtype == 'favicon.ico':
-            connection.send_response(404)
-            return
 
         connection.send_response(200)
         connection.send_header('Content-type', 'text/html; charset=utf-8')
