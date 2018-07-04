@@ -12,14 +12,9 @@ import time
 import logging, re
 import requests
 
-localnetranges = (
-        '192.168.0.0/16',
-        '10.0.0.0/8',
-        '172.16.0.0/12',
-        '224.0.0.0/4',
-        '240.0.0.0/5',
-        '127.0.0.0/8',
-        )
+localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
+                   '172.16.0.0/12', '224.0.0.0/4',
+                   '240.0.0.0/5', '127.0.0.0/8', )
 
 class Stat(AceProxyPlugin):
     handlers = ('stat', 'favicon.icon')
@@ -31,7 +26,7 @@ class Stat(AceProxyPlugin):
 
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
-        lookup_url = 'http://freegeoip.net/json/%s' % ip_address
+        lookup_url = 'http://api.2ip.ua/geo.json?ip=%s' % ip_address
         headers={'User-Agent':'API Browser'}
         response = requests.get(lookup_url, headers=headers, timeout=5).json()
 
