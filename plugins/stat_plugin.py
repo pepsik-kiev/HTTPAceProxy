@@ -26,11 +26,7 @@ class Stat(AceProxyPlugin):
 
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Trying to obtain geoip info for IP:%s' % ip_address)
-<<<<<<< HEAD
         lookup_url = 'https://freegeoip.lwan.ws/json/%s' % ip_address
-=======
-        lookup_url = 'http://api.2ip.ua/geo.json?ip=%s' % ip_address
->>>>>>> origin/master
         headers={'User-Agent':'API Browser'}
         response = requests.get(lookup_url, headers=headers, timeout=5, verify=True).json()
 
