@@ -50,7 +50,7 @@ class Stat(AceProxyPlugin):
 
         except: Stat.logger.error("Can't execute arp! Check if arp is installed!"); return "Local IP address "
 
-        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).group(0)
+        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).groups()[0]
         if mac_address:
            headers = {'User-Agent':'API Browser'}
            response = requests.get('http://macvendors.co/api/vendorname/%s' % mac_address, headers=headers, timeout=5)
