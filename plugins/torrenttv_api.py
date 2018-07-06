@@ -49,10 +49,6 @@ class TorrentTvApi(object):
         self.conf = ConfigParser.RawConfigParser()
         self.headers = {'User-Agent': 'Magic Browser'} # headers for connection to the TTV API
 
-    def get_mac(self):
-        mac = hex(getnode()).replace('0x', '')
-        return ''.join([mac[i: i+2] for i in range(0, 11, 2)])
-
     def auth(self):
         """
         User authentication
@@ -68,7 +64,7 @@ class TorrentTvApi(object):
              self.session = self.conf.get('torrenttv_api', 'session')
              self.guid = self.conf.get('torrenttv_api', 'guid')
              if self.conf.get('torrenttv_api', 'email') != self.email: raise
-        except: self.session = None; self.guid = self.get_mac()
+        except: self.session = None; self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6))) # get device mac address
 
         with self.lock:
             if not self.session:
@@ -123,7 +119,7 @@ class TorrentTvApi(object):
         :return: records list
         """
         request = 'arc_records.php'
-        params = {'epg_id': channel_id, 'date': date.replace('-0', '-')}
+        params = {'epg_id': channel_id, 'date': date.strftime('X%d-X%m-%Y').replace('X0', '')}
         if raw:
             try:
                 res = self._xmlresult(request, params)

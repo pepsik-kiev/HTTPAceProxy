@@ -22,7 +22,7 @@ import requests
 from urlparse import parse_qs
 from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
-from datetime import date, timedelta, datetime
+from datetime import timedelta, datetime
 
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
@@ -83,7 +83,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream, '')
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream,'')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
@@ -171,7 +171,7 @@ class P2pproxy(AceProxyPlugin):
         # /archive/ branch
         elif connection.reqtype == 'archive':
             if len(connection.splittedpath) >= 3 and connection.splittedpath[2] in ('dates', 'dates.m3u'):  # /archive/dates.m3u
-                d = date.today()
+                d = datetime.now()
                 delta = timedelta(days=1)
                 playlistgen = PlaylistGenerator()
                 hostport = connection.headers['Host']
@@ -194,13 +194,13 @@ class P2pproxy(AceProxyPlugin):
 
                 if 'date' in self.params:
                     for d in self.params['date']:
-                        dates.append(self.parse_date(d).strftime('%d-%m-%Y').replace('-0', '-'))
+                        dates.append(self.parse_date(d).strftime('%d-%m-%Y'))
                 else:
-                    d = date.today()
+                    d = datetime.now()
                     delta = timedelta(days=1)
                     days = int(self.get_param('days')) if 'days' in self.params else 7
                     for i in range(days):
-                        dates.append(d.strftime('%d-%m-%Y').replace('-0', '-'))
+                        dates.append(d.strftime('%d-%m-%Y'))
                         d = d - delta
 
                 connection.send_response(200)
@@ -262,7 +262,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream, '')
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream,'')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
@@ -270,7 +270,6 @@ class P2pproxy(AceProxyPlugin):
                 connection.handleRequest(headers_only, fmt=self.get_param('fmt'))
             # /archive/?type=m3u&date=[param_date]&channel_id=[param_channel]
             elif self.get_param('type') == 'm3u':
-                d = self.get_date_param()
 
                 if headers_only:
                     connection.send_response(200)
@@ -280,7 +279,7 @@ class P2pproxy(AceProxyPlugin):
 
                 playlistgen = PlaylistGenerator()
                 param_channel = self.get_param('channel_id')
-                d = d.strftime('%d-%m-%Y').replace('-0', '-')
+                d = self.get_date_param()
 
                 if param_channel == '' or not param_channel:
                     channels_list = self.api.archive_channels()
@@ -333,14 +332,10 @@ class P2pproxy(AceProxyPlugin):
             # /archive/?date=[param_date]&channel_id=[param_channel]
             else:
                 param_date = self.get_param('date')
-                if not param_date: d = date.today()
+                if not param_date: d = datetime.now()
                 else:
-                    try:
-                        param_date = param_date.split('-')
-                        d = date(int(param_date[2]), int(param_date[1]), int(param_date[0]))
-                    except IndexError:
-                        connection.dieWithError(500, 'Date param is not correct!', logging.ERROR)
-                        return
+                    try: d = parse_date(param_date)
+                    except: return
                 param_channel = self.get_param('channel_id')
                 if param_channel == '' or not param_channel:
                     connection.dieWithError(500, 'Got /archive/ request but no channel_id specified!', logging.ERROR)
@@ -382,12 +377,10 @@ class P2pproxy(AceProxyPlugin):
 
     def get_date_param(self):
         d = self.get_param('date')
-        return date.today() if not d else self.parse_date(d)
+        return datetime.now() if not d else self.parse_date(d)
 
     def parse_date(self, d):
-        try:
-            param_date = d.split('-')
-            return date(int(param_date[2]), int(param_date[1]), int(param_date[0]))
+        try: return datetime.strptime(d, '%d-%m-%Y')
         except IndexError as e:
             P2pproxy.logger.error('date param is not correct!')
             raise e

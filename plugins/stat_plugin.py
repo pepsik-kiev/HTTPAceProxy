@@ -51,9 +51,8 @@ class Stat(AceProxyPlugin):
 
         mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0])
         if mac_address:
-           mac_address = mac_address.groups()[0]
            headers = {'User-Agent':'API Browser'}
-           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5).json()['result']['company']
+           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address.groups()[0], headers=headers, timeout=5).json()['result']['company']
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
            else: return response
         else: Stat.logger.error("Can't obtain MAC address for %s" % ip_address)
