@@ -37,7 +37,7 @@ class Stat(AceProxyPlugin):
 
         try:
            if AceConfig.osplatform != 'Windows':
-              Popen(['ping', '-c 1', ip_address], stdout = PIPE, shell=False)
+              Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
               pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
            else:
               popen_params = { 'stdout' : PIPE, 'shell' : False }
@@ -45,12 +45,13 @@ class Stat(AceProxyPlugin):
               CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
               DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
               popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
-              Popen(["ping", "-n 1", ip_address], **popen_params)
-              pid = Popen(["arp", "-a", ip_address], **popen_params)
+              Popen(['ping', '-n', '1', ip_address], **popen_params)
+              pid = Popen(['arp', '-a', ip_address], **popen_params)
         except: Stat.logger.error("Can't execute arp! Check if arp is installed!"); return 'Local IP address '
 
-        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).groups()[0]
+        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0])
         if mac_address:
+           mac_address = mac_address.groups()[0]
            headers = {'User-Agent':'API Browser'}
            try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5).json()['result']['company']
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
