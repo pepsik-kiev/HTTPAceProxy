@@ -10,6 +10,7 @@ import psutil
 import time, os
 import logging, re
 import requests
+from jinja2 import Template
 
 localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
                    '172.16.0.0/12', '224.0.0.0/4',
@@ -64,42 +65,133 @@ class Stat(AceProxyPlugin):
         max_mem = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
 
-        connection.wfile.write('<html><head>')
-        connection.wfile.write('<meta charset="UTF-8" http-equiv="Refresh" content="60"/>')
-        connection.wfile.write('<title>AceProxy stat info</title>')
-        connection.wfile.write('<link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>')
-        connection.wfile.write('<link rel="shortcut icon" href="http://i.piccy.info/i9/5777461ca749986f6fb4c4b06a70bfbe/1504856430/10417/1177931/SHesterenka_150x150.png" type="image/png">')
-        connection.wfile.write('<style>h5 {margin-bottom: -15px;}</style>')
-        connection.wfile.write('</head>')
-        connection.wfile.write('<body><div class="f16">')
+        template = Template(header_template)
+        connection.wfile.write(template.render(os_platform = AceConfig.osplatform,
+                                               cpu_nums = psutil.cpu_count(),
+                                               cpu_percent = psutil.cpu_percent(),
+                                               total_ram = round(max_mem.total/2**20,2),
+                                               used_ram = round(max_mem.used/2**20,2),
+                                               free_ram = round(max_mem.available/2**20,2),
+                                               total_disk = round(disk.total/2**30,2),
+                                               used_disk = round(disk.used/2**30,2),
+                                               free_disk = round(disk.free/2**30,2),
+                                               max_clients = self.config.maxconns,
+                                               total_clients = self.stuff.clientcounter.total,
+                                               ).encode('UTF8'))
 
-        connection.wfile.write('<p>Connections limit: ' + str(self.config.maxconns) + '&nbsp;&nbsp;&nbsp;Connected clients: ' + str(self.stuff.clientcounter.total) + '</p>')
-
-        connection.wfile.write('<table  border="2" cellspacing="0" cellpadding="3">')
-        connection.wfile.write('<tr align=CENTER valign=BASELINE BGCOLOR="#eeeee5"><td>Channel name</td><td>Client IP</td><td>Client/Location</td><td>Start time</td><td>Duration</td></tr>')
-
-
+        template = Template(row_template)
         for i in self.stuff.clientcounter.clients:
             for c in self.stuff.clientcounter.clients[i]:
-                connection.wfile.write('<tr><td>')
-                if c.channelIcon: connection.wfile.write('<img src="' + c.channelIcon + '" width="40" height="16"/>&nbsp;')
-                if c.channelName: connection.wfile.write(c.channelName.encode('UTF8'))
-                else: connection.wfile.write(i)
-                connection.wfile.write('</td><td>' + c.handler.clientip + '</td>')
-                clientinrange = any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges])
-                if clientinrange: connection.wfile.write('<td>' + self.mac_lookup(c.handler.clientip).encode('UTF8').strip() + '</td>')
+                if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
+                   clientInfo = self.mac_lookup(c.handler.clientip).strip()
                 else:
-                    geo_ip_info = self.geo_ip_lookup(c.handler.clientip)
-                    connection.wfile.write('<td>' + geo_ip_info.get('country').encode('UTF8') + ', ' + geo_ip_info.get('city').encode('UTF8') + '&nbsp;<i class="flag ' + geo_ip_info.get('country_code').encode('UTF8').lower() + '"></i>&nbsp;</td>')
-                connection.wfile.write('<td>' + time.strftime('%c', time.localtime(c.connectionTime)) + '</td>')
-                connection.wfile.write('<td align="center">' + time.strftime("%H:%M:%S",  time.gmtime(current_time-c.connectionTime)) + '</td></tr>')
-        connection.wfile.write('</table></div>')
+                   clientInfo = self.geo_ip_lookup(c.handler.clientip).get('country')
+                connection.wfile.write(template.render(channelIcon = c.channelIcon,
+                                                       channelName = c.channelName,
+                                                       clientIP = c.handler.clientip,
+                                                       clientLocation = clientInfo,
+                                                       startTime = time.strftime('%c', time.localtime(c.connectionTime)),
+                                                       durationTime = time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime)),
+                                                       ).encode('UTF8'))
+        connection.wfile.write(foot_template)
 
-        connection.wfile.write('<h5>SYSTEM INFO :</h5>')
-        connection.wfile.write('<p><font size="-3">OS '+ AceConfig.osplatform + '&nbsp;')
-        connection.wfile.write('CPU cores: %s' % psutil.cpu_count() + ' used: %s' % psutil.cpu_percent() + '%</br>')
-        connection.wfile.write('RAM MiB &nbsp;' )
-        connection.wfile.write('total: %s ' % round(max_mem.total/2**20,2) + '&nbsp;used: %s' % round(max_mem.used/2**20,2) + '&nbsp;free: %s </br>' % round(max_mem.available/2**20,2))
-        connection.wfile.write('DISK GiB &nbsp;')
-        connection.wfile.write('total: %s ' % round(disk.total/2**30,2) + '&nbsp;used: %s' % round(disk.used/2**30,2) + '&nbsp;free: %s </font></p>' % round(disk.free/2**30,2))
-        connection.wfile.write('</body></html>')
+
+header_template = """
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" http-equiv="Refresh" content="60"/>
+    <meta name="description" content="HTTP AceProxy state panel">
+
+<link rel="shortcut icon" href="http://i.piccy.info/i9/699484caf086b9c6b5c6cf2cf48f3624/1530371843/19958/1254756/shesterenka.png" type="image/png">
+
+    <title>AceProxy stat info</title>
+
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+
+    <link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+
+    <style>
+        .header {height: 150px; background-color: #0a0351 !important; background-size: 100%;background-image: url(http://i.piccy.info/i9/32afd3631fc0032bbfc7bed47d8fec11/1530666765/66668/1254756/space_2294795_1280.jpg);}
+        .header-block {position: relative; color:aliceblue; width: 100%; height: 100%;}
+        .info-block {position: absolute; left: 15px; bottom:5px; text-shadow: 1px 1px 3px black;}
+        .info-block > h6 {margin-bottom: 3px; font-weight: bold}
+        .info-block > p {font-size: 0.7em; margin: 0;}
+        .status-connection > p {position: absolute; right: 15px; bottom:5px; margin: 0;text-shadow: 1px 1px 1px black;}
+        .heder-title {color:aliceblue; padding-top:35px; font-weight: bold; text-shadow: 2px 2px 1px black, 0 0 0.9em #008aff;}
+        .heder-title > h1 {font-weight: bold; margin-bottom: 0px}
+        .home-link {text-decoration: none; color: aliceblue; font-size: 0.7em;}
+        .home-link:hover{color: #b6dcfe; text-decoration: none; font-size: 0.8em;}
+        H1 > small {font-size: 0.4em;}
+        .table .thead-light th {color: #495057; background-color: #e9e9e9; border: 3px ridge #4b4b4b;}
+        .table-bordered td {border: 3px ridge #4b4b4b;}
+        th > small {font-weight: bold}
+
+    </style>
+
+  </head>
+
+  <body>
+
+    <nav class="header">
+
+        <div class="header-block">
+            <div class="info-block">
+                <h6>SYSTEM INFO :</h6>
+                <p>OS {{os_platform}}&nbsp;CPU cores: {{cpu_nums}} used: {{cpu_percent}}%</br>
+                RAM MiB &nbsp;total: {{total_ram}} &nbsp;used: {{used_ram}}&nbsp;free: {{free_ram}}</br>DISK GiB &nbsp;total: {{total_disk}}&nbsp;used: {{used_disk}}&nbsp;free: {{free_disk}} </p>
+            </div>
+            <div class="status-connection">
+                <p>Connections limit: {{max_clients}}&nbsp;&nbsp;&nbsp;Connected clients: {{total_clients}}</p>
+            </div>
+            <div class="heder-title">
+                <h1 class="text-center">HTTP AceProxy</h1>
+                <p class="text-center"><a class="home-link" href="https://github.com/pepsik-kiev/HTTPAceProxy" target="_blank">Project home page on GitHub</a></p>
+                <p class="text-center"><a class="home-link" href="http://mytalks.ru/index.php?topic=4506.0" target="_blank">Forum HTTPAceProxy</a></p>
+            </div>
+        </div>
+
+    </nav>
+
+    <main role="main" class="container" style="margin-top: 30px">
+        <div class="f16 container container-fluid">
+            <table class="table table-sm table-bordered">
+                <thead class="thead-light text-center">
+                    <tr>
+                        <th scope="col">Channel name</th>
+                        <th scope="col">Client IP</th>
+                        <th scope="col">Client/Location</th>
+                        <th scope="col">Start time</th>
+                        <th scope="col">Duration</th>
+                    </tr>
+                </thead>
+"""
+
+row_template = """
+                <tbody>
+
+                    <tr>
+                        <td>
+                            <img src="{{channelIcon}}" width="40" height="20"/>&nbsp;&nbsp;{{channelName}}
+                        </td>
+                        <td>{{clientIP}}</td>
+                        <td>{{clientLocation}}</td>
+                        <td>{{startTime}}</td>
+                        <td class="text-center">{{durationTime}}</td>
+                    </tr>
+                </tbody>
+"""
+
+foot_template = """
+            </table>
+        </div>
+    </main>
+
+  </body>
+</html>
+
+"""
