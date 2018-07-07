@@ -104,7 +104,7 @@ class P2pproxy(AceProxyPlugin):
 
                 translations_list = self.api.translations(param_filter)
 
-                playlistgen = PlaylistGenerator()
+                playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
                 P2pproxy.logger.debug('Generating requested m3u playlist')
                 for channel in translations_list:
                     group_id = channel.getAttribute('group')
@@ -121,8 +121,7 @@ class P2pproxy(AceProxyPlugin):
                     playlistgen.addItem(fields)
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
-                header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
-                exported = playlistgen.exportm3u(hostport=hostport, header=header, fmt=self.get_param('fmt')).encode('utf-8')
+                exported = playlistgen.exportm3u(hostport=hostport, header=config.m3uheadertemplate, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'application/x-mpegurl')
                 connection.send_header('Content-Length', str(len(exported)))
@@ -181,7 +180,7 @@ class P2pproxy(AceProxyPlugin):
                     dfmt = d.strftime('%d-%m-%Y')
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
                     playlistgen.addItem({'group': '', 'tvg': '', 'name': dfmt, 'url': url})
-                    d = d - delta
+                    d -= delta
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.get_param('fmt')).encode('utf-8')
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'application/x-mpegurl')
@@ -201,7 +200,7 @@ class P2pproxy(AceProxyPlugin):
                     days = int(self.get_param('days')) if 'days' in self.params else 7
                     for i in range(days):
                         dates.append(d.strftime('%d-%m-%Y'))
-                        d = d - delta
+                        d -= delta
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'application/x-mpegurl')

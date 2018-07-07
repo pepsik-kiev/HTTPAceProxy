@@ -6,9 +6,8 @@ To use it, go to http://127.0.0.1:8000/stat
 from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
-from gevent.subprocess import Popen, PIPE
 import psutil
-import time
+import time, os
 import logging, re
 import requests
 
@@ -35,27 +34,21 @@ class Stat(AceProxyPlugin):
 
     def mac_lookup(self,ip_address):
 
-        try:
-           if AceConfig.osplatform != 'Windows':
-              Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
-              pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
-           else:
-              popen_params = { 'stdout' : PIPE, 'shell' : False }
-              CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
-              CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
-              DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
-              popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
-              Popen(['ping', '-n', '1', ip_address], **popen_params)
-              pid = Popen(['arp', '-a', ip_address], **popen_params)
-        except: Stat.logger.error("Can't execute arp! Check if arp is installed!"); return 'Local IP address '
+        if ip_address == AceConfig.httphost:
+           mac_address = []
+           from uuid import getnode
+           mac_address[0] = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6)))
+        else:
+           try: pid = os.system('arp -n %s' % ip_address) if AceConfig.osplatform != 'Windows' else os.system('arp -a %s' % ip_address)
+           except: Stat.logger.error("Can't execute arp! Check if arp is installed!"); return "Local IP address "
+           mac_address = re.findall(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", str(pid))
 
-        mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0])
         if mac_address:
            headers = {'User-Agent':'API Browser'}
-           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address.groups()[0], headers=headers, timeout=5).json()['result']['company']
+           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address[0], headers=headers, timeout=5).json()['result']['company']
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
            else: return response
-        else: Stat.logger.error("Can't obtain MAC address for %s" % ip_address)
+        else: Stat.logger.error("Can't obtain MAC address for local IP %s" % ip_address)
         return 'Local IP address '
 
     def handle(self, connection, headers_only=False):
@@ -68,8 +61,6 @@ class Stat(AceProxyPlugin):
 
         if headers_only: return
         # Sys Info
-        cpu_nums = psutil.cpu_count()
-        cpu_percent = psutil.cpu_percent()
         max_mem = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
 
@@ -106,7 +97,7 @@ class Stat(AceProxyPlugin):
 
         connection.wfile.write('<h5>SYSTEM INFO :</h5>')
         connection.wfile.write('<p><font size="-3">OS '+ AceConfig.osplatform + '&nbsp;')
-        connection.wfile.write('CPU cores: %s' % cpu_nums + ' used: %s' % cpu_percent + '%</br>')
+        connection.wfile.write('CPU cores: %s' % psutil.cpu_count() + ' used: %s' % psutil.cpu_percent() + '%</br>')
         connection.wfile.write('RAM MiB &nbsp;' )
         connection.wfile.write('total: %s ' % round(max_mem.total/2**20,2) + '&nbsp;used: %s' % round(max_mem.used/2**20,2) + '&nbsp;free: %s </br>' % round(max_mem.available/2**20,2))
         connection.wfile.write('DISK GiB &nbsp;')

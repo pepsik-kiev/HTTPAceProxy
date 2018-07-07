@@ -34,9 +34,8 @@ class Torrenttelik(AceProxyPlugin):
 
     def downloadPlaylist(self, url):
         headers = {'User-Agent': 'Magic Browser'}
-        proxies=config.proxies if config.useproxy else {}
         try:
-            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=proxies, timeout=30).json()
+            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30).json()
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
         except requests.exceptions.ConnectionError:
@@ -75,8 +74,7 @@ class Torrenttelik(AceProxyPlugin):
             return
 
         Torrenttelik.logger.debug('Exporting m3u playlist')
-        header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' %(config.tvgurl, config.tvgshift)
-        exported = playlistgen.exportm3u(hostport, header=header, add_ts=add_ts, fmt=self.getparam('fmt')).encode('utf-8')
+        exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=self.getparam('fmt')).encode('utf-8')
 
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

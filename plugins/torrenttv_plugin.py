@@ -41,13 +41,12 @@ class Torrenttv(AceProxyPlugin):
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser'}
-        proxies = config.proxies if config.useproxy else {}
         try:
-            origin = requests.get(config.url, headers=headers, proxies=proxies, timeout=30).text.encode('utf-8')
+            origin = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text.encode('utf-8')
 
             self.logger.info('TTV playlist %s downloaded' % config.url)
             self.playlisttime = int(time.time())
-            self.playlist = PlaylistGenerator()
+            self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
             self.channels = dict()
             m = hashlib.md5()
             if self.updatelogos:
@@ -112,7 +111,7 @@ class Torrenttv(AceProxyPlugin):
                     connection.dieWithError(404, 'Invalid path: ' + requests.compat.unquote(path), logging.ERROR)
                     return
 
-                name = requests.compat.unquote(connection.path[19:-4]).decode('UTF8')
+                name = requests.compat.unquote(path[19:-4]).decode('UTF8')
                 url = self.channels.get(name)
                 if not url:
                     connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
@@ -136,8 +135,7 @@ class Torrenttv(AceProxyPlugin):
                 hostport = connection.headers['Host']
                 path = '' if len(self.channels) == 0 else '/torrenttv/channel'
                 add_ts = True if path.endswith('/ts') else False
-                header = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (config.tvgurl, config.tvgshift)
-                exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=header, fmt=fmt)
+                exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=fmt)
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

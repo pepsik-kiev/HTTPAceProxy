@@ -25,9 +25,19 @@ fullpathlogo = True
 
 # TV Guide URL
 tvgurl = 'http://1ttvapi.top/ttv.xmltv.xml.gz'
-
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
+
+# Channel playlist template
+# The following values are allowed:
+# name - channel name
+# url - channel URL
+# tvg - channel tvg name (optional)
+# tvgid - channel tvg id (optional)
+# group - channel playlist group (optional)
+# logo - channel logo file name (optional)
+m3uheadertemplate = '#EXTM3U url-tvg="%s" tvg-shift=%d deinterlace=1 m3uautoload=1 cache=1000\n' % (tvgurl, tvgshift)
+m3uchanneltemplate = '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-id="%(tvgid)s" tvg-logo="%(logo)s",%(name)s\n#EXTGRP:%(group)s\n%(url)s\n'
 
 # Format of the tvg-id tag or empty string
 tvgid='ttv%(id)s'
