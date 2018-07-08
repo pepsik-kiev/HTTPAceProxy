@@ -1,13 +1,15 @@
 '''
 Simple statistics plugin
+You will need to "pip install jinja2" first!
 
-To use it, go to http://127.0.0.1:8000/stat
+To use it, go to http://acehttp_proxy_ip:port/stat
 '''
 from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
+from gevent.subprocess import Popen, PIPE
 import psutil
-import time, os
+import time
 import logging, re
 import requests
 from jinja2 import Template
@@ -36,17 +38,30 @@ class Stat(AceProxyPlugin):
     def mac_lookup(self,ip_address):
 
         if ip_address == AceConfig.httphost:
-           mac_address = []
            from uuid import getnode
-           mac_address[0] = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6)))
+           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6)))
+           except: mac_address = None
         else:
-           try: pid = os.system('arp -n %s' % ip_address) if AceConfig.osplatform != 'Windows' else os.system('arp -a %s' % ip_address)
-           except: Stat.logger.error("Can't execute arp! Check if arp is installed!"); return "Local IP address "
-           mac_address = re.findall(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", str(pid))
+           try:
+              if AceConfig.osplatform != 'Windows':
+                 Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
+                 pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
+              else:
+                 popen_params = { 'stdout' : PIPE,
+                                  'shell'  : False }
+                 CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
+                 CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
+                 DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
+                 popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
+                 Popen(['ping', '-n', '1', ip_address], **popen_params)
+                 pid = Popen(['arp', '-a', ip_address], **popen_params)
+           except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
+           try: mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).group(0)
+           except: mac_address = None
 
         if mac_address:
            headers = {'User-Agent':'API Browser'}
-           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address[0], headers=headers, timeout=5).json()['result']['company']
+           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5).json()['result']['company']
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
            else: return response
         else: Stat.logger.error("Can't obtain MAC address for local IP %s" % ip_address)
@@ -83,7 +98,7 @@ class Stat(AceProxyPlugin):
         for i in self.stuff.clientcounter.clients:
             for c in self.stuff.clientcounter.clients[i]:
                 if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
-                   clientInfo = self.mac_lookup(c.handler.clientip).strip()
+                   clientInfo = self.mac_lookup(c.handler.clientip)
                 else:
                    clientInfo = self.geo_ip_lookup(c.handler.clientip).get('country')
                 connection.wfile.write(template.render(channelIcon = c.channelIcon,
