@@ -9,7 +9,6 @@ __author__ = 'AndreyPavlenko, Dorik1972'
 import logging, re
 import time
 import gevent
-from urlparse import parse_qs
 import hashlib
 import traceback, threading
 import requests
@@ -35,7 +34,7 @@ class Torrenttv(AceProxyPlugin):
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
     def playlistTimedDownloader(self):
-        while True:
+        while 1:
             with self.lock: self.downloadPlaylist()
             gevent.sleep(config.updateevery * 60)
 
@@ -81,7 +80,7 @@ class Torrenttv(AceProxyPlugin):
                 if url.startswith(('acestream://', 'infohash://')) \
                       or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                     self.channels[name] = url
-                    itemdict['url'] = requests.compat.quote(encname,'') + '.mp4'
+                    itemdict['url'] = requests.compat.quote(encname,'') + '.ts'
 
                 self.playlist.addItem(itemdict)
                 m.update(encname)
@@ -103,24 +102,23 @@ class Torrenttv(AceProxyPlugin):
 
             url = requests.compat.urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
-            params = parse_qs(connection.query)
+            params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
             fmt = params['fmt'][0] if 'fmt' in params else None
 
             if path.startswith('/torrenttv/channel/'):
-                if not path.endswith('.mp4'):
+                if not path.endswith('.ts'):
                     connection.dieWithError(404, 'Invalid path: ' + requests.compat.unquote(path), logging.ERROR)
                     return
-
-                name = requests.compat.unquote(path[19:-4]).decode('UTF8')
+                name = requests.compat.unquote(path[19:-3]).decode('UTF8')
                 url = self.channels.get(name)
                 if not url:
                     connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
                 elif url.startswith('acestream://'):
-                    connection.path = '/content_id/%s/stream.mp4' % url.split('/')[2]
+                    connection.path = '/content_id/%s/stream.ts' % url.split('/')[2]
                 elif url.startswith('infohash://'):
-                    connection.path = '/infohash/%s/stream.mp4' % url.split('/')[2]
+                    connection.path = '/infohash/%s/stream.ts' % url.split('/')[2]
                 elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                    connection.path = '/url/%s/stream.mp4' % requests.compat.quote(url,'')
+                    connection.path = '/url/%s/stream.ts' % requests.compat.quote(url,'')
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 play = True

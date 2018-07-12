@@ -9,13 +9,25 @@ class PlaylistConfig():
        '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-id="%(tvgid)s" tvg-logo="%(logo)s",%(name)s\n#EXTGRP:%(group)s\n%(url)s\n'
 
     # Channel names mapping. You may use this to rename channels.
-    # Examples:
-    # m3uchannelnames['Canal+ HD (France)'] = 'Canal+ HD'
-    # m3uchannelnames['Sky Sport 1 HD (Italy)'] = 'Sky Sport 1 HD'
     m3uchannelnames = dict()
-    # m3uchannelnames['UA:Перший (Украина)'] = 'UA Перший (Украина)'
-    # m3uchannelnames['100% News'] = '100 News'
-    # m3uchannelnames['РЕН ТВ [16:9]'] = 'РЕН ТВ (16-9)'
+    # Examples:
+    m3uchannelnames['A1'] = 'Amedia 1'
+    m3uchannelnames['A2'] = 'Amedia 2'
+    m3uchannelnames['Da Vinci'] = 'Da Vinci Learning'
+    m3uchannelnames['5 канал'] = 'Пятый канал'
+    m3uchannelnames['TV XXI'] = 'TV XXI (TV21)'
+    m3uchannelnames['TV1000 Русское кино'] = 'TV 1000 Русское кино'
+    m3uchannelnames['Travel+Adventure'] = 'Travel + Adventure'
+    m3uchannelnames['Первый'] = 'Первый канал'
+    m3uchannelnames['ТВ3'] = 'ТВ 3'
+    m3uchannelnames['КХЛ'] = 'КХЛ ТВ'
+    m3uchannelnames['Канал Disney'] = 'Disney Channel'
+    m3uchannelnames['Бобёр']  = 'Бобер'
+    m3uchannelnames['Наука'] = 'Наука 2.0'
+    m3uchannelnames['Russian Travel Guide'] = 'RTG TV'
+    m3uchannelnames['Иллюзион +'] = 'Иллюзион+'
+    m3uchannelnames['РТВ - Любимое кино'] = 'Наше Любимое Кино'
+    m3uchannelnames['ТВ Центр'] = 'ТВЦ'
 
     # Similar to m3uchannelnames but for groups
     m3ugroupnames = dict()
@@ -50,10 +62,10 @@ class PlaylistConfig():
             value = item[key]
             if not setKey: setKey = key
 
-            if isinstance(value, str):
+            if type(value) == str:
                 value = replacementsDict.get(value)
                 if value: item[setKey] = value
-            elif isinstance(value, unicode):
+            elif type(value) == unicode:
                 value = replacementsDict.get(value.encode('utf8'))
                 if value: item[setKey] = value.decode('utf8')
 

@@ -7,7 +7,6 @@ http://ip:port/allfon
 __author__ = 'miltador, Dorik1972'
 
 import logging, re
-from urlparse import parse_qs
 import requests
 import time
 from PluginInterface import AceProxyPlugin
@@ -59,7 +58,7 @@ class Allfon(AceProxyPlugin):
         for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
 
         Allfon.logger.debug('Exporting m3u playlist')
-        params = parse_qs(connection.query)
+        params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
         fmt = params['fmt'][0] if 'fmt' in params else None
 
         exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=fmt)

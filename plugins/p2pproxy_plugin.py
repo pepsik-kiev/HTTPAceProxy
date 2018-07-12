@@ -18,8 +18,7 @@ What is this plugin for?
 __author__ = 'miltador, Dorik1972'
 
 import logging
-import requests
-from urlparse import parse_qs
+from requests.compat import quote, unquote
 from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
@@ -43,11 +42,12 @@ class P2pproxy(AceProxyPlugin):
         P2pproxy.logger.debug('Handling request')
 
         hostport = connection.headers['Host']
-        self.params = parse_qs(connection.query)
+        self.params = { k:[v] for k,v in (unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+
         # /channels/ branch
         if connection.reqtype in ('channels', 'channels.m3u'):
-            # /channels/play?id=[id]
-            if len(connection.splittedpath) == 3 and connection.splittedpath[2].split('?')[0] == 'play':
+
+            if connection.path.endswith('play'):  # /channels/play?id=[id]
                 channel_id = self.get_param('id')
                 if not channel_id:
                     # /channels/play?id=&_=[epoch timestamp] is Torrent-TV widget proxy check
@@ -83,12 +83,13 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream,'')
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 connection.handleRequest(headers_only, name, logo, fmt=self.get_param('fmt'))
+
             # /channels/?filter=[filter]&group=[group]&type=m3u
             elif connection.reqtype == 'channels.m3u' or self.get_param('type') == 'm3u':
                 if headers_only:
@@ -127,6 +128,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
+
             # /channels/?filter=[filter]
             else:
                 if headers_only:
@@ -150,26 +152,27 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Content-Length', str(len(translations_list)))
                 connection.end_headers()
                 connection.wfile.write(translations_list)
+
         # same as /channels request
-        elif connection.reqtype == 'xbmc.pvr':
-            if len(connection.splittedpath) == 3 and connection.splittedpath[2] == 'playlist':
-                connection.send_response(200)
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('Connection', 'close')
-                connection.send_header('Content-Type', 'text/xml;charset=utf-8')
+        elif connection.reqtype == 'xbmc.pvr' and connection.path.endswith('playlist'):
+            connection.send_response(200)
+            connection.send_header('Access-Control-Allow-Origin', '*')
+            connection.send_header('Connection', 'close')
+            connection.send_header('Content-Type', 'text/xml;charset=utf-8')
 
-                if headers_only:
-                    connection.end_headers()
-                    return
-
-                translations_list = self.api.translations('all', True)
-                connection.send_header('Content-Length', str(len(translations_list)))
+            if headers_only:
                 connection.end_headers()
-                P2pproxy.logger.debug('Exporting m3u playlist')
-                connection.wfile.write(translations_list)
+                return
+
+            translations_list = self.api.translations('all', True)
+            connection.send_header('Content-Length', str(len(translations_list)))
+            connection.end_headers()
+            P2pproxy.logger.debug('Exporting m3u playlist')
+            connection.wfile.write(translations_list)
+
         # /archive/ branch
         elif connection.reqtype == 'archive':
-            if len(connection.splittedpath) >= 3 and connection.splittedpath[2] in ('dates', 'dates.m3u'):  # /archive/dates.m3u
+            if connection.path.endswith(('dates', 'dates.m3u')):  # /archive/dates.m3u
                 d = datetime.now()
                 delta = timedelta(days=1)
                 playlistgen = PlaylistGenerator()
@@ -188,7 +191,8 @@ class P2pproxy(AceProxyPlugin):
                 connection.end_headers()
                 connection.wfile.write(exported)
                 return
-            elif len(connection.splittedpath) >= 3 and connection.splittedpath[2] in ('playlist', 'playlist.m3u'):  # /archive/playlist.m3u
+
+            elif connection.path.endswith(('playlist', 'playlist.m3u')):  # /archive/playlist.m3u
                 dates = list()
 
                 if 'date' in self.params:
@@ -229,8 +233,8 @@ class P2pproxy(AceProxyPlugin):
                 connection.end_headers()
                 connection.wfile.write(exported)
                 return
-            # /archive/channels
-            elif len(connection.splittedpath) == 3 and connection.splittedpath[2] == 'channels':
+
+            elif connection.path.endswith('channels'):  # /archive/channels
                 connection.send_response(200)
                 connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('Connection', 'close')
@@ -244,8 +248,8 @@ class P2pproxy(AceProxyPlugin):
                     connection.end_headers()
                     connection.wfile.write(archive_channels)
                 return
-            # /archive/play?id=[record_id]
-            if len(connection.splittedpath) == 3 and connection.splittedpath[2].split('?')[0] == 'play':
+
+            if connection.path.endswith('play'):  # /archive/play?id=[record_id]
                 record_id = self.get_param('id')
                 if not record_id:
                     connection.dieWithError(400, 'Bad request')  # Bad request
@@ -261,12 +265,13 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % requests.compat.quote(stream,'')
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
                 connection.handleRequest(headers_only, fmt=self.get_param('fmt'))
+
             # /archive/?type=m3u&date=[param_date]&channel_id=[param_channel]
             elif self.get_param('type') == 'm3u':
 
@@ -328,6 +333,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
+
             # /archive/?date=[param_date]&channel_id=[param_channel]
             else:
                 param_date = self.get_param('date')
@@ -352,6 +358,7 @@ class P2pproxy(AceProxyPlugin):
                     connection.send_header('Content-Length', str(len(records_list)))
                     connection.end_headers()
                     connection.wfile.write(records_list)
+
         # Used to generate logomap for the torrenttv plugin
         elif connection.reqtype == 'logos':
             translations_list = self.api.translations('all')

@@ -17,7 +17,6 @@ Playlist format example:
 __author__ = 'miltador, Dorik1972'
 
 import logging
-from urlparse import parse_qs
 import requests
 import time
 from PluginInterface import AceProxyPlugin
@@ -54,8 +53,7 @@ class Torrenttelik(AceProxyPlugin):
             connection.end_headers()
             return
 
-        self.params = parse_qs(connection.query)
-
+        self.params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
         # 15 minutes cache
         if not Torrenttelik.playlist or (int(time.time()) - Torrenttelik.playlisttime > 15 * 60):
             if not self.downloadPlaylist(config.url): connection.dieWithError(); return

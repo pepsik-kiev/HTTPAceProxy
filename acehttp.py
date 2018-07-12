@@ -6,17 +6,17 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import os, sys, glob
-# Uppend the directory for custom modules at the front of the path.
-base_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, os.path.join(base_dir, 'modules'))
-for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
-
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.subprocess import Popen, PIPE
 import gevent.queue
+
+import os, sys, glob
+# Uppend the directory for custom modules at the front of the path.
+base_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(base_dir, 'modules'))
+for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
 import aceclient
 from aceclient.clientcounter import ClientCounter
@@ -32,7 +32,6 @@ from base64 import b64encode
 import time
 import requests
 from bencode import __version__ as bencode_version__
-from urlparse import parse_qs
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
@@ -132,7 +131,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
         self.requrl = requests.compat.urlparse(self.path)
-        self.reqparams = parse_qs(self.query)
+        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in self.query.split('&') for s2 in s1.split(';')] if '=' in x) }
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
@@ -172,8 +171,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict = dict()
         for i in range(3, 8):
-            try: paramsdict.update({aceclient.acemessages.AceConst.START_PARAMS[i-3]: int(self.splittedpath[i])})
-            except (IndexError, ValueError): paramsdict.update({aceclient.acemessages.AceConst.START_PARAMS[i-3]: '0'})
+            try: paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = int(self.splittedpath[i])
+            except (IndexError, ValueError): paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 
@@ -228,13 +227,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                    headers={'User-Agent': 'Python-urllib/2.7', 'Content-Type': 'application/octet-stream', 'Connection': 'close'}
                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
             except: pass
-            if not cid:
+            if cid is None:
                 logging.debug("Failed to get ContentID from WEB API")
                 try:
                     with AceStuff.clientcounter.lock:
                         if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
                         cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                except: logging.error("Failed to get Infohash from engine")
+                except: logging.error("Failed to get ContentID from engine")
 
         return None if not cid else cid
 
@@ -305,7 +304,7 @@ class Client:
                     except: break
                 except gevent.queue.Empty: logger.warning('No data received in 60 seconds - disconnecting "%s"' % self.channelName); break
         finally:
-            if transcoder:
+            if transcoder is not None:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
             return
@@ -417,7 +416,7 @@ def clean_proc():
         with AceStuff.clientcounter.lock:
             if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy(); gevent.sleep(1)
         for proc in psutil.process_iter():
-           if proc.name() == name: proc.terminate(); gevent.sleep(1)
+            if proc.name() == name: proc.terminate(); gevent.sleep(1)
         # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try: os.remove(AceStuff.acedir + '\\acestream.port')

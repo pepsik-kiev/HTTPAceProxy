@@ -11,8 +11,8 @@ import xml.dom.minidom as dom
 import logging
 import time
 import threading
-import ConfigParser
-from uuid import getnode
+try: from ConfigParser import RawConfigParser
+except : from configparser import RawConfigParser
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -46,7 +46,7 @@ class TorrentTvApi(object):
         self.allTranslations = self.session = self.guid = None
         self.lock = threading.RLock()
         self.log = logging.getLogger("TTV API")
-        self.conf = ConfigParser.RawConfigParser()
+        self.conf = RawConfigParser()
         self.headers = {'User-Agent': 'Magic Browser'} # headers for connection to the TTV API
 
     def auth(self):
@@ -60,11 +60,14 @@ class TorrentTvApi(object):
         :return: unique session string
         """
         try:
-             self.conf.read('.aceconfig')
-             self.session = self.conf.get('torrenttv_api', 'session')
-             self.guid = self.conf.get('torrenttv_api', 'guid')
-             if self.conf.get('torrenttv_api', 'email') != self.email: raise
-        except: self.session = None; self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6))) # get device mac address
+            self.conf.read('.aceconfig')
+            self.session = self.conf.get('torrenttv_api', 'session')
+            self.guid = self.conf.get('torrenttv_api', 'guid')
+            if self.conf.get('torrenttv_api', 'email') != self.email: raise
+        except:
+            from uuid import getnode
+            self.session = None
+            self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6)))) # get device mac address
 
         with self.lock:
             if not self.session:

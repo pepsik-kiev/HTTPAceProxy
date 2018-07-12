@@ -4,13 +4,16 @@ Torrent Films Playlist Plugin
 http://ip:port/proxyfilms - for use with AceProxy as proxy
 http://ip:port/films - for use with bulit-in AceStream proxy
 '''
+
+__author__ = 'Dorik1972'
+
 import os
 import logging
 import bencode, hashlib
 import time
-from urlparse import urlparse, parse_qs
 import gevent
 import threading
+from requests.compat import unquote
 from PluginInterface import AceProxyPlugin
 import config.torrentfilms as config
 from aceconfig import AceConfig
@@ -31,7 +34,7 @@ class Torrentfilms(AceProxyPlugin):
             gevent.spawn(self.playlistTimedDownloader)
 
     def playlistTimedDownloader(self):
-        while True:
+        while 1:
             time.sleep(15)
             with self.lock:
                  self.playlistdata()
@@ -40,7 +43,7 @@ class Torrentfilms(AceProxyPlugin):
     def playlistdata(self):
         self.playlist = []
         try:
-            filelist = filter(lambda x: x.endswith(('.torrent','.torrent.added')), os.listdir(unicode(config.directory)))
+            filelist = [x for x in os.listdir(str(config.directory)) if x.endswith(('.torrent','.torrent.added'))]
         except:
             self.logger.error("Can't load torrent files from %s" % config.directory)
             return False
@@ -58,15 +61,15 @@ class Torrentfilms(AceProxyPlugin):
                   try:
                      for files in metainfo[b'info'][b'files']:
                         if ''.join(files[b'path']).endswith(self.videoextdefaults):
-                           self.playlist.append([''.join(files[b'path']).translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, str(idx), metainfo[b'info'][b'name']])
+                           self.playlist.append([''.join(files[b'path']).translate(dict.fromkeys(list(map(ord, "%~}{][^$@*,-!?&`|><+=")))), infohash, str(idx), metainfo[b'info'][b'name']])
                            idx+=1
                   except Exception as e:
                      self.logger.error("Can't decode content of: %s\r\n%s" % (filename,repr(e)))
                else:
                     try:
-                       self.playlist.append([metainfo[b'info'][b'name'].translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><=+"))), infohash, '0', 'Other'])
+                       self.playlist.append([metainfo[b'info'][b'name'].translate(dict.fromkeys(list(map(ord, "%~}{][^$@*,-!?&`|><=+")))), infohash, '0', 'Other'])
                     except:
-                       self.playlist.append([filename.translate(dict.fromkeys(map(ord, "%~}{][^$@*,-!?&`|><+="))), infohash, '0', 'Other'])
+                       self.playlist.append([filename.translate(dict.fromkeys(list(map(ord, "%~}{][^$@*,-!?&`|><+=")))), infohash, '0', 'Other'])
 
         self.playlist.sort(key=lambda data: (data[3], data[0]))
         return True
@@ -106,7 +109,7 @@ class Torrentfilms(AceProxyPlugin):
                connection.end_headers()
                return
 
-            params = parse_qs(connection.query)
+            params = { k:[v] for k,v in (unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
             fmt = params['fmt'][0] if 'fmt' in params else None
 
             exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, fmt).encode('utf-8')

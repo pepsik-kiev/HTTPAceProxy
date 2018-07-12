@@ -4,8 +4,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 from aceconfig import AceConfig
 from acemessages import *
 import gevent, gevent.queue
-from gevent.event import AsyncResult
-from gevent.event import Event
+from gevent.event import AsyncResult, Event
 from gevent.subprocess import Popen, PIPE
 import telnetlib
 from socket import SHUT_WR
@@ -182,7 +181,7 @@ class AceClient(object):
         return self._getResult()
 
     def GETCONTENTINFO(self, datatype, value):
-        paramsdict = {datatype:value,'developer_id':'0','affiliate_id':'0','zone_id':'0'}
+        paramsdict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
         return self.LOADASYNC(datatype, paramsdict)
 
     def GETCID(self, datatype, url):
@@ -218,7 +217,7 @@ class AceClient(object):
                 return None
 
               if url.endswith('.m3u8'):
-                  self._streamReaderConnection.headers = {'Content-Type':'application/octet-stream','Connection': 'Keep-Alive','Keep-Alive': 'timeout=15, max=100'}
+                  self._streamReaderConnection.headers = {'Content-Type': 'application/octet-stream', 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100'}
                   popen_params = { "bufsize": AceConfig.readchunksize,
                                    "stdout" : PIPE,
                                    "stderr" : None,
@@ -246,12 +245,12 @@ class AceClient(object):
           else:
               with self._lock: self._streamReaderState = 2; self._lock.notifyAll()
               self.play_event()
-              while self._streamReaderConnection:
+              while 1:
                   self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                   clients = counter.getClients(cid)
                   try: data = out.read(AceConfig.readchunksize)
                   except: data = None
-                  if data and clients:
+                  if data is not None and clients:
                       if self._streamReaderQueue.full(): self._streamReaderQueue.get()
                       self._streamReaderQueue.put(data)
                       for c in clients:
@@ -295,7 +294,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while self._socket:
+        while 1:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
@@ -310,7 +309,7 @@ class AceClient(object):
 
                 # HELLOTS
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
-                    try: params = dict(x.split('=') for x in self._recvbuffer.partition(' ')[2].split())
+                    try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     except: logger.error("Can't parse HELLOTS"); params = {}
                     if 'version_code' in params: self._engine_version_code = params['version_code']
                     if 'key' in params:
@@ -359,16 +358,16 @@ class AceClient(object):
                     elif self._state == '6': self._result.set(False) # error
                 # STATUS
                 elif self._recvbuffer.startswith(AceMessage.response.STATUS):
-                    self._status = self._recvbuffer.split()[1].split(';')[0]
-                    if self._status == 'main:err':
-                       logger.error('%s with message %s' % (self._status, self._recvbuffer.split(';')[2]))
-                       self._result.set_exception(AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
-                       self._urlresult.set_exception(AceException(self._status + ' with message ' + self._recvbuffer.split(';')[2]))
+                    self._status = self._recvbuffer.split()[1].split(';')
+                    if 'main:err' in set(self._status):  # main:err;error_id;error_message
+                       logger.error('%s with message %s' % (self._status[0], self._status[2]))
+                       self._result.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
+                       self._urlresult.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
                 # LIVEPOS
                 elif self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
                     if self._seekback and not self._started_again:
                         try:
-                             params = dict(x.split('=') for x in self._recvbuffer.partition('livepos ')[2].split())
+                             params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                              self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
                              logger.debug('Seeking back.....')
                              self._started_again = True
