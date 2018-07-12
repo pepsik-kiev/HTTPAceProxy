@@ -49,7 +49,7 @@ class P2pproxy(AceProxyPlugin):
 
             if connection.path.endswith('play'):  # /channels/play?id=[id]
                 channel_id = self.get_param('id')
-                if not channel_id:
+                if channel_id is None:
                     # /channels/play?id=&_=[epoch timestamp] is Torrent-TV widget proxy check
                     # P2pProxy simply closes connection on this request sending Server header, so do we
                     if self.get_param('_'):
@@ -100,7 +100,7 @@ class P2pproxy(AceProxyPlugin):
 
                 param_group = self.params.get('group')
                 param_filter = self.get_param('filter')
-                if not param_filter: param_filter = 'all'  # default filter
+                if param_filter is None: param_filter = 'all'  # default filter
                 if param_group and 'all' in param_group[0]: param_group = None
 
                 translations_list = self.api.translations(param_filter)
@@ -140,7 +140,7 @@ class P2pproxy(AceProxyPlugin):
                     return
 
                 param_filter = self.get_param('filter')
-                if not param_filter: param_filter = 'all'  # default filter
+                if param_filter is None: param_filter = 'all'  # default filter
 
                 translations_list = self.api.translations(param_filter, True)
 
@@ -251,7 +251,7 @@ class P2pproxy(AceProxyPlugin):
 
             if connection.path.endswith('play'):  # /archive/play?id=[record_id]
                 record_id = self.get_param('id')
-                if not record_id:
+                if record_id is None:
                     connection.dieWithError(400, 'Bad request')  # Bad request
                     return
 
@@ -285,7 +285,7 @@ class P2pproxy(AceProxyPlugin):
                 param_channel = self.get_param('channel_id')
                 d = self.get_date_param()
 
-                if param_channel == '' or not param_channel:
+                if param_channel == '' or param_channel is None:
                     channels_list = self.api.archive_channels()
 
                     for channel in channels_list:
@@ -337,12 +337,12 @@ class P2pproxy(AceProxyPlugin):
             # /archive/?date=[param_date]&channel_id=[param_channel]
             else:
                 param_date = self.get_param('date')
-                if not param_date: d = datetime.now()
+                if param_date is None: d = datetime.now()
                 else:
                     try: d = parse_date(param_date)
                     except: return
                 param_channel = self.get_param('channel_id')
-                if param_channel == '' or not param_channel:
+                if param_channel == '' or param_channel is None:
                     connection.dieWithError(500, 'Got /archive/ request but no channel_id specified!', logging.ERROR)
                     return
 

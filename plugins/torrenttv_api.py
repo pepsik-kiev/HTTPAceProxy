@@ -70,7 +70,7 @@ class TorrentTvApi(object):
             self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6)))) # get device mac address
 
         with self.lock:
-            if not self.session:
+            if self.session is None or self.session == '':
                self.log.debug('Creating new session')
                url = TorrentTvApi.API_URL + 'auth.php'
                params = {'typeresult': 'json', 'username':self.email, 'password': self.password, 'application': 'tsproxy', 'guid': self.guid}
@@ -246,7 +246,6 @@ class TorrentTvApi(object):
         try:
             url = TorrentTvApi.API_URL + request
             params.update({'session': self.auth(), 'typeresult': 'json'})
-            #self.log.debug(url)
             return requests.get(url, params=params, headers=self.headers, timeout=5).json()
         except requests.exceptions.ConnectionError as e:
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
@@ -262,7 +261,6 @@ class TorrentTvApi(object):
         try:
             url = TorrentTvApi.API_URL + request
             params.update({'session': self.auth(), 'typeresult': 'xml'})
-            #self.log.debug(url)
             return requests.get(url, params=params, headers=self.headers, timeout=5).content
         except requests.exceptions.ConnectionError as e:
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))

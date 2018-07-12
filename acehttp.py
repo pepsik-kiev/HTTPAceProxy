@@ -26,12 +26,12 @@ import traceback
 import signal
 import logging
 import psutil
+import time
+import requests
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
-import time
-import requests
-from bencode import __version__ as bencode_version__
+import pkg_resources
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
@@ -454,22 +454,20 @@ if AceConfig.httphost == '0.0.0.0':
     logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
-    logger.error("Cannot bind to port %s without root privileges" % AceConfig.httpport)
+    logger.error('Cannot bind to port %s without root privileges' % AceConfig.httpport)
     sys.exit(1)
 
-logger.info("Ace Stream HTTP Proxy server starting .....")
-logger.debug("Using python %s" % sys.version.split()[0])
-logger.debug("Using gevent %s" % gevent.__version__)
-logger.debug("Using psutil %s" % psutil.__version__)
-logger.debug("Using requests %s" % requests.__version__)
-logger.debug("Using bencode %s" % bencode_version__)
+logger.info('Ace Stream HTTP Proxy server starting .....')
+for p in [(p.project_name,p.version) for p in pkg_resources.working_set \
+              if p.project_name in ('Python', 'gevent', 'greenlet', 'psutil', 'jinja2')]:
+    logger.debug('Using %s %s' % (p[0], p[1]))
 
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
     if drop_privileges(AceConfig.aceproxyuser):
-        logger.info("Dropped privileges to user %s" % AceConfig.aceproxyuser)
+        logger.info('Dropped privileges to user %s' % AceConfig.aceproxyuser)
     else:
-        logger.error("Cannot drop privileges to user %s" % AceConfig.aceproxyuser)
+        logger.error('Cannot drop privileges to user %s' % AceConfig.aceproxyuser)
         sys.exit(1)
 
 # setting signal handlers
