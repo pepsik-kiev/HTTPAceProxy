@@ -55,8 +55,9 @@ class Torrenttv(AceProxyPlugin):
                         name = channel.getAttribute('name').encode('utf-8')
                         logo = channel.getAttribute('logo').encode('utf-8')
                         if channel.getAttribute('epg_id') != '0':
-                           self.epg_id[name] = ('ttv%s' % channel.getAttribute('id')).encode('utf-8')
-                        if not name in self.logomap: self.logomap[name] = config.logobase + logo
+                           self.epg_id[name] = 'ttv%s' % channel.getAttribute('id').encode('utf-8')
+                        if not name in self.logomap:
+                           self.logomap[name] = config.logobase + logo
 
                     self.logger.debug("Logos updated")
                     self.updatelogos = False
@@ -73,7 +74,7 @@ class Torrenttv(AceProxyPlugin):
                 logo = self.logomap.get(name)
                 if logo: itemdict['logo'] = logo
 
-                tvgid = self.epg_id.get(name)
+                tvgid = self.epg_id.get(encname)
                 if tvgid: itemdict['tvgid'] = tvgid
 
                 url = itemdict['url']
