@@ -13,6 +13,7 @@ from gevent.subprocess import Popen, PIPE
 import gevent.queue
 
 import os, sys, glob
+import pkg_resources
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
@@ -31,7 +32,6 @@ import requests
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
-import pkg_resources
 import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
@@ -458,9 +458,9 @@ if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport
     sys.exit(1)
 
 logger.info('Ace Stream HTTP Proxy server starting .....')
-for p in [(p.project_name,p.version) for p in pkg_resources.working_set \
-              if p.project_name in ('Python', 'gevent', 'greenlet', 'psutil', 'jinja2')]:
-    logger.debug('Using %s %s' % (p[0], p[1]))
+for p in [(p.project_name, p.version) for p in pkg_resources.working_set \
+              if p.project_name in ('Python', 'gevent', 'psutil', 'jinja2')]:
+    logger.debug('Using %s %s' % p)
 
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
