@@ -458,9 +458,13 @@ if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport
     sys.exit(1)
 
 logger.info('Ace Stream HTTP Proxy server starting .....')
-for p in [(p.project_name, p.version) for p in pkg_resources.working_set \
-              if p.project_name in ('Python', 'gevent', 'psutil', 'jinja2')]:
-    logger.debug('Using %s %s' % p)
+requirements = ['Python>=2.7.10', 'gevent>=1.2.2', 'psutil>=5.3.0', 'jinja2>=2.9',]
+try:
+   for p in [(p.project_name, p.version) for p in pkg_resources.working_set.require(requirements)]:
+       logger.debug('Using %s %s' % p)
+except Exception as e:
+       logger.error('%s' % e)
+       sys.exit(1)
 
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
