@@ -1,18 +1,19 @@
 #!/usr/local/bin/python2
 # -*- coding: utf-8 -*-
 '''
+
 AceProxy: Ace Stream to HTTP Proxy
 Website: https://github.com/pepsik-kiev/HTTPAceProxy
+
+!!!!! Requirements !!!!!
+
+Python 2.x.x >= 2.7.10
+gevent >= 1.2.2
+psutil >= 5.3.0
+jinja2 >= 2.9
+
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
-
-import pkg_resources
-requirements = ['Python>=2.7.10', 'gevent>=1.2.2', 'psutil>=5.3.0', 'jinja2>=2.9',]
-try:
-   dep = [(p.project_name, p.version) for p in pkg_resources.working_set.require(requirements)]
-except Exception as e:
-   print('%s' % e)
-   exit()
 
 import gevent
 # Monkeypatching and all the stuff
@@ -456,6 +457,9 @@ logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format
 logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
+
+logger.info('Ace Stream HTTP Proxy server starting .....')
+
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':
     AceConfig.httphost = [(s.connect(('1.1.1.1', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
@@ -464,9 +468,6 @@ if AceConfig.httphost == '0.0.0.0':
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
     logger.error('Cannot bind to port %s without root privileges' % AceConfig.httpport)
     sys.exit(1)
-
-logger.info('Ace Stream HTTP Proxy server starting .....')
-for pkg in dep: logger.debug('Using %s %s' % pkg)
 
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:

@@ -71,8 +71,8 @@ class Torrenttv(AceProxyPlugin):
                 encname = itemdict.get('name')
                 name = encname.decode('utf-8')
 
-                logo = self.logomap.get(name)
-                if logo: itemdict['logo'] = logo
+                logo = self.logomap.get(encname)
+                itemdict['logo'] = logo if logo else 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
 
                 tvgid = self.epg_id.get(encname)
                 if tvgid: itemdict['tvgid'] = tvgid
