@@ -39,7 +39,7 @@ class Stat(AceProxyPlugin):
 
         if ip_address == AceConfig.httphost:
            from uuid import getnode
-           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6)))
+           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6))))
            except: mac_address = None
         else:
            try:
@@ -59,8 +59,8 @@ class Stat(AceProxyPlugin):
            try: mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).group(0)
            except: mac_address = None
 
-        if mac_address:
-           headers = {'User-Agent':'API Browser'}
+        if mac_address is not None:
+           headers = {'User-Agent': 'API Browser'}
            try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5).json()['result']['company']
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
            else: return response
@@ -184,11 +184,10 @@ header_template = """
                         <th scope="col">Duration</th>
                     </tr>
                 </thead>
+                <tbody>
 """
 
 row_template = """
-                <tbody>
-
                     <tr>
                         <td>
                             <img src="{{channelIcon}}" width="40" height="20"/>&nbsp;&nbsp;{{channelName}}
@@ -198,10 +197,10 @@ row_template = """
                         <td>{{startTime}}</td>
                         <td class="text-center">{{durationTime}}</td>
                     </tr>
-                </tbody>
 """
 
 foot_template = """
+                </tbody>
             </table>
         </div>
     </main>

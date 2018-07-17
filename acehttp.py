@@ -6,6 +6,14 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
+import pkg_resources
+requirements = ['Python>=2.7.10', 'gevent>=1.2.2', 'psutil>=5.3.0', 'jinja2>=2.9',]
+try:
+   dep = [(p.project_name, p.version) for p in pkg_resources.working_set.require(requirements)]
+except Exception as e:
+   print('%s' % e)
+   exit()
+
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
@@ -13,7 +21,6 @@ from gevent.subprocess import Popen, PIPE
 import gevent.queue
 
 import os, sys, glob
-import pkg_resources
 # Uppend the directory for custom modules at the front of the path.
 base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
@@ -333,11 +340,12 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     os.setuid(running_uid)
 
     # Ensure a very conservative umask
-    old_umask = os.umask(077)
+    old_umask = os.umask(int('077', 8))
 
     if os.getuid() == running_uid and os.getgid() == running_gid:
         # could be useful
         os.environ['HOME'] = running_uid_home
+        logger.info('Changed permissions to: %s: %i, %s, %i' % (uid_name, running_uid, gid_name, running_gid))
         return True
     return False
 
@@ -458,13 +466,7 @@ if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport
     sys.exit(1)
 
 logger.info('Ace Stream HTTP Proxy server starting .....')
-requirements = ['Python>=2.7.10', 'gevent>=1.2.2', 'psutil>=5.3.0', 'jinja2>=2.9',]
-try:
-   for p in [(p.project_name, p.version) for p in pkg_resources.working_set.require(requirements)]:
-       logger.debug('Using %s %s' % p)
-except Exception as e:
-       logger.error('%s' % e)
-       sys.exit(1)
+for pkg in dep: logger.debug('Using %s %s' % pkg)
 
 # Dropping root privileges if needed
 if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() == 0:
