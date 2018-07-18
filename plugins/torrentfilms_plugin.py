@@ -61,15 +61,15 @@ class Torrentfilms(AceProxyPlugin):
                   try:
                      for files in metainfo[b'info'][b'files']:
                         if ''.join(files[b'path']).endswith(self.videoextdefaults):
-                           self.playlist.append([''.join(files[b'path']).translate(dict.fromkeys(list(map(ord, "%~}{][^$@*,-!?&`|><+=")))), infohash, str(idx), metainfo[b'info'][b'name']])
+                           self.playlist.append([''.join(files[b'path']).translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, str(idx), metainfo[b'info'][b'name']])
                            idx+=1
                   except Exception as e:
                      self.logger.error("Can't decode content of: %s\r\n%s" % (filename,repr(e)))
                else:
                     try:
-                       self.playlist.append([metainfo[b'info'][b'name'].translate(dict.fromkeys(list(map(ord, "%~}{][^$@*,-!?&`|><=+")))), infohash, '0', 'Other'])
+                       self.playlist.append([metainfo[b'info'][b'name'].translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
                     except:
-                       self.playlist.append([filename.translate(dict.fromkeys(list(map(ord, "%~}{][^$@*,-!?&`|><+=")))), infohash, '0', 'Other'])
+                       self.playlist.append([filename.decode('utf-8').translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
 
         self.playlist.sort(key=lambda data: (data[3], data[0]))
         return True
