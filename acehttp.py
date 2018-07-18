@@ -10,7 +10,6 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 Python 2.x.x >= 2.7.10
 gevent >= 1.2.2
 psutil >= 5.3.0
-jinja2 >= 2.9
 
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
@@ -212,8 +211,12 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 gevent.sleep()
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
-        except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
+        except aceclient.AceException as e:
+                self.dieWithError(500, 'AceClient exception: %s' % repr(e))
+                logger.error(traceback.format_exc())
+        except Exception as e:
+                self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
+                logger.error(traceback.format_exc())
         else:
             if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
             # streaming to client

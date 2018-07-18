@@ -1,6 +1,5 @@
 '''
 Simple statistics plugin
-You will need to "pip install jinja2" first!
 
 To use it, go to http://acehttp_proxy_ip:port/stat
 '''
@@ -9,10 +8,10 @@ from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from gevent.subprocess import Popen, PIPE
 import psutil
-import time
+import json
+import time, threading
 import logging, re
 import requests
-from jinja2 import Template
 
 localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
                    '172.16.0.0/12', '224.0.0.0/4',
@@ -25,21 +24,22 @@ class Stat(AceProxyPlugin):
     def __init__(self, AceConfig, AceStuff):
         self.config = AceConfig
         self.stuff = AceStuff
+        self.lock = threading.Lock()
+        self.params = None
 
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
         headers = {'User-Agent':'API Browser'}
-        response = requests.get('https://freegeoip.lwan.ws/json/%s' % ip_address, headers=headers, timeout=5, verify=True).json()
-
-        return {'country_code' : '' if not response['country_code'] else response['country_code'] ,
-                'country'      : '' if not response['country_name'] else response['country_name'] ,
+        response = requests.get('http://geoip.nekudo.com/api/%s/en' % ip_address, headers=headers, timeout=5).json()
+        return {'country_code' : '' if not response['country']['code'] else response['country']['code'] ,
+                'country'      : '' if not response['country']['name'] else response['country']['name'] ,
                 'city'         : '' if not response['city'] else response['city']}
 
     def mac_lookup(self,ip_address):
 
         if ip_address == AceConfig.httphost:
            from uuid import getnode
-           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6))))
+           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6)))
            except: mac_address = None
         else:
            try:
@@ -59,76 +59,107 @@ class Stat(AceProxyPlugin):
            try: mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).group(0)
            except: mac_address = None
 
-        if mac_address is not None:
-           headers = {'User-Agent': 'API Browser'}
+        if mac_address:
+           headers = {'User-Agent':'API Browser'}
            try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5).json()['result']['company']
            except: Stat.logger.error("Can't obtain vendor for MAC address %s" % mac_address)
            else: return response
         else: Stat.logger.error("Can't obtain MAC address for local IP %s" % ip_address)
         return 'Local IP address '
 
+    def get_param(self, key):
+        return self.params[key][0] if key in self.params else None
+
     def handle(self, connection, headers_only=False):
-        current_time = time.time()
+        self.params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
 
-        connection.send_response(200)
-        connection.send_header('Content-type', 'text/html; charset=utf-8')
-        connection.send_header('Connection', 'close')
-        connection.end_headers()
+        if self.get_param('action') == 'get_status':
 
-        if headers_only: return
-        # Sys Info
-        max_mem = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+            current_time = time.time()
 
-        template = Template(header_template)
-        connection.wfile.write(template.render(os_platform = AceConfig.osplatform,
-                                               cpu_nums = psutil.cpu_count(),
-                                               cpu_percent = psutil.cpu_percent(),
-                                               total_ram = round(max_mem.total/2**20,2),
-                                               used_ram = round(max_mem.used/2**20,2),
-                                               free_ram = round(max_mem.available/2**20,2),
-                                               total_disk = round(disk.total/2**30,2),
-                                               used_disk = round(disk.used/2**30,2),
-                                               free_disk = round(disk.free/2**30,2),
-                                               max_clients = self.config.maxconns,
-                                               total_clients = self.stuff.clientcounter.total,
-                                               ).encode('UTF8'))
+            connection.send_response(200)
+            connection.send_header('Content-type', 'application/json')
+            connection.send_header('Connection', 'close')
+            connection.end_headers()
 
-        template = Template(row_template)
-        for i in self.stuff.clientcounter.clients:
-            for c in self.stuff.clientcounter.clients[i]:
-                if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
-                   clientInfo = self.mac_lookup(c.handler.clientip)
-                else:
-                   clientInfo = self.geo_ip_lookup(c.handler.clientip).get('country')
-                connection.wfile.write(template.render(channelIcon = c.channelIcon,
-                                                       channelName = c.channelName,
-                                                       clientIP = c.handler.clientip,
-                                                       clientLocation = clientInfo,
-                                                       startTime = time.strftime('%c', time.localtime(c.connectionTime)),
-                                                       durationTime = time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime)),
-                                                       ).encode('UTF8'))
-        connection.wfile.write(foot_template)
+            if headers_only: return
+            # Sys Info
+            max_mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+
+            response = {}
+            response['status'] = 'success'
+            response['sys_info'] = {
+                 'os_platform': AceConfig.osplatform,
+                 'cpu_nums': psutil.cpu_count(),
+                 'cpu_percent': psutil.cpu_percent(),
+                 'total_ram': round(max_mem.total/2**20,2),
+                 'used_ram': round(max_mem.used/2**20,2),
+                 'free_ram': round(max_mem.available/2**20,2),
+                 'total_disk': round(disk.total/2**30,2),
+                 'used_disk': round(disk.used/2**30,2),
+                 'free_disk': round(disk.free/2**30,2),
+                  }
+
+            response['connection_info'] = {
+                 'max_clients': self.config.maxconns,
+                 'total_clients': self.stuff.clientcounter.total,
+                }
+
+            response['clients_data'] = []
+
+            with self.lock: clients = self.stuff.clientcounter.clients.copy()
+
+            for i in clients:
+                for c in clients[i]:
+                    if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
+                       clientInfo = self.mac_lookup(c.handler.clientip)
+                    else:
+                       clientInfo = self.geo_ip_lookup(c.handler.clientip).get('country')+ ', '+ \
+                                    self.geo_ip_lookup(c.handler.clientip).get('city') + '&nbsp;<i class="flag '+ \
+                                    self.geo_ip_lookup(c.handler.clientip).get('country_code').lower() + '"></i>&nbsp;'
+
+                    client_data = {
+                        'channelIcon': c.channelIcon,
+                        'channelName': c.channelName,
+                        'clientIP': c.handler.clientip,
+                        'clientLocation': clientInfo,
+                        'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
+                        'durationTime': time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime))
+                       }
+
+                    response['clients_data'].append(client_data)
+
+            connection.wfile.write(json.dumps(response).encode('UTF8'))
+
+        else:
+
+          connection.send_response(200)
+          connection.send_header('Content-type', 'text/html; charset=utf-8')
+          connection.send_header('Connection', 'close')
+          connection.end_headers()
+
+          connection.wfile.write(html_template)
 
 
-header_template = """
+html_template = """
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" http-equiv="Refresh" content="60"/>
+    <meta charset="UTF-8"/>
     <meta name="description" content="HTTP AceProxy state panel">
 
 <link rel="shortcut icon" href="http://i.piccy.info/i9/699484caf086b9c6b5c6cf2cf48f3624/1530371843/19958/1254756/shesterenka.png" type="image/png">
 
     <title>AceProxy stat info</title>
 
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
 
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
 
     <link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>
-
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
 
     <style>
         .header {height: 150px; background-color: #0a0351 !important; background-size: 100%;background-image: url(http://i.piccy.info/i9/32afd3631fc0032bbfc7bed47d8fec11/1530666765/66668/1254756/space_2294795_1280.jpg);}
@@ -148,20 +179,78 @@ header_template = """
 
     </style>
 
+    <script type="text/javascript">
+        getStatus();
+
+        function getStatus() {
+            $.ajax({
+                url: 'stat/?action=get_status',
+                type: 'get',
+                success: function(resp) {
+                    if(resp.status === 'success') {
+                        renderPage(resp);
+                    } else {
+                        console.error('Error! getStatus() Response not returning status success');
+                    }
+                    setTimeout(getStatus, 5000);
+                },
+                error: function(resp, textStatus, errorThrown) {
+                    console.error("getStatus() Unknown error!." +
+                        " ResponseCode: " + resp.status +
+                        " | textStatus: " + textStatus +
+                        " | errorThrown: " + errorThrown);
+                    $('tbody').html("");
+                    $('main').append('<h1 class="text-center" style="color:red; font-weight: bold;">Server not responding! Refresh page!!!</h1>')
+                },
+            });
+        }
+
+        function renderPage(data) {
+            var sys_info = data.sys_info;
+            var connection_info = data.connection_info;
+            var clients_data = data.clients_data;
+            var clients_content = "";
+
+            $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
+                                " used: " + sys_info.cpu_percent + "%</br>"+
+                                "RAM MiB &nbsp;total: " + sys_info.total_ram +
+                                " &nbsp;used: " + sys_info.used_ram +
+                                "&nbsp;free: " + sys_info.free_ram + "</br>DISK GiB &nbsp;total: " + sys_info.total_disk +
+                                "&nbsp;used: " + sys_info.used_disk + "&nbsp;free: " + sys_info.free_disk);
+
+            $('#connection_info').html("Connections limit: " + connection_info.max_clients +
+                                       "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
+
+            if (clients_data.length) {
+
+                clients_data.forEach(function(item, i, arr) {
+
+                    clients_content += '<tr><td><img src="' + item.channelIcon +
+                                       '" width="40" height="20"/>&nbsp;&nbsp;' + item.channelName +
+                                        '</td><td>' + item.clientIP + '</td><td>' + item.clientLocation + '</td>' +
+                                        '<td>' + item.startTime + '</td><td class="text-center">' + item.durationTime + '</td></tr>';
+                });
+
+                $('tbody').html(clients_content);
+
+            } else {
+                $('tbody').html('');
+            }
+        }
+
+    </script>
+
   </head>
 
   <body>
-
     <nav class="header">
-
         <div class="header-block">
             <div class="info-block">
                 <h6>SYSTEM INFO :</h6>
-                <p>OS {{os_platform}}&nbsp;CPU cores: {{cpu_nums}} used: {{cpu_percent}}%</br>
-                RAM MiB &nbsp;total: {{total_ram}} &nbsp;used: {{used_ram}}&nbsp;free: {{free_ram}}</br>DISK GiB &nbsp;total: {{total_disk}}&nbsp;used: {{used_disk}}&nbsp;free: {{free_disk}} </p>
+                <p id="sys_info"></p>
             </div>
             <div class="status-connection">
-                <p>Connections limit: {{max_clients}}&nbsp;&nbsp;&nbsp;Connected clients: {{total_clients}}</p>
+                <p id="connection_info"></p>
             </div>
             <div class="heder-title">
                 <h1 class="text-center">HTTP AceProxy</h1>
@@ -185,26 +274,10 @@ header_template = """
                     </tr>
                 </thead>
                 <tbody>
-"""
-
-row_template = """
-                    <tr>
-                        <td>
-                            <img src="{{channelIcon}}" width="40" height="20"/>&nbsp;&nbsp;{{channelName}}
-                        </td>
-                        <td>{{clientIP}}</td>
-                        <td>{{clientLocation}}</td>
-                        <td>{{startTime}}</td>
-                        <td class="text-center">{{durationTime}}</td>
-                    </tr>
-"""
-
-foot_template = """
                 </tbody>
             </table>
         </div>
     </main>
-
   </body>
 </html>
 
