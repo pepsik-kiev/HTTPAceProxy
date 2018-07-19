@@ -36,6 +36,7 @@ import logging
 import psutil
 import time
 import requests
+from netaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
@@ -176,7 +177,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
-        paramsdict = dict()
+        paramsdict = {}
         for i in range(3, 8):
             try: paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = int(self.splittedpath[i])
             except (IndexError, ValueError): paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = '0'
@@ -371,7 +372,7 @@ def spawnAce(cmd, delay=0.1):
     except: return False
 
 def checkFirewall(clientip):
-    try: clientinrange = any([requests.utils.address_in_network(clientip, i if '/' in i else i+'/0') for i in AceConfig.firewallnetranges])
+    try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
     except: logger.error('Check firewall netranges settings !'); return False
     if (AceConfig.firewallblacklistmode and clientinrange) or (not AceConfig.firewallblacklistmode and not clientinrange): return False
     return True
