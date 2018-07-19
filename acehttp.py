@@ -36,7 +36,7 @@ import logging
 import psutil
 import time
 import requests
-from netaddr import IPNetwork, IPAddress
+from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
