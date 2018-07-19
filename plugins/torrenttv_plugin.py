@@ -54,10 +54,10 @@ class Torrenttv(AceProxyPlugin):
                     for channel in translations_list:
                         name = channel.getAttribute('name').encode('utf-8')
                         logo = channel.getAttribute('logo').encode('utf-8')
-                        if channel.getAttribute('epg_id') != '0':
-                           self.epg_id[name] = 'ttv%s' % channel.getAttribute('id').encode('utf-8')
-                        if not name in self.logomap:
-                           self.logomap[name] = config.logobase + logo
+                        if channel.getAttribute('epg_id') not in ('0', '', ' '):
+                           self.epg_id[name.decode('utf-8')] = 'ttv%s' % channel.getAttribute('id').encode('utf-8')
+                        if not name.decode('utf-8') in self.logomap:
+                           self.logomap[name.decode('utf-8')] = config.logobase + logo
 
                     self.logger.debug("Logos updated")
                     self.updatelogos = False
@@ -71,10 +71,10 @@ class Torrenttv(AceProxyPlugin):
                 encname = itemdict.get('name')
                 name = encname.decode('utf-8')
 
-                logo = self.logomap.get(encname)
+                logo = self.logomap.get(name)
                 itemdict['logo'] = logo if logo else 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
 
-                tvgid = self.epg_id.get(encname)
+                tvgid = self.epg_id.get(name)
                 if tvgid: itemdict['tvgid'] = tvgid
 
                 url = itemdict['url']
