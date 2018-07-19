@@ -122,7 +122,7 @@ class TorrentTvApi(object):
         :return: records list
         """
         request = 'arc_records.php'
-        params = {'epg_id': channel_id, 'date': date.strftime('X%d-X%m-%Y').replace('X0', '')}
+        params = {'epg_id': channel_id, 'date': date.strftime('X%d-X%m-%Y').replace('X0','X').replace('X','')}
         if raw:
             try:
                 res = self._xmlresult(request, params)
