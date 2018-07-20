@@ -187,7 +187,7 @@ class AceClient(object):
     def GETCID(self, datatype, url):
         contentinfo = self.GETCONTENTINFO(datatype, url)
         self._cidresult = AsyncResult()
-        self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), 0, 0, 0))
+        self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), '0', '0', '0'))
         cid = self._cidresult.get(True, 5)
         return '' if not cid or cid == '' else cid[2:]
 

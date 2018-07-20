@@ -177,10 +177,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
-        paramsdict = {}
-        for i in range(3, 8):
-            try: paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = int(self.splittedpath[i])
-            except (IndexError, ValueError): paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = '0'
+        paramsdict = {}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')
+        for i in range(3, len(self.splittedpath)):
+            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 
@@ -191,7 +190,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
                headers = {'User-Agent': 'Magic Browser'}
                params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
-               channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][str(paramsdict['file_indexes'])]
+               channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
            except: channelName = CID
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
