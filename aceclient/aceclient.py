@@ -130,13 +130,13 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
 
         if not self._authevent.wait(self._resulttimeout):
-            errmsg = 'Authentication timeout during AceEngine init. Wrong key?' # HELLOTS not resived from engine
+            errmsg = 'Authentication timeout during AceEngine init!' # HELLOTS not resived from engine or Wrong key!
             logger.error(errmsg)
             raise AceException(errmsg)
             return
 
-        if not self._auth:
-            errmsg = 'Authentication error during AceEngine init. Wrong key?'
+        if self._auth is None:
+            errmsg = 'User data error! Check "aceage" and "acesex" parameters in aceconfig.py!' # Error while sending USERDATA to engine
             logger.error(errmsg)
             raise AceException(errmsg)
             return
@@ -187,7 +187,7 @@ class AceClient(object):
     def GETCID(self, datatype, url):
         contentinfo = self.GETCONTENTINFO(datatype, url)
         self._cidresult = AsyncResult()
-        self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), '0', '0', '0'))
+        self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), 0, 0, 0))
         cid = self._cidresult.get(True, 5)
         return '' if not cid or cid == '' else cid[2:]
 
@@ -326,8 +326,8 @@ class AceClient(object):
                     try:
                         self._auth = self._recvbuffer.split()[1]
                         self._write(AceMessage.request.USERDATA(self._gender, self._age))
-                    except: pass
-                    self._authevent.set()
+                    except: self._auth = None; pass
+                    else: self._authevent.set()
                 # GETUSERDATA
                 elif self._recvbuffer.startswith(AceMessage.response.GETUSERDATA):
                     raise AceException('You should init me first!')

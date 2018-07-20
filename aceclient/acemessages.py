@@ -41,7 +41,7 @@ class AceMessage(object):
     class request(object):
         # Requests (from client to acestream)
         # API Version
-        HELLO = 'HELLOBG version=' + str(AceConst.APIVERSION)  # Hello
+        HELLO = 'HELLOBG version=%s' % AceConst.APIVERSION  # Hello
         READY_nokey = 'READY'  # Sent when ready
         SHUTDOWN = 'SHUTDOWN'
         SETOPTIONS = 'SETOPTIONS use_stop_notifications=1'
@@ -54,56 +54,56 @@ class AceMessage(object):
 
         @staticmethod
         def READY_key(request_key, product_key):
-            return 'READY key=' + product_key.split('-')[0] + '-' + hashlib.sha1(request_key + product_key).hexdigest()
+            return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(request_key + product_key).hexdigest())
         # End READY_KEY
 
         @staticmethod
         def LOADASYNC(command, request_id, params_dict):
             if command == 'URL':
-                return 'LOADASYNC %s TORRENT ' % request_id + ' %(url)s %(developer_id)s %(affiliate_id)s %(zone_id)s' % params_dict
+                return 'LOADASYNC %s TORRENT ' % request_id + '{url} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
             elif command == 'INFOHASH':
-                return 'LOADASYNC %s INFOHASH ' % request_id + ' %(infohash)s %(developer_id)s %(affiliate_id)s %(zone_id)s' % params_dict
+                return 'LOADASYNC %s INFOHASH ' % request_id + '{infohash} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
             elif command == 'DATA':
-                return 'LOADASYNC %s RAW ' % request_id + ' %(data)s %(developer_id)s %(affiliate_id)s %(zone_id)s' % params_dict
+                return 'LOADASYNC %s RAW ' % request_id + '{data} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
             elif command == 'CONTENT_ID':
-                return 'LOADASYNC %s PID ' % request_id + ' %(content_id)s' % params_dict
+                return 'LOADASYNC %s PID ' % request_id + '{content_id}'.format(**params_dict)
         # End LOADASYNC
 
         @staticmethod
         def START(command, params_dict, stream_type):
             if command == 'URL':
-                return 'START TORRENT %(url)s %(file_indexes)s %(developer_id)s %(affiliate_id)s %(zone_id)s %(stream_id)s ' % params_dict+stream_type
+                return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} '.format(**params_dict)+stream_type
 
             elif command == 'INFOHASH':
-                return 'START INFOHASH %(infohash)s %(file_indexes)s %(developer_id)s %(affiliate_id)s %(zone_id)s ' % params_dict+stream_type
+                return 'START INFOHASH {infohash} {file_indexes} {developer_id} {affiliate_id} {zone_id} '.format(**params_dict)+stream_type
 
             elif command == 'CONTENT_ID':
-                return 'START PID %(content_id)s %(file_indexes)s ' % params_dict+stream_type
+                return 'START PID {content_id} {file_indexes} '.format(**params_dict)+stream_type
 
             elif command == 'DATA':
-                return 'START RAW %(data)s %(file_indexes)s %(developer_id)s %(affiliate_id)s %(zone_id)s ' % params_dict+stream_type
+                return 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} '.format(**params_dict)+stream_type
 
             elif command == 'DIRECT_URL':
-                return 'START URL %(direct_url)s %(file_indexes)s %(developer_id)s %(affiliate_id)s %(zone_id)s ' % params_dict+stream_type
+                return 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} '.format(**params_dict)+stream_type
 
             elif command == 'EFILE_URL':
-                return 'START EFILE %(efile_url)s ' % params_dict+stream_type
+                return 'START EFILE {efile_url} '.format(**params_dict)+stream_type
         # End START
 
         @staticmethod
         def GETCID(checksum, infohash, developer, affiliate, zone):
-            return 'GETCID checksum=%s infohash=%s developer=%s affilate=%s zone=%s' % (checksum, infohash, developer, affiliate, zone)
+            return 'GETCID checksum={} infohash={} developer={} affilate={} zone={}'.format(checksum, infohash, developer, affiliate, zone)
 
         @staticmethod
         def USERDATA(gender, age):
-            return 'USERDATA [{"gender": "%s"}, {"age": "%s"}]' % (gender, age)
+            return 'USERDATA [{{"gender": {}}}, {{"age": {}}}]'.format(gender, age)
 
         @staticmethod
         def LIVESEEK(timestamp):
-            return 'LIVESEEK %s' % timestamp
+            return 'LIVESEEK {}'.format(timestamp)
 
     class response(object):
         # Responses (from acestream to client)
