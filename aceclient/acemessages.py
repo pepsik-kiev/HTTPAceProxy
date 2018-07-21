@@ -95,15 +95,15 @@ class AceMessage(object):
 
         @staticmethod
         def GETCID(checksum, infohash, developer, affiliate, zone):
-            return 'GETCID checksum={} infohash={} developer={} affilate={} zone={}'.format(checksum, infohash, developer, affiliate, zone)
+            return 'GETCID checksum=%s infohash=%s developer=%s affilate=%s zone=%s' % (checksum, infohash, developer, affiliate, zone)
 
         @staticmethod
         def USERDATA(gender, age):
-            return 'USERDATA [{{"gender": {}}}, {{"age": {}}}]'.format(gender, age)
+            return 'USERDATA [{"gender": %s}, {"age": %s}]' % (gender, age)
 
         @staticmethod
         def LIVESEEK(timestamp):
-            return 'LIVESEEK {}'.format(timestamp)
+            return 'LIVESEEK %s' % timestamp
 
     class response(object):
         # Responses (from acestream to client)

@@ -70,7 +70,7 @@ class AceClient(object):
         self._streamReaderState = None
         self._lock = threading.Condition(threading.Lock())
         self._streamReaderQueue = gevent.queue.Queue(maxsize=AceConfig.readcachesize) # Ring buffer
-        self._engine_version_code = 0
+        self._engine_version_code = None
 
         # Logger
         logger = logging.getLogger('AceClientimport tracebacknt_init')
@@ -156,10 +156,8 @@ class AceClient(object):
         Start video method
         '''
         if stream_type == 'hls' and self._engine_version_code >= 3010500:
-           stream_type = 'output_format=hls' + ' transcode_audio=' + str(AceConfig.transcode_audio) \
-                                             + ' transcode_mp3=' + str(AceConfig.transcode_mp3) \
-                                             + ' transcode_ac3=' + str(AceConfig.transcode_ac3) \
-                                             + ' preferred_audio_language=' + AceConfig.preferred_audio_language
+           stream_type = 'output_format=hls transcode_audio=%s transcode_mp3=%s transcode_ac3=%s preferred_audio_language=%s' % \
+                         (AceConfig.transcode_audio, AceConfig.transcode_mp3, AceConfig.transcode_ac3, AceConfig.preferred_audio_language)
         else: stream_type = 'output_format=http'
 
         self._urlresult = AsyncResult()
@@ -210,7 +208,7 @@ class AceClient(object):
         if 'range' in req_headers: del req_headers['range']
         logger.debug('Get headers from client: %s' % req_headers)
 
-        with requests.get(url, headers=req_headers, stream=True, timeout=(5, None)) as self._streamReaderConnection:
+        with requests.get(url, headers=req_headers, stream=True, timeout=(5,60)) as self._streamReaderConnection:
           try:
               if self._streamReaderConnection.status_code  not in (200, 206):
                 logger.error('Failed to open video stream %s' % url)
@@ -237,14 +235,9 @@ class AceClient(object):
                   logger.warning('HLS stream detected. Ffmpeg transcoding started')
               else: out = self._streamReaderConnection.raw
 
-          except requests.exceptions.RequestException:
-              logger.error('Failed to open video stream %s' % url)
-              logger.error(traceback.format_exc())
-          except: logger.error(traceback.format_exc())
-
-          else:
               with self._lock: self._streamReaderState = 2; self._lock.notifyAll()
               self.play_event()
+
               while 1:
                   self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                   clients = counter.getClients(cid)
@@ -261,9 +254,18 @@ class AceClient(object):
                                   c.destroy()
                   elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
                   else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
+
+          except requests.exceptions.RequestException:
+              logger.error('Error reading the video stream or connecting error to %s' % url)
+              logger.error(traceback.format_exc())
+          except:
+              logger.error('Unexpected error in streamreader')
+              logger.error(traceback.format_exc())
+
           finally:
+              self.closeStreamReader()
               with self._lock: self._streamReaderState = None; self._lock.notifyAll()
-              if transcoder:
+              if transcoder is not None:
                  try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                  except: pass
 
@@ -311,7 +313,7 @@ class AceClient(object):
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
                     try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     except: logger.error("Can't parse HELLOTS"); params = {}
-                    if 'version_code' in params: self._engine_version_code = params['version_code']
+                    self._engine_version_code = params['version_code'] if 'version_code' in params else None
                     if 'key' in params:
                         self._write(AceMessage.request.READY_key(params['key'], self._product_key))
                         self._request_key = None
@@ -369,7 +371,7 @@ class AceClient(object):
                         try:
                              params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                              self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
-                             logger.debug('Seeking back.....')
+                             logger.debug('Seeking back..<<..')
                              self._started_again = True
                         except: logger.error("Can't parse %s" % AceMessage.response.LIVEPOS)
                 # CID

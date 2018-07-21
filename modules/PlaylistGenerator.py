@@ -6,7 +6,7 @@ and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-from requests.compat import quote
+from requests.compat import quote, urlparse
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
@@ -55,7 +55,7 @@ class PlaylistGenerator(object):
         '''
         Exports m3u playlist
         '''
-        if add_ts: hostport = 'ts://' + hostport  # Adding ts:// after http:// for some players
+        if add_ts: hostport = 'ts://%s' % hostport  # Adding ts:// after http:// for some players
 
         if header is None: itemlist = self.m3uheader if not empty_header else self.m3uemptyheader
         else: itemlist = header
@@ -69,16 +69,16 @@ class PlaylistGenerator(object):
             url = item['url']
             if process_url and url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                   item['url'] = 'http://%s%s/url/%s/stream.mp4' % (hostport, path, quote(url,''))
+                   item['url'] = 'http://%s/url/%s/stream.mp4' % (hostport, quote(url,''))
                 elif url.startswith('infohash://'): # For INFOHASHes
-                   item['url'] = 'http://%s%s/infohash/%s/stream.mp4' % (hostport, path, url.split('/')[2])
+                   item['url'] = 'http://%s/infohash/%s/stream.mp4' % (hostport, urlparse(url).netloc)
                 elif url.startswith('acestream://'): # For PIDs
-                   item['url'] = 'http://%s%s/content_id/%s/stream.mp4' % (hostport, path, url.split('/')[2])
+                   item['url'] = 'http://%s/content_id/%s/stream.mp4' % (hostport, urlparse(url).netloc)
                 elif archive and url.isdigit(): # For archive channel id's
-                   item['url'] = 'http://%s%s/archive/play?id=%s' % (hostport, path, url)
+                   item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
                 elif not archive and url.isdigit(): # For channel id's
-                   item['url'] = 'http://%s%s/channels/play?id=%s' % (hostport, path, url)
-                else: # For channel name
+                   item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
+                elif path == '/torrenttv/channel' : # For channel name fot torrenttv_pugin
                    item['url'] = 'http://%s%s/%s' % (hostport, path, url)
 
             if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
