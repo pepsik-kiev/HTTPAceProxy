@@ -405,4 +405,4 @@ class AceClient(object):
                     self._socket = None
                     self.hanggreenlet.kill()
                     logger.debug('AceClient destroyed')
-        return
+                    return
