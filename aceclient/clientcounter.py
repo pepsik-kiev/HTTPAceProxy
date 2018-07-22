@@ -8,6 +8,7 @@ import gevent
 import threading
 import logging
 import time
+
 from aceconfig import AceConfig
 from aceclient import AceClient
 
@@ -15,7 +16,7 @@ class ClientCounter(object):
 
     def __init__(self):
         self.lock = threading.RLock()
-        self.clients = dict()
+        self.clients = {}
         self.idleace = None
         self.total = 0
         gevent.spawn(self.checkIdle)
@@ -44,7 +45,7 @@ class ClientCounter(object):
                 client.queue = client.ace._streamReaderQueue.copy()
                 clients.append(client)
             else:
-                if self.idleace:
+                if self.idleace is not None:
                     client.ace = self.idleace
                     self.idleace = None
                 else:
@@ -72,7 +73,7 @@ class ClientCounter(object):
                 else:
                     del self.clients[cid]
                     client.ace.stop_event()
-                    if self.idleace: client.ace.destroy()
+                    if self.idleace is not None: client.ace.destroy()
                     else:
                         try:
                             client.ace.STOP()
@@ -93,7 +94,7 @@ class ClientCounter(object):
                 del self.clients[cid]
                 clients[0].ace.stop_event()
                 self.total -= len(clients)
-                if self.idleace: clients[0].ace.destroy()
+                if self.idleace is not None: clients[0].ace.destroy()
                 else:
                     try:
                         clients[0].ace.STOP()
@@ -108,7 +109,7 @@ class ClientCounter(object):
     def destroyIdle(self):
         with self.lock:
             try:
-                if self.idleace: self.idleace.destroy()
+                if self.idleace is not None: self.idleace.destroy()
             finally: self.idleace = None
 
     def checkIdle(self):

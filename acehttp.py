@@ -14,6 +14,7 @@ psutil >= 5.3.0
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
+import traceback
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
@@ -26,11 +27,6 @@ base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
-import aceclient
-from aceclient.clientcounter import ClientCounter
-import aceconfig
-from aceconfig import AceConfig
-import traceback
 import signal
 import logging
 import psutil
@@ -44,7 +40,13 @@ import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
 from concurrent.futures import ThreadPoolExecutor
 
+import aceclient
+from aceclient.clientcounter import ClientCounter
+import aceconfig
+from aceconfig import AceConfig
+
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
+
     allow_reuse_address = daemon_threads = True
 
     def process_request_thread(self, request, client_address):
@@ -101,8 +103,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
-        logger.info("Accepted connection from %s path %s" % (self.clientip, requests.compat.unquote(self.path)))
-        logger.debug("Headers: %s" % self.headers.dict)
+        logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
+        logger.debug('Headers: %s' % self.headers.dict)
         self.requrl = requests.compat.urlparse(self.path)
         self.query = self.requrl.query
         self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
@@ -211,12 +213,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 gevent.sleep()
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
-        except aceclient.AceException as e:
-                self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-                logger.error(traceback.format_exc())
-        except Exception as e:
-                self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
-                logger.error(traceback.format_exc())
+        except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
+        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
             if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
             # streaming to client
@@ -438,9 +436,11 @@ def clean_proc():
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     clean_proc()
-    server.pool.shutdown()
+    server.pool.shutdown(wait=True)
     server.shutdown()
     server.server_close()
+    import gc
+    gevent.killall([obj for obj in gc.get_objects() if isinstance(obj, gevent.Greenlet)])
     logger.info('Bye Bye .....')
     sys.exit()
 
@@ -526,7 +526,7 @@ if ace_pid and AceConfig.osplatform == 'Windows': detectPort()
 try: os.chdir(os.path.dirname(os.path.realpath(__file__)))
 except: pass
 # Creating dict of handlers
-AceStuff.pluginshandlers = dict()
+AceStuff.pluginshandlers = {}
 # And a list with plugin instances
 AceStuff.pluginlist = list()
 sys.path.insert(0, 'plugins')
