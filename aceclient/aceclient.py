@@ -28,8 +28,6 @@ class AceClient(object):
     def __init__(self, acehostslist, connect_timeout=5, result_timeout=10):
         # Receive buffer
         self._recvbuffer = None
-        # Stream URL
-        self._url = None
         # Ace stream socket
         self._socket = None
         # Result timeout
@@ -42,12 +40,6 @@ class AceClient(object):
         self._status = None
         # Current STATE
         self._state = None
-        # Current video position
-        self._position = None
-        # Available video position (loaded data)
-        self._position_last = None
-        # Buffered video pieces
-        self._position_buf = None
         # Current AUTH
         self._auth = None
         self._gender = None
@@ -257,18 +249,20 @@ class AceClient(object):
               else: logger.warning('No data received - broadcast stoped'); counter.deleteAll(cid); break
 
         except requests.exceptions.HTTPError as err:
-              logger.error('An http error occurred while connecting to aceengine: %s' % err)
+              logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
         except requests.exceptions.ConnectTimeout:
               logger.error('The request timed out while trying to connect to %s' % url)
         except requests.exceptions.ReadTimeout:
-              logger.error('The aceengine did not send any data in 60sec')
+              logger.error('The aceengine did not send any data in 60sec from %s' % url)
         except requests.exceptions.RequestException:
-              logger.error('There was an ambiguous exception that occurred while handling request to %s' % url)
+              logger.error('There was an ambiguous exception that occurred while handling request')
+              logger.error(traceback.format_exc())
         except:
               logger.error('Unexpected error in streamreader')
               logger.error(traceback.format_exc())
 
         finally:
+              self.closeStreamReader()
               with self._lock: self._streamReaderState = None; self._lock.notifyAll()
               if transcoder is not None:
                  try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
@@ -382,7 +376,7 @@ class AceClient(object):
                              self._started_again = True
                         except: logger.error("Can't parse %s" % AceMessage.response.LIVEPOS)
                 # CID
-                elif self._recvbuffer.startswith('##') or len(self._recvbuffer) == 0: self._cidresult.set(self._recvbuffer)
+                elif self._recvbuffer.startswith('##') or not self._recvbuffer: self._cidresult.set(self._recvbuffer)
                 #DOWNLOADSTOP
                 elif self._recvbuffer.startswith(AceMessage.response.DOWNLOADSTOP): pass
                 # INFO
