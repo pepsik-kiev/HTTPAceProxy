@@ -204,7 +204,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Send START commands to AceEngine
                 self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 # Getting URL from engine
-                self.url = self.client.ace.getUrl(AceConfig.videotimeout*2) if self.reqtype in ('infohash', 'url', 'data') else self.client.ace.getUrl(AceConfig.videotimeout)
+                self.url = self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
                 p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                 self.url = requests.compat.urlunparse(p)
@@ -263,13 +263,13 @@ class Client:
 
         with self.ace._lock:
             start = time.time()
-            while self.handler.connection and self.ace._streamReaderState == 1:
+            while self.handler.connection and not self.ace._streamReaderState:
                 remaining = start + 5.0 - time.time()
                 if remaining > 0: self.ace._lock.wait(remaining)
                 else:
                     self.handler.dieWithError(500, 'Video stream not opened in 5 seconds - disconnecting')
                     return
-            if self.handler.connection and self.ace._streamReaderState != 2:
+            if self.handler.connection and not self.ace._streamReaderState:
                 self.handler.dieWithError(500, 'No video stream received from AceEngine', logging.WARNING)
                 return
 
@@ -306,12 +306,14 @@ class Client:
             else:
                 logger.error("Can't found fmt key. Ffmpeg transcoding not started !")
         try:
-            while self.handler.connection and self.ace._streamReaderState == 2:
+            while self.handler.connection:
                 try:
-                    data = self.queue.get(timeout=60)
+                    data = self.queue.get(timeout=AceConfig.videotimeout)
                     try: out.write(data)
                     except: break
-                except gevent.queue.Empty: logger.warning('No data received in 60 seconds - disconnecting "%s"' % self.channelName); break
+                except gevent.queue.Empty:
+                    logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
+                    break
         finally:
             if transcoder is not None:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
