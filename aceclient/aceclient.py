@@ -234,8 +234,8 @@ class AceClient(object):
               #self.getPlayEvent(float(AceConfig.videotimeout)): # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
               clients = counter.getClients(cid)
               try: data = out.read(AceConfig.readchunksize)
-              except: data = None
-              if data is not None and clients:
+              except: logger.debug('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+              if clients:
                   self._streamReaderQueue.get() if self._streamReaderQueue.full() else self._streamReaderQueue.put(data)
                   for c in clients:
                       try: c.queue.put(data, timeout=5)
@@ -244,7 +244,7 @@ class AceClient(object):
                               logger.debug('Disconnecting client: %s' % c.handler.clientip)
                               c.destroy()
               elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
-              else: logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+              else: logger.error('The non-standard situation in StreamReader - broadcast stoped'); break
 
         except requests.exceptions.HTTPError as err:
               logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
@@ -289,7 +289,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_recvdata')
 
-        while 1:
+        while self._socket:
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
@@ -388,5 +388,6 @@ class AceClient(object):
                     self._socket.get_socket().shutdown(SHUT_WR)
                     self._recvbuffer = self._socket.read_all()
                     self._socket.close()
+                    self._socket = None
                     logger.debug('AceClient destroyed')
                     return
