@@ -234,7 +234,9 @@ class AceClient(object):
               #self.getPlayEvent(float(AceConfig.videotimeout)): # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
               clients = counter.getClients(cid)
               try: data = out.read(AceConfig.readchunksize)
-              except: logger.debug('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+              except requests.packages.urllib3.exceptions.ReadTimeoutError:
+                     logger.debug('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+              except: break
               if clients:
                   self._streamReaderQueue.get() if self._streamReaderQueue.full() else self._streamReaderQueue.put(data)
                   for c in clients:
