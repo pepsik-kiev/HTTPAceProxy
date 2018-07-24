@@ -132,9 +132,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e:
-                self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                logger.error(traceback.format_exc())
+            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
             finally: return
         self.handleRequest(headers_only)
 
@@ -194,7 +192,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
                channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
            except: channelName = CID
-        if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
         self.client = Client(CID, self, channelName, channelIcon)
         try:
@@ -248,7 +245,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 class Client:
 
-    def __init__(self, cid, handler, channelName, channelIcon):
+    def __init__(self, cid, handler, channelName, channelIcon='http://static.acestream.net/sites/acestream/img/ACE-logo.png'):
         self.cid = cid
         self.handler = handler
         self.channelName = channelName
