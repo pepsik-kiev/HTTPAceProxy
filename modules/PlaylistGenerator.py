@@ -6,7 +6,7 @@ and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-from requests.compat import quote, urlparse
+from requests.compat import quote
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
@@ -71,9 +71,9 @@ class PlaylistGenerator(object):
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
                    item['url'] = 'http://%s/url/%s/stream.mp4' % (hostport, quote(url,''))
                 elif url.startswith('infohash://'): # For INFOHASHes
-                   item['url'] = 'http://%s/infohash/%s/stream.mp4' % (hostport, urlparse(url).netloc)
+                   item['url'] = 'http://%s/infohash/%s/stream.mp4' % (hostport, url.split('/')[2])
                 elif url.startswith('acestream://'): # For PIDs
-                   item['url'] = 'http://%s/content_id/%s/stream.mp4' % (hostport, urlparse(url).netloc)
+                   item['url'] = 'http://%s/content_id/%s/stream.mp4' % (hostport, url.split('/')[2])
                 elif archive and url.isdigit(): # For archive channel id's
                    item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
                 elif not archive and url.isdigit(): # For channel id's

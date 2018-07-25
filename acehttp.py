@@ -32,22 +32,24 @@ import logging
 import psutil
 import time
 import requests
+import BaseHTTPServer
 from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
 from base64 import b64encode
-import BaseHTTPServer, SocketServer
 from modules.PluginInterface import AceProxyPlugin
-from concurrent.futures import ThreadPoolExecutor
 
 import aceclient
 from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
 
-class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
+class GeventHTTPServer(BaseHTTPServer.HTTPServer):
 
-    allow_reuse_address = daemon_threads = True
+    def process_request(self, request, client_address):
+        checkAce() # Check is AceStream engine alive
+        gevent.spawn(self.process_request_thread, request, client_address)
+        gevent.sleep()
 
     def process_request_thread(self, request, client_address):
         try:
@@ -58,20 +60,10 @@ class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
             self.handle_error(request, client_address)
             self.close_request(request)
 
-    def process_request(self, request, client_address):
-        checkAce() # Check is AceStream engine alive
-        self.pool.submit(self.process_request_thread, request, client_address)
-
     def handle_error(self, request, client_address):
         logging.debug(traceback.format_exc())
         pass
 
-class ThreadedPoolHTTPServer(ThreadPoolMixIn, BaseHTTPServer.HTTPServer):
-    """
-    Handle requests in a pool of separate threads.
-    """
-    # default threads value if max_workers=None - cpu_num() * 5 for custom value max_workers=N
-    pool = ThreadPoolExecutor(max_workers=AceConfig.maxconns, thread_name_prefix='PoolHTTPServerThread')
 
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
@@ -207,12 +199,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
                 gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
-                gevent.sleep()
+                #gevent.sleep()
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
+            gevent.sleep()
             if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
             # streaming to client
             logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
@@ -221,6 +214,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         finally:
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
+                 with self.client.ace._lock: self.client.ace._streamReaderState = False; self.client.ace._lock.notifyAll()
             self.client.destroy()
             return
 
@@ -421,25 +415,28 @@ def findProcess(name):
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        logger.info('AceStream Engine with pid %s terminate .....' % AceStuff.ace.pid)
         with AceStuff.clientcounter.lock:
-            if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy(); gevent.sleep(1)
-        for proc in psutil.process_iter():
-            if proc.name() == name: proc.terminate(); gevent.sleep(1)
-        # for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
+            if AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace.destroy()
+        procs = psutil.process_iter(attrs=['pid', 'name'])
+        for p in procs:
+            if name in p.name(): logger.info('%s with pid %s terminate .....' % (name.split()[0], p.pid)); p.terminate()
+        gone, alive = psutil.wait_procs(procs, timeout=3)
+        for p in alive:
+          if name in p.name(): p.kill()
+        #for windows, subprocess.terminate() is just an alias for kill(), so we have to delete the acestream port file manually
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try: os.remove(AceStuff.acedir + '\\acestream.port')
             except: pass
+    import gc
+    for obj in gc.get_objects():
+       if isinstance(obj, gevent.Greenlet): gevent.kill(obj)
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     clean_proc()
-    server.pool.shutdown(wait=True)
     server.shutdown()
     server.server_close()
-    import gc
-    gevent.killall([obj for obj in gc.get_objects() if isinstance(obj, gevent.Greenlet)])
     logger.info('Bye Bye .....')
     sys.exit()
 
@@ -542,7 +539,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-server = ThreadedPoolHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
+server = GeventHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()

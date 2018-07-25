@@ -87,8 +87,7 @@ class AceClient(object):
         '''
         logger = logging.getLogger('AceClient_destroy') # Logger
 
-        if self._shuttingDown.isSet():   # Already in the middle of destroying
-            return
+        if self._shuttingDown.isSet(): return   # Already in the middle of destroying
 
         self._resumeevent.set() # We should resume video to prevent read greenlet deadlock
         self._urlresult.set()   # And to prevent getUrl deadlock
@@ -202,8 +201,8 @@ class AceClient(object):
         if 'range' in req_headers: del req_headers['range']
         logger.debug('Get headers from client: %s' % req_headers)
 
-        try:
-          with requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout)) as self._streamReaderConnection:
+        with requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout)) as self._streamReaderConnection:
+          try:
               self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
 
               if url.endswith('.m3u8'):
@@ -233,36 +232,37 @@ class AceClient(object):
               while self._streamReaderState:
                  self.getPlayEvent(float(AceConfig.videotimeout)) # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                  clients = counter.getClients(cid)
-                 try: data = out.read(AceConfig.readchunksize)
-                 except requests.packages.urllib3.exceptions.ReadTimeoutError:
-                        logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
-                 except: break
                  if clients:
-                     self._streamReaderQueue.get() if self._streamReaderQueue.full() else self._streamReaderQueue.put(data)
-                     for c in clients:
-                         try: c.queue.put(data, timeout=5)
-                         except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
-                             if len(clients) > 1:
-                                 logger.debug('Disconnecting client: %s' % c.handler.clientip)
-                                 c.destroy()
-                 elif counter.count(cid) == 0: logger.debug('All clients disconnected - broadcast stoped'); break
-                 else: logger.error('Abnormal situation in StreamReader - broadcast stoped'); break
+                     try:
+                         data = out.read(AceConfig.readchunksize)
+                         if self._streamReaderQueue.full(): self._streamReaderQueue.get()
+                         self._streamReaderQueue.put(data)
+                     except requests.packages.urllib3.exceptions.ReadTimeoutError:
+                         logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+                     except: break
+                     else:
+                         for c in clients:
+                            try: c.queue.put(data, timeout=5)
+                            except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
+                                if len(clients) > 1:
+                                    logger.debug('Disconnecting client: %s' % c.handler.clientip)
+                                    c.destroy()
+              logger.debug('All clients disconnected - broadcast stoped')
 
-        except requests.exceptions.HTTPError as err:
-              logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
-        except requests.exceptions.RequestException:
-              logger.error('There was an ambiguous exception that occurred while handling request')
-              logger.error(traceback.format_exc())
-        except:
-              logger.error('Unexpected error in streamreader')
-              logger.error(traceback.format_exc())
-        finally:
-              with self._lock: self._streamReaderState = False; self._lock.notifyAll()
-              if transcoder is not None:
-                 try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-                 except: pass
-              counter.deleteAll(cid)
-              return
+          except requests.exceptions.HTTPError as err:
+                logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
+          except requests.exceptions.RequestException:
+                logger.error('There was an ambiguous exception that occurred while handling request')
+          except:
+                logger.error('Unexpected error in streamreader')
+                logger.error(traceback.format_exc())
+          finally:
+                self.closeStreamReader()
+                with self._lock: self._streamReaderState = False; self._lock.notifyAll()
+                if transcoder:
+                   try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+                   except: pass
+                counter.deleteAll(cid)
 
     def closeStreamReader(self):
         logger = logging.getLogger('StreamReader')

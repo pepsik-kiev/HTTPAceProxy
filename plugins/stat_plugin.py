@@ -7,9 +7,10 @@ from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from gevent.subprocess import Popen, PIPE
+import gevent.lock
 import psutil
 import json
-import time, threading
+import time
 import logging, re
 import requests
 
@@ -24,7 +25,7 @@ class Stat(AceProxyPlugin):
     def __init__(self, AceConfig, AceStuff):
         self.config = AceConfig
         self.stuff = AceStuff
-        self.lock = threading.Lock()
+        self.lock = gevent.lock.RLock()
         self.params = None
 
     def geo_ip_lookup(self, ip_address):

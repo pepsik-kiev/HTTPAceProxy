@@ -4,8 +4,7 @@ Simple Client Counter for VLC VLM
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent
-import threading
+import gevent, gevent.lock
 import logging
 import time
 
@@ -15,7 +14,7 @@ from aceclient import AceClient
 class ClientCounter(object):
 
     def __init__(self):
-        self.lock = threading.RLock()
+        self.lock = gevent.lock.RLock()
         self.clients = {}
         self.idleace = None
         self.total = 0
@@ -80,7 +79,6 @@ class ClientCounter(object):
                             self.idleace = client.ace
                             self.idleace.reset()
                         except: client.ace.destroy()
-                    clients[0].ace.closeStreamReader()
                     return 0
             finally: self.total -= 1
 
@@ -89,8 +87,8 @@ class ClientCounter(object):
         try:
             with self.lock:
                 if not cid in self.clients: return
-
                 clients = self.clients[cid]
+
                 del self.clients[cid]
                 clients[0].ace.stop_event()
                 self.total -= len(clients)
@@ -101,7 +99,6 @@ class ClientCounter(object):
                         self.idleace = clients[0].ace
                         self.idleace.reset()
                     except: clients[0].ace.destroy()
-                clients[0].ace.closeStreamReader()
         finally:
                 if clients:
                    for c in clients: c.destroy()
@@ -114,9 +111,9 @@ class ClientCounter(object):
 
     def checkIdle(self):
         while 1:
-            gevent.sleep(60.0)
             with self.lock:
                 ace = self.idleace
                 if ace and (ace._idleSince + 60.0 <= time.time()):
                     self.idleace = None
                     ace.destroy()
+            gevent.sleep(60.0)
