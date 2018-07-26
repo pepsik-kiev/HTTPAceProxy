@@ -230,7 +230,7 @@ class AceClient(object):
               self.play_event()
 
               while self._streamReaderState:
-                 self.getPlayEvent(float(AceConfig.videotimeout)) # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
+                 #self.getPlayEvent(float(AceConfig.videotimeout)) # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                  clients = counter.getClients(cid)
                  if clients:
                      try:
@@ -247,7 +247,7 @@ class AceClient(object):
                                 if len(clients) > 1:
                                     logger.debug('Disconnecting client: %s' % c.handler.clientip)
                                     c.destroy()
-              logger.debug('All clients disconnected - broadcast stoped')
+                 else: logger.debug('All clients disconnected - broadcast stoped'); break
 
           except requests.exceptions.HTTPError as err:
                 logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
