@@ -185,6 +185,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
            except: channelName = CID
         # Create client
+        stream_reader = None
         self.client = Client(CID, self, channelName, channelIcon)
         try:
             # If there is no existing broadcast we create it
@@ -198,14 +199,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
                 self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
-                gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
-                #gevent.sleep()
+                stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
+                gevent.sleep()
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
-            gevent.sleep()
             if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
             # streaming to client
             logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
@@ -215,6 +215,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
                  with self.client.ace._lock: self.client.ace._streamReaderState = False; self.client.ace._lock.notifyAll()
+                 if stream_reader: stream_reader.kill()
             self.client.destroy()
             return
 

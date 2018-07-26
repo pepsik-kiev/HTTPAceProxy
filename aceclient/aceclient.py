@@ -85,9 +85,9 @@ class AceClient(object):
         '''
         AceClient Destructor
         '''
-        logger = logging.getLogger('AceClient_destroy') # Logger
-
         if self._shuttingDown.isSet(): return   # Already in the middle of destroying
+
+        logger = logging.getLogger('AceClient_destroy') # Logger
 
         self._resumeevent.set() # We should resume video to prevent read greenlet deadlock
         self._urlresult.set()   # And to prevent getUrl deadlock
@@ -229,8 +229,8 @@ class AceClient(object):
               with self._lock: self._streamReaderState = True; self._lock.notifyAll()
               self.play_event()
 
-              while self._streamReaderState:
-                 #self.getPlayEvent(float(AceConfig.videotimeout)) # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
+              while self._streamReaderState and self._streamReaderConnection:
+                 #self.getPlayEvent() # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                  clients = counter.getClients(cid)
                  if clients:
                      try:
@@ -241,12 +241,13 @@ class AceClient(object):
                          logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
                      except: break
                      else:
-                         for c in clients:
-                            try: c.queue.put(data, timeout=5)
-                            except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
-                                if len(clients) > 1:
-                                    logger.debug('Disconnecting client: %s' % c.handler.clientip)
-                                    c.destroy()
+                         with self._lock:
+                           for c in clients:
+                              try:c.queue.put(data, timeout=5)
+                              except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
+                                  if len(clients) > 1:
+                                      logger.debug('Disconnecting client: %s' % c.handler.clientip)
+                                      c.destroy()
                  else: logger.debug('All clients disconnected - broadcast stoped'); break
 
           except requests.exceptions.HTTPError as err:
@@ -380,9 +381,9 @@ class AceClient(object):
                 # CANSAVE
                 elif self._recvbuffer.startswith(AceMessage.response.CANSAVE): pass
                 # PAUSE
-                elif self._recvbuffer.startswith(AceMessage.response.PAUSE): self.pause_event(); self._resumeevent.clear()
+                elif self._recvbuffer.startswith(AceMessage.response.PAUSE): pass #self.pause_event(); self._resumeevent.clear()
                 # RESUME
-                elif self._recvbuffer.startswith(AceMessage.response.RESUME): self.play_event(); gevent.sleep(); self._resumeevent.set()
+                elif self._recvbuffer.startswith(AceMessage.response.RESUME): pass #self.play_event(); gevent.sleep(); self._resumeevent.set()
                 # STOP
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
