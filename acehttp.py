@@ -54,10 +54,10 @@ class GeventHTTPServer(BaseHTTPServer.HTTPServer):
     def process_request_thread(self, request, client_address):
         try:
             self.finish_request(request, client_address)
-            self.close_request(request)
         except SocketException: pass
         except Exception:
             self.handle_error(request, client_address)
+        finally:
             self.close_request(request)
 
     def handle_error(self, request, client_address):
@@ -215,7 +215,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
                  with self.client.ace._lock: self.client.ace._streamReaderState = False; self.client.ace._lock.notifyAll()
-                 if stream_reader: stream_reader.kill()
+                 if not stream_reader.ready(): stream_reader.join(timeout=3)
             self.client.destroy()
             return
 
