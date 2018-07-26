@@ -241,13 +241,14 @@ class AceClient(object):
                          logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
                      except: break
                      else:
-                         with self._lock:
-                           for c in clients:
-                              try:c.queue.put(data, timeout=5)
-                              except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
-                                  if len(clients) > 1:
-                                      logger.debug('Disconnecting client: %s' % c.handler.clientip)
-                                      c.destroy()
+                         for c in clients:
+                            try:c.queue.put(data, timeout=5)
+                            except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
+                                if len(clients) > 1:
+                                    logger.debug('Disconnecting client: %s' % c.handler.clientip)
+                                    c.destroy()
+                            except gevent.GreenletExit: pass
+
                  else: logger.debug('All clients disconnected - broadcast stoped'); break
 
           except requests.exceptions.HTTPError as err:
