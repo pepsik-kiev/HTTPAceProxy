@@ -7,7 +7,6 @@ from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from gevent.subprocess import Popen, PIPE
-import gevent.lock
 import psutil
 import json
 import time
@@ -25,7 +24,6 @@ class Stat(AceProxyPlugin):
     def __init__(self, AceConfig, AceStuff):
         self.config = AceConfig
         self.stuff = AceStuff
-        self.lock = gevent.lock.RLock()
         self.params = None
 
     def bytes2human(self, n):
@@ -119,8 +117,7 @@ class Stat(AceProxyPlugin):
                 }
 
             response['clients_data'] = []
-
-            with self.lock:
+            with self.stuff.clientcounter.lock:
               for i in self.stuff.clientcounter.clients:
                  for c in self.stuff.clientcounter.clients[i]:
                     if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
@@ -137,7 +134,7 @@ class Stat(AceProxyPlugin):
                         'clientLocation': clientInfo,
                         'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
                         'durationTime': time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime))
-                       }
+                         }
 
                     response['clients_data'].append(client_data)
 

@@ -6,11 +6,11 @@ http://ip:port/ttvplaylist
 
 __author__ = 'AndreyPavlenko, Dorik1972'
 
+import traceback
+import gevent, gevent.lock
 import logging, re
 import time
-import gevent
 import hashlib
-import traceback, threading
 import requests
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
@@ -24,8 +24,8 @@ class Torrenttv(AceProxyPlugin):
     handlers = ('torrenttv', 'ttvplaylist',)
 
     def __init__(self, AceConfig, AceStuff):
-        self.logger = logging.getLogger('plugin_torrenttv')
-        self.lock = threading.Lock()
+        self.logger = logging.getLogger('torrenttv_plugin')
+        self.lock = gevent.lock.Semaphore()
         self.channels = self.playlist = self.playlisttime = self.etag = self.tvgid = None
         self.logomap = config.logomap
         self.epg_id = { k:'' for k in self.logomap }
@@ -108,7 +108,7 @@ class Torrenttv(AceProxyPlugin):
 
             if path.startswith('/torrenttv/channel/'):
                 if not path.endswith('.ts'):
-                    connection.dieWithError(404, 'Invalid path: ' + requests.compat.unquote(path), logging.ERROR)
+                    connection.dieWithError(404, 'Invalid path: %s' % requests.compat.unquote(path), logging.ERROR)
                     return
                 name = requests.compat.unquote(path[19:-3]).decode('UTF8')
                 url = self.channels.get(name)

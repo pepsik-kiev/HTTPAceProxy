@@ -11,8 +11,7 @@ import os
 import logging
 import bencode, hashlib
 import time
-import gevent
-import threading
+import gevent, gevent.lock
 from requests.compat import unquote
 from PluginInterface import AceProxyPlugin
 import config.torrentfilms as config
@@ -24,7 +23,7 @@ class Torrentfilms(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceStuff):
         self.logger = logging.getLogger('plugin_TorrentFilms')
-        self.lock = threading.Lock()
+        self.lock = gevent.lock.Semaphore()
         self.playlist = []
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
                                  '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
@@ -35,7 +34,6 @@ class Torrentfilms(AceProxyPlugin):
 
     def playlistTimedDownloader(self):
         while 1:
-            time.sleep(15)
             with self.lock:
                  self.playlistdata()
             gevent.sleep(config.updateevery * 60)

@@ -10,7 +10,7 @@ import requests
 import xml.dom.minidom as dom
 import logging
 import time
-import threading
+import gevent.lock
 try: from ConfigParser import RawConfigParser
 except : from configparser import RawConfigParser
 
@@ -44,7 +44,7 @@ class TorrentTvApi(object):
         self.email = email
         self.password = password
         self.allTranslations = self.session = self.guid = None
-        self.lock = threading.RLock()
+        self.lock = gevent.lock.RLock()
         self.log = logging.getLogger("TTV API")
         self.conf = RawConfigParser()
         self.headers = {'User-Agent': 'Magic Browser'} # headers for connection to the TTV API
