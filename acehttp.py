@@ -67,6 +67,9 @@ class GeventHTTPServer(BaseHTTPServer.HTTPServer):
 
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
+    server_version = 'HTTPAceProxy'
+    protocol_version = 'HTTP/1.1'
+
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
     def log_request(self, code='-', size='-'): pass
@@ -90,16 +93,15 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         GET request handler
         '''
         logger = logging.getLogger('do_GET')
-        self.server_version = 'HTTPAceProxy'
-        if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
-
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
         logger.debug('Headers: %s' % self.headers.dict)
-        self.requrl = requests.compat.urlparse(self.path)
-        self.query = self.requrl.query
-        self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
+
+        scheme, netloc, path, params, query, fragment = requests.compat.urlparse(self.path)
+        self.query = query
+        self.path = path[:-1] if path.endswith('/') else path
+
         # If firewall enabled
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
@@ -130,9 +132,11 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
-        self.requrl = requests.compat.urlparse(self.path)
-        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in self.query.split('&') for s2 in s1.split(';')] if '=' in x) }
-        self.path = self.requrl.path[:-1] if self.requrl.path.endswith('/') else self.requrl.path
+
+        scheme, netloc, path, params, query, fragment = requests.compat.urlparse(self.path)
+        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        self.path = path[:-1] if path.endswith('/') else path
+
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
                                  '.ogx', '.qt', '.rm', '.swf', '.ts', '.vob', '.wmv', '.wav', '.webm')
@@ -259,14 +263,10 @@ class Client:
 
         # Sending client headers to videostream
         if self.handler.connection:
-            self.handler.send_response(self.ace._streamReaderConnection.status_code)
-            FORWARD_HEADERS = ['Connection', 'Keep-Alive', 'Content-Range', 'Content-Type', 'X-Content-Duration', 'Content-Length']
             SKIP_HEADERS = ['Server', 'Date', 'Transfer-Encoding', 'Accept-Ranges']
-
-            new_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in (FORWARD_HEADERS + SKIP_HEADERS)}
-            if new_headers: logger.error('NEW HEADERS FOUND: %s' % new_headers)
-
             response_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS}
+
+            self.handler.send_response(self.ace._streamReaderConnection.status_code)
             for h in response_headers: self.handler.send_header(h, response_headers[h])
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
@@ -277,11 +277,11 @@ class Client:
         if AceConfig.transcode and fmt and AceConfig.osplatform != 'Windows':
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                popen_params = { "bufsize": AceConfig.readchunksize,
-                                 "stdin"  : PIPE,
-                                 "stdout" : self.handler.wfile,
-                                 "stderr" : stderr,
-                                 "shell"  : False }
+                popen_params = { 'bufsize': AceConfig.readchunksize,
+                                 'stdin'  : PIPE,
+                                 'stdout' : self.handler.wfile,
+                                 'stderr' : stderr,
+                                 'shell'  : False }
 
                 transcoder = Popen(AceConfig.transcodecmd[fmt], **popen_params)
                 gevent.sleep()
