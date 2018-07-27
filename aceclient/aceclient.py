@@ -11,7 +11,6 @@ import logging
 import requests
 import json
 import time
-import threading
 import random
 
 from aceconfig import AceConfig
@@ -60,7 +59,6 @@ class AceClient(object):
         self._idleSince = time.time()
         self._streamReaderConnection = None
         self._streamReaderState = Event()
-        self._lock = threading.Condition(threading.Lock())
         self._streamReaderQueue = gevent.queue.Queue(maxsize=AceConfig.readcachesize) # Ring buffer
         self._engine_version_code = None
 
@@ -218,10 +216,10 @@ class AceClient(object):
                  logger.warning('HLS stream detected. Ffmpeg transcoding started')
               else: out = self._streamReaderConnection.raw
 
-              with self._lock: self._streamReaderState.set(); self._lock.notifyAll()
+              self._streamReaderState.set()
               self.play_event()
 
-              while self._streamReaderState.is_set():
+              while 1:
                  gevent.sleep()
                  #self.getPlayEvent(timeout=AceConfig.videotimeout) # Wait for PlayEvent (stop/resume sending data from AceEngine to streamReaderQueue)
                  clients = counter.getClients(cid)
@@ -253,7 +251,7 @@ class AceClient(object):
                 logger.error(traceback.format_exc())
           finally:
                 self.closeStreamReader()
-                with self._lock: self._streamReaderState.clear(); self._lock.notifyAll()
+                self._streamReaderState.clear()
                 if transcoder:
                    try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                    except: pass

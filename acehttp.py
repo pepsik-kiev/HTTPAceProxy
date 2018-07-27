@@ -214,8 +214,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         finally:
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
-                 if self.client.ace:
-                     with self.client.ace._lock: self.client.ace._streamReaderState.clear(); self.client.ace._lock.notifyAll()
+                 if self.client.ace: self.client.ace._streamReaderState.clear()
                  if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
             self.client.destroy()
             return
@@ -254,17 +253,9 @@ class Client:
         logger = logging.getLogger("ClientHandler")
         self.connectionTime = time.time()
 
-        with self.ace._lock:
-            start = time.time()
-            while self.handler.connection and not self.ace._streamReaderState.is_set():
-                remaining = start + 5.0 - time.time()
-                if remaining > 0: self.ace._lock.wait(remaining)
-                else:
-                    self.handler.dieWithError(500, 'Video stream not opened in 5 seconds - disconnecting')
-                    return
-            if self.handler.connection and not self.ace._streamReaderState.is_set():
-                self.handler.dieWithError(500, 'No video stream received from AceEngine', logging.WARNING)
-                return
+        while self.handler.connection and not self.ace._streamReaderState.wait(timeout=5):
+              self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
+              return
 
         # Sending client headers to videostream
         if self.handler.connection:
