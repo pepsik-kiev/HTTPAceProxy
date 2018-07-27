@@ -28,6 +28,17 @@ class Stat(AceProxyPlugin):
         self.lock = gevent.lock.RLock()
         self.params = None
 
+    def bytes2human(self, n):
+        # http://code.activestate.com/recipes/578019
+        symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+        prefix = {s:(1 << (i + 1)*10) for i,s in enumerate(symbols)}
+        for s in reversed(symbols):
+            if n >= prefix[s]:
+                value = float(n) / prefix[s]
+                return '%.1f%s' % (value, s)
+        return '%sB' % n
+
+
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
         headers = {'User-Agent':'API Browser'}
@@ -40,7 +51,7 @@ class Stat(AceProxyPlugin):
 
         if ip_address == AceConfig.httphost:
            from uuid import getnode
-           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6)))
+           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6))))
            except: mac_address = None
         else:
            try:
@@ -93,13 +104,13 @@ class Stat(AceProxyPlugin):
             response['sys_info'] = {
                  'os_platform': AceConfig.osplatform,
                  'cpu_nums': psutil.cpu_count(),
-                 'cpu_percent': psutil.cpu_percent(),
-                 'total_ram': round(max_mem.total/2**20,2),
-                 'used_ram': round(max_mem.used/2**20,2),
-                 'free_ram': round(max_mem.available/2**20,2),
-                 'total_disk': round(disk.total/2**30,2),
-                 'used_disk': round(disk.used/2**30,2),
-                 'free_disk': round(disk.free/2**30,2),
+                 'cpu_percent': psutil.cpu_percent(interval=1),
+                 'total_ram': self.bytes2human(max_mem.total),
+                 'used_ram': self.bytes2human(max_mem.used),
+                 'free_ram': self.bytes2human(max_mem.available),
+                 'total_disk': self.bytes2human(disk.total),
+                 'used_disk': self.bytes2human(disk.used),
+                 'free_disk': self.bytes2human(disk.free),
                   }
 
             response['connection_info'] = {
@@ -109,10 +120,9 @@ class Stat(AceProxyPlugin):
 
             response['clients_data'] = []
 
-            with self.lock: clients = self.stuff.clientcounter.clients.copy()
-
-            for i in clients:
-                for c in clients[i]:
+            with self.lock:
+              for i in self.stuff.clientcounter.clients:
+                 for c in self.stuff.clientcounter.clients[i]:
                     if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
                        clientInfo = self.mac_lookup(c.handler.clientip)
                     else:
@@ -214,9 +224,9 @@ html_template = """
 
             $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
                                 " used: " + sys_info.cpu_percent + "%</br>"+
-                                "RAM MiB &nbsp;total: " + sys_info.total_ram +
+                                "RAM &nbsp;total: " + sys_info.total_ram +
                                 " &nbsp;used: " + sys_info.used_ram +
-                                "&nbsp;free: " + sys_info.free_ram + "</br>DISK GiB &nbsp;total: " + sys_info.total_disk +
+                                "&nbsp;free: " + sys_info.free_ram + "</br>DISK &nbsp;total: " + sys_info.total_disk +
                                 "&nbsp;used: " + sys_info.used_disk + "&nbsp;free: " + sys_info.free_disk);
 
             $('#connection_info').html("Connections limit: " + connection_info.max_clients +

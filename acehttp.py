@@ -44,12 +44,12 @@ from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
 
+
 class GeventHTTPServer(BaseHTTPServer.HTTPServer):
 
     def process_request(self, request, client_address):
         checkAce() # Check is AceStream engine alive
         gevent.spawn(self.process_request_thread, request, client_address)
-        gevent.sleep()
 
     def process_request_thread(self, request, client_address):
         try:
@@ -184,6 +184,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
                channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
            except: channelName = CID
+        if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
         stream_reader = None
         self.client = Client(CID, self, channelName, channelIcon)
@@ -200,7 +201,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
                 stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
-                gevent.sleep()
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
@@ -214,8 +214,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         finally:
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
-                 with self.client.ace._lock: self.client.ace._streamReaderState = False; self.client.ace._lock.notifyAll()
-                 if not stream_reader.ready(): stream_reader.join(timeout=3)
+                 if self.client.ace:
+                     with self.client.ace._lock: self.client.ace._streamReaderState.clear(); self.client.ace._lock.notifyAll()
+                 if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
             self.client.destroy()
             return
 
@@ -240,7 +241,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 class Client:
 
-    def __init__(self, cid, handler, channelName, channelIcon='http://static.acestream.net/sites/acestream/img/ACE-logo.png'):
+    def __init__(self, cid, handler, channelName, channelIcon):
         self.cid = cid
         self.handler = handler
         self.channelName = channelName
@@ -255,13 +256,13 @@ class Client:
 
         with self.ace._lock:
             start = time.time()
-            while self.handler.connection and not self.ace._streamReaderState:
+            while self.handler.connection and not self.ace._streamReaderState.is_set():
                 remaining = start + 5.0 - time.time()
                 if remaining > 0: self.ace._lock.wait(remaining)
                 else:
                     self.handler.dieWithError(500, 'Video stream not opened in 5 seconds - disconnecting')
                     return
-            if self.handler.connection and not self.ace._streamReaderState:
+            if self.handler.connection and not self.ace._streamReaderState.is_set():
                 self.handler.dieWithError(500, 'No video stream received from AceEngine', logging.WARNING)
                 return
 
@@ -298,7 +299,8 @@ class Client:
             else:
                 logger.error("Can't found fmt key. Ffmpeg transcoding not started !")
         try:
-            while self.handler.connection:
+            while self.handler.connection and self.ace._streamReaderState.is_set():
+                gevent.sleep()
                 try:
                     data = self.queue.get(timeout=AceConfig.videotimeout)
                     try: out.write(data)
@@ -405,13 +407,8 @@ def isRunning(process):
     return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
 
 def findProcess(name):
-    for proc in psutil.process_iter():
-        try:
-            pinfo = proc.as_dict(attrs=['pid', 'name'])
-            if name in pinfo['name']: return pinfo['pid']
-        except psutil.AccessDenied: pass # System process pass
-        except psutil.NoSuchProcess: pass # # Process terminated
-    return None
+    pinfo = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]
+    return pinfo[0]['pid'] if pinfo else None
 
 def clean_proc():
     # Trying to close all spawned processes gracefully
