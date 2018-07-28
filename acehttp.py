@@ -52,13 +52,10 @@ class GeventHTTPServer(BaseHTTPServer.HTTPServer):
         gevent.spawn(self.process_request_thread, request, client_address)
 
     def process_request_thread(self, request, client_address):
-        try:
-            self.finish_request(request, client_address)
+        try: self.finish_request(request, client_address)
         except SocketException: pass
-        except Exception:
-            self.handle_error(request, client_address)
-        finally:
-            self.close_request(request)
+        except Exception: self.handle_error(request, client_address)
+        finally: self.close_request(request)
 
     def handle_error(self, request, client_address):
         logging.debug(traceback.format_exc())
@@ -66,7 +63,6 @@ class GeventHTTPServer(BaseHTTPServer.HTTPServer):
 
 
 class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
 
@@ -251,7 +247,7 @@ class Client:
         self.channelIcon = channelIcon
         self.ace = None
         self.connectionTime = time.time()
-        self.queue = gevent.queue.Queue(maxsize=AceConfig.readcachesize)
+        self.queue = gevent.queue.Queue(maxsize=1024)
 
     def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
@@ -267,7 +263,7 @@ class Client:
             response_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS}
 
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
-            for k,v in response_headers.items(): self.handler.send_header(k,v)
+            for k,v in list(response_headers.items()): self.handler.send_header(k,v)
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 

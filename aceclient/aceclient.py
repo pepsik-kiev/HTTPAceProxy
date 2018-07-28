@@ -59,7 +59,7 @@ class AceClient(object):
         self._idleSince = time.time()
         self._streamReaderConnection = None
         self._streamReaderState = Event()
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=AceConfig.readcachesize) # Ring buffer
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=1024) # Ring buffer
         self._engine_version_code = None
 
         # Logger
@@ -187,11 +187,13 @@ class AceClient(object):
         logger = logging.getLogger('StreamReader')
         logger.debug('Open video stream: %s' % url)
         transcoder = None
+        readchunksize = requests.models.CONTENT_CHUNK_SIZE
 
         if 'range' in req_headers: del req_headers['range']
         logger.debug('Get headers from client: %s' % req_headers)
 
         with requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout)) as self._streamReaderConnection:
+
           try:
               self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
 
@@ -225,7 +227,7 @@ class AceClient(object):
                  clients = counter.getClients(cid)
                  if clients:
                      try:
-                         data = out.read(AceConfig.readchunksize)
+                         data = out.read(readchunksize)
                          if self._streamReaderQueue.full(): self._streamReaderQueue.get()
                          self._streamReaderQueue.put(data)
                      except requests.packages.urllib3.exceptions.ReadTimeoutError:
@@ -233,7 +235,7 @@ class AceClient(object):
                      except: break
                      else:
                          for c in clients:
-                            try:c.queue.put(data, timeout=5)
+                            try: c.queue.put(data, timeout=5)
                             except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
                                 if len(clients) > 1:
                                     logger.debug('Disconnecting client: %s' % c.handler.clientip)

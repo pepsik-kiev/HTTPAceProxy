@@ -24,8 +24,6 @@ class AceDefConfig(object):
     aceresulttimeout = 5
     httphost='0.0.0.0'
     httpport = 8000
-    readchunksize = 8192
-    readcachesize = 1024
     aceproxyuser = ''
     firewall = False
     firewallblacklistmode = False
