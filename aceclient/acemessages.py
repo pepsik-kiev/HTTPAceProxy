@@ -74,23 +74,24 @@ class AceMessage(object):
 
         @staticmethod
         def START(command, params_dict, stream_type):
+            params_dict['stream_type'] = stream_type
             if command == 'URL':
-                return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} '.format(**params_dict)+stream_type
+                return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} {stream_type}'.format(**params_dict)
 
             elif command == 'INFOHASH':
-                return 'START INFOHASH {infohash} {file_indexes} {developer_id} {affiliate_id} {zone_id} '.format(**params_dict)+stream_type
+                return 'START INFOHASH {infohash} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
             elif command == 'CONTENT_ID':
-                return 'START PID {content_id} {file_indexes} '.format(**params_dict)+stream_type
+                return 'START PID {content_id} {file_indexes} {stream_type}'.format(**params_dict)
 
             elif command == 'DATA':
-                return 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} '.format(**params_dict)+stream_type
+                return 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
             elif command == 'DIRECT_URL':
-                return 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} '.format(**params_dict)+stream_type
+                return 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
             elif command == 'EFILE_URL':
-                return 'START EFILE {efile_url} '.format(**params_dict)+stream_type
+                return 'START EFILE {efile_url} {stream_type}'.format(**params_dict)
         # End START
 
         @staticmethod

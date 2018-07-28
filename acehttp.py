@@ -98,9 +98,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
         logger.debug('Headers: %s' % self.headers.dict)
 
-        scheme, netloc, path, params, query, fragment = requests.compat.urlparse(self.path)
-        self.query = query
-        self.path = path[:-1] if path.endswith('/') else path
+        params = requests.compat.urlparse(self.path)
+        self.query = params.query
+        self.path = params.path[:-1] if params.path.endswith('/') else params.path
 
         # If firewall enabled
         if AceConfig.firewall and not checkFirewall(self.clientip):
@@ -133,9 +133,9 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
 
-        scheme, netloc, path, params, query, fragment = requests.compat.urlparse(self.path)
-        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in query.split('&') for s2 in s1.split(';')] if '=' in x) }
-        self.path = path[:-1] if path.endswith('/') else path
+        params = requests.compat.urlparse(self.path)
+        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in params.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        self.path = params.path[:-1] if params.path.endswith('/') else params.path
 
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
@@ -201,7 +201,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Getting URL from engine
                 self.url = self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
-                p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':'+str(AceConfig.aceHTTPport))
+                p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':%s' % AceConfig.aceHTTPport)
                 self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
                 stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
@@ -267,7 +267,7 @@ class Client:
             response_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS}
 
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
-            for h in response_headers: self.handler.send_header(h, response_headers[h])
+            for k,v in response_headers.items(): self.handler.send_header(k,v)
             self.handler.end_headers()
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 

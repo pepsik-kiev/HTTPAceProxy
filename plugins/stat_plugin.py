@@ -41,8 +41,8 @@ class Stat(AceProxyPlugin):
         Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
         headers = {'User-Agent':'API Browser'}
         response = requests.get('http://geoip.nekudo.com/api/%s/en' % ip_address, headers=headers, timeout=5).json()
-        return {'country_code' : '' if not response['country']['code'] else response['country']['code'] ,
-                'country'      : '' if not response['country']['name'] else response['country']['name'] ,
+        return {'country_code' : '' if not response['country']['code'] else response['country']['code'].lower(),
+                'country'      : '' if not response['country']['name'] else response['country']['name'],
                 'city'         : '' if not response['city'] else response['city']}
 
     def mac_lookup(self,ip_address):
@@ -123,9 +123,7 @@ class Stat(AceProxyPlugin):
                     if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
                        clientInfo = self.mac_lookup(c.handler.clientip)
                     else:
-                       clientInfo = self.geo_ip_lookup(c.handler.clientip).get('country')+ ', '+ \
-                                    self.geo_ip_lookup(c.handler.clientip).get('city') + '&nbsp;<i class="flag '+ \
-                                    self.geo_ip_lookup(c.handler.clientip).get('country_code').lower() + '"></i>&nbsp;'
+                       clientInfo ='{country}, {city}&nbsp;<i class="flag {country_code}"></i>&nbsp;'.format(**self.geo_ip_lookup(c.handler.clientip))
 
                     client_data = {
                         'channelIcon': c.channelIcon,
