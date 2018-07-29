@@ -32,7 +32,7 @@ import logging
 import psutil
 import time
 import requests
-import BaseHTTPServer
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -45,7 +45,7 @@ import aceconfig
 from aceconfig import AceConfig
 
 
-class GeventHTTPServer(BaseHTTPServer.HTTPServer):
+class GeventHTTPServer(HTTPServer):
 
     def process_request(self, request, client_address):
         checkAce() # Check is AceStream engine alive
@@ -61,8 +61,7 @@ class GeventHTTPServer(BaseHTTPServer.HTTPServer):
         logging.debug(traceback.format_exc())
         pass
 
-
-class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
 
@@ -110,8 +109,7 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             old2newUrlParts = {'torrent': 'url', 'pid': 'content_id'}
             if self.reqtype in old2newUrlParts: self.reqtype = old2newUrlParts[self.reqtype]
 
-            # If first parameter is 'content_id','url','infohash' .... etc or it should be handled
-            # by plugin
+            # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
             if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceStuff.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
                 return
@@ -129,9 +127,8 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
 
-        params = requests.compat.urlparse(self.path)
-        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in params.query.split('&') for s2 in s1.split(';')] if '=' in x) }
-        self.path = params.path[:-1] if params.path.endswith('/') else params.path
+        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in self.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        self.path = self.path[:-1] if self.path.endswith('/') else self.path
 
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
@@ -214,7 +211,6 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         finally:
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
-                 if self.client.ace: self.client.ace._streamReaderState.clear()
                  if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
             self.client.destroy()
             return
@@ -259,7 +255,7 @@ class Client:
 
         # Sending client headers to videostream
         if self.handler.connection:
-            SKIP_HEADERS = ['Server', 'Date', 'Transfer-Encoding', 'Accept-Ranges']
+            SKIP_HEADERS = ['Server', 'Date', 'Accept-Ranges', 'Transfer-Encoding']
             response_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS}
 
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
