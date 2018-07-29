@@ -273,7 +273,7 @@ class Client:
         if AceConfig.transcode and fmt and AceConfig.osplatform != 'Windows':
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                popen_params = { 'bufsize': AceConfig.readchunksize,
+                popen_params = { 'bufsize': requests.models.CONTENT_CHUNK_SIZE,
                                  'stdin'  : PIPE,
                                  'stdout' : self.handler.wfile,
                                  'stderr' : stderr,

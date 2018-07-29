@@ -187,7 +187,6 @@ class AceClient(object):
         logger = logging.getLogger('StreamReader')
         logger.debug('Open video stream: %s' % url)
         transcoder = None
-        readchunksize = requests.models.CONTENT_CHUNK_SIZE
 
         if 'range' in req_headers: del req_headers['range']
         logger.debug('Get headers from client: %s' % req_headers)
@@ -199,7 +198,7 @@ class AceClient(object):
 
               if url.endswith('.m3u8'):
                  self._streamReaderConnection.headers = {'Content-Type': 'application/octet-stream', 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100'}
-                 popen_params = { "bufsize": AceConfig.readchunksize,
+                 popen_params = { "bufsize": requests.models.CONTENT_CHUNK_SIZE,
                                   "stdout" : PIPE,
                                   "stderr" : None,
                                   "shell"  : False }
@@ -227,7 +226,7 @@ class AceClient(object):
                  clients = counter.getClients(cid)
                  if clients:
                      try:
-                         data = out.read(readchunksize)
+                         data = out.read(requests.models.CONTENT_CHUNK_SIZE)
                          if self._streamReaderQueue.full(): self._streamReaderQueue.get()
                          self._streamReaderQueue.put(data)
                      except requests.packages.urllib3.exceptions.ReadTimeoutError:
