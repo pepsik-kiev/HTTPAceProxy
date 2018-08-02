@@ -18,8 +18,6 @@ import traceback
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
-from gevent.subprocess import Popen, PIPE
-import gevent.queue
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -27,7 +25,6 @@ base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
-import signal
 import logging
 import psutil
 import time
@@ -91,7 +88,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
-        logger.debug('Headers: %s' % self.headers.dict)
+        logger.debug('Headers: %s' % dict(self.headers))
 
         params = requests.compat.urlparse(self.path)
         self.query = params.query
@@ -197,7 +194,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':%s' % AceConfig.aceHTTPport)
                 self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
-                stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, self.headers.dict)
+                stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, dict(self.headers))
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
@@ -225,12 +222,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
             except: pass
             if cid is None:
-                logging.debug("Failed to get ContentID from WEB API")
+                logging.error('Failed to get ContentID from WEB API')
                 try:
                     with AceStuff.clientcounter.lock:
                         if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
                         cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                except: logging.error("Failed to get ContentID from engine")
+                except:
+                       logging.error('Failed to get ContentID from engine')
+                       logger.error(traceback.format_exc())
 
         return None if not cid else cid
 
@@ -241,9 +240,8 @@ class Client:
         self.handler = handler
         self.channelName = channelName
         self.channelIcon = channelIcon
-        self.ace = None
+        self.ace = self.queue = None
         self.connectionTime = time.time()
-        self.queue = gevent.queue.Queue(maxsize=1024)
 
     def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
@@ -256,7 +254,7 @@ class Client:
         # Sending client headers to videostream
         if self.handler.connection:
             SKIP_HEADERS = ['Server', 'Date', 'Accept-Ranges', 'Transfer-Encoding']
-            response_headers = {k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS}
+            response_headers = { k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS }
 
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
             for k,v in list(response_headers.items()): self.handler.send_header(k,v)
@@ -270,12 +268,12 @@ class Client:
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
                 popen_params = { 'bufsize': requests.models.CONTENT_CHUNK_SIZE,
-                                 'stdin'  : PIPE,
+                                 'stdin'  : gevent.subprocess.PIPE,
                                  'stdout' : self.handler.wfile,
                                  'stderr' : stderr,
                                  'shell'  : False }
 
-                transcoder = Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
                 gevent.sleep()
                 out = transcoder.stdin
                 logger.warning('Ffmpeg transcoding started')
@@ -297,7 +295,8 @@ class Client:
                except: pass
             return
 
-    def destroy(self): self.queue.queue.clear()
+    def destroy(self):
+            if self.queue: self.queue.queue.clear()
 
 class AceStuff(object):
     '''
@@ -333,12 +332,12 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 # Spawning procedures
 def spawnAce(cmd, delay=0.1):
     if AceConfig.osplatform == 'Windows':
-        import _winreg
-        reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
-        try: key = _winreg.OpenKey(reg, 'Software\AceStream')
+        from _winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
+        reg = ConnectRegistry(None, HKEY_CURRENT_USER)
+        try: key = OpenKey(reg, 'Software\AceStream')
         except: logger.error("Can't find acestream!"); sys.exit(1)
         else:
-            engine = _winreg.QueryValueEx(key, 'EnginePath')
+            engine = QueryValueEx(key, 'EnginePath')
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
@@ -372,12 +371,12 @@ def detectPort():
     except AttributeError:
         logger.error("Ace Engine is not running!")
         clean_proc(); sys.exit(1)
-    import _winreg
-    reg = _winreg.ConnectRegistry(None, _winreg.HKEY_CURRENT_USER)
-    try: key = _winreg.OpenKey(reg, 'Software\AceStream')
+        from _winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
+    reg = ConnectRegistry(None, HKEY_CURRENT_USER)
+    try: key = OpenKey(reg, 'Software\AceStream')
     except: logger.error("Can't find AceStream!"); sys.exit(1)
     else:
-        engine = _winreg.QueryValueEx(key, 'EnginePath')
+        engine = QueryValueEx(key, 'EnginePath')
         AceStuff.acedir = os.path.dirname(engine[0])
         try:
             AceConfig.acehostslist[0][1] = int(open(AceStuff.acedir + '\\acestream.port', 'r').read())
@@ -459,8 +458,8 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
 
 # setting signal handlers
 try:
-    gevent.signal(signal.SIGHUP, _reloadconfig)
-    gevent.signal(signal.SIGTERM, shutdown)
+    gevent.signal(gevent.signal.SIGHUP, _reloadconfig)
+    gevent.signal(gevent.signal.SIGTERM, shutdown)
 except AttributeError: pass  # not available on Windows
 
 # Creating ClientCounter

@@ -11,7 +11,7 @@ import os
 import logging
 import bencode, hashlib
 import time
-import gevent, gevent.lock
+import gevent
 from requests.compat import unquote
 from PluginInterface import AceProxyPlugin
 import config.torrentfilms as config

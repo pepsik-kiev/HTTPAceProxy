@@ -4,7 +4,7 @@ Simple Client Counter for VLC VLM
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent, gevent.lock
+import gevent
 import logging
 import time
 
@@ -41,7 +41,6 @@ class ClientCounter(object):
             clients = self.clients.get(cid)
             if clients:
                 client.ace = clients[0].ace
-                client.queue = client.ace._streamReaderQueue.copy()
                 clients.append(client)
             else:
                 if self.idleace is not None:
@@ -56,7 +55,7 @@ class ClientCounter(object):
 
                 clients = [client]
                 self.clients[cid] = clients
-
+            client.queue = client.ace._streamReaderQueue.copy()
             self.total += 1
             return len(clients)
 

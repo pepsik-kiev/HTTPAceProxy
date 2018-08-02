@@ -11,8 +11,7 @@ import xml.dom.minidom as dom
 import logging
 import time
 import gevent.lock
-try: from ConfigParser import RawConfigParser
-except : from configparser import RawConfigParser
+from ConfigParser import RawConfigParser
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -38,7 +37,7 @@ class TorrentTvApi(object):
         12: 'Религиозные'
     }
 
-    API_URL = 'http://api.torrent-tv.ru/v3/'
+    API_URL = 'http://api.torrent-tv.ru/v3/' #http://1ttvxbmc.top/v3/
 
     def __init__(self, email, password):
         self.email = email

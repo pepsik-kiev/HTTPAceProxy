@@ -2,11 +2,9 @@
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import traceback
-import gevent, gevent.queue
+import gevent
 from gevent.event import AsyncResult, Event
-from gevent.subprocess import Popen, PIPE
 import telnetlib
-from socket import SHUT_WR
 import logging
 import requests
 import json
@@ -59,7 +57,8 @@ class AceClient(object):
         self._idleSince = time.time()
         self._streamReaderConnection = None
         self._streamReaderState = Event()
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=1024) # Ring buffer
+        self._CHUNK_NUM = 1024 # Max number of chunks in queue
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=self._CHUNK_NUM) # Ring buffer
         self._engine_version_code = None
 
         # Logger
@@ -106,7 +105,7 @@ class AceClient(object):
         try:
             logger = logging.getLogger('AceClient_write')
             logger.debug('>>> %s' % message)
-            self._socket.write('%s\r\n' % message )
+            self._socket.write( '{}\r\n'.format(message) )
         except EOFError as e: raise AceException('Write error! %s' % repr(e))
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=AceConfig.acekey):
@@ -169,7 +168,7 @@ class AceClient(object):
     def GETCID(self, datatype, url):
         contentinfo = self.GETCONTENTINFO(datatype, url)
         self._cidresult = AsyncResult()
-        self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), 0, 0, 0))
+        self._write(AceMessage.request.GETCID(contentinfo.get(b'checksum'), contentinfo.get(b'infohash'), '0', '0', '0'))
         cid = self._cidresult.get(True, 5)
         return '' if not cid or cid == '' else cid[2:]
 
@@ -199,7 +198,7 @@ class AceClient(object):
               if url.endswith('.m3u8'):
                  self._streamReaderConnection.headers = {'Content-Type': 'application/octet-stream', 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100'}
                  popen_params = { "bufsize": requests.models.CONTENT_CHUNK_SIZE,
-                                  "stdout" : PIPE,
+                                  "stdout" : gevent.subprocess.PIPE,
                                   "stderr" : None,
                                   "shell"  : False }
 
@@ -212,7 +211,7 @@ class AceClient(object):
                  else: ffmpeg_cmd = 'ffmpeg '
 
                  ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
-                 transcoder = Popen(ffmpeg_cmd.split(), **popen_params)
+                 transcoder = gevent.subprocess.Popen(ffmpeg_cmd.split(), **popen_params)
                  out = transcoder.stdout
                  logger.warning('HLS stream detected. Ffmpeg transcoding started')
               else: out = self._streamReaderConnection.raw
@@ -227,7 +226,7 @@ class AceClient(object):
                  if clients:
                      try:
                          data = out.read(requests.models.CONTENT_CHUNK_SIZE)
-                         if self._streamReaderQueue.full(): self._streamReaderQueue.get()
+                         if self._streamReaderQueue.qsize() >= self._CHUNK_NUM: self._streamReaderQueue.get()
                          self._streamReaderQueue.put(data)
                      except requests.packages.urllib3.exceptions.ReadTimeoutError:
                          logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
@@ -289,7 +288,7 @@ class AceClient(object):
             gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
-                logger.debug('<<< %s' % requests.compat.unquote(self._recvbuffer).decode('utf8'))
+                logger.debug('<<< %s' % requests.compat.unquote(self._recvbuffer).decode('utf-8'))
             except:
                 # If something happened during read, abandon reader.
                 logger.error('Exception at socket read. AceClient destroyed')
@@ -371,7 +370,6 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
-                    self._socket.get_socket().shutdown(SHUT_WR)
                     self._recvbuffer = self._socket.read_all()
                     self._socket.close()
                     logger.debug('AceClient destroyed')

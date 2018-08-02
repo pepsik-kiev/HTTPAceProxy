@@ -373,8 +373,7 @@ class P2pproxy(AceProxyPlugin):
                 name = channel.getAttribute('name').encode('utf-8')
                 logo = channel.getAttribute('logo').encode('utf-8')
                 connection.wfile.write("    u'%s': logobase + '%s'" % (name, logo))
-                if not channel == last: connection.wfile.write(",\n")
-                else: connection.wfile.write("\n")
+                connection.wfile.write(",\n") if not channel == last else connection.wfile.write("\n")
 
             connection.wfile.write("}\n")
 

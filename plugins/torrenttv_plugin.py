@@ -7,7 +7,7 @@ http://ip:port/ttvplaylist
 __author__ = 'AndreyPavlenko, Dorik1972'
 
 import traceback
-import gevent, gevent.lock
+import gevent
 import logging, re
 import time
 import hashlib
@@ -71,11 +71,8 @@ class Torrenttv(AceProxyPlugin):
                 encname = itemdict.get('name')
                 name = encname.decode('utf-8')
 
-                logo = self.logomap.get(name)
-                itemdict['logo'] = logo if logo else 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
-
-                tvgid = self.epg_id.get(name)
-                if tvgid: itemdict['tvgid'] = tvgid
+                itemdict['logo'] = self.logomap.get(name, 'http://static.acestream.net/sites/acestream/img/ACE-logo.png')
+                itemdict['tvgid'] = self.epg_id.get(name, '')
 
                 url = itemdict['url']
                 if url.startswith(('acestream://', 'infohash://')) \
