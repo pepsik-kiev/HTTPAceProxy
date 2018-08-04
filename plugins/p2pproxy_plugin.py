@@ -81,10 +81,10 @@ class P2pproxy(AceProxyPlugin):
                         if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
                         break
 
-                if stream_type not in ('torrent', 'contentid'):
+                if stream_type not in (b'torrent', b'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
-                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+                elif stream_type == b'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
+                elif stream_type == b'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
@@ -112,7 +112,7 @@ class P2pproxy(AceProxyPlugin):
                     if param_group and not group_id in param_group[0]: continue # filter channels by &group=1,2,5...
 
                     name = channel.getAttribute('name')
-                    group = TorrentTvApi.CATEGORIES[int(group_id)].decode('UTF-8')
+                    group = TorrentTvApi.CATEGORIES[int(group_id)]
                     cid = channel.getAttribute('id')
                     logo = channel.getAttribute('logo')
                     if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
@@ -178,7 +178,7 @@ class P2pproxy(AceProxyPlugin):
                 playlistgen = PlaylistGenerator()
                 hostport = connection.headers['Host']
                 days = int(self.get_param('days')) if 'days' in self.params else 7
-                suffix = '&suffix=' + self.get_param('suffix') if 'suffix' in self.params else ''
+                suffix = '&suffix=%s' % self.get_param('suffix') if 'suffix' in self.params else ''
                 for i in range(days):
                     dfmt = d.strftime('%d-%m-%Y')
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
@@ -216,7 +216,7 @@ class P2pproxy(AceProxyPlugin):
                 channels_list = self.api.archive_channels()
                 hostport = connection.headers['Host']
                 playlistgen = PlaylistGenerator()
-                suffix = '&suffix=' + self.get_param('suffix') if 'suffix' in self.params else ''
+                suffix = '&suffix=%s' % self.get_param('suffix') if 'suffix' in self.params else ''
 
                 for channel in channels_list:
                         epg_id = channel.getAttribute('epg_id')
@@ -263,10 +263,10 @@ class P2pproxy(AceProxyPlugin):
 
                 stream_type, stream = self.api.archive_stream_source(record_id)
 
-                if stream_type not in ('torrent', 'contentid'):
+                if stream_type not in (b'torrent', b'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
-                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+                elif stream_type == b'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
+                elif stream_type == b'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()

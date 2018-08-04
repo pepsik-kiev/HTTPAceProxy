@@ -51,23 +51,26 @@ class Torrentfilms(AceProxyPlugin):
             idx = 0
             try:
                with open('%s/%s' % (config.directory, filename), "rb") as torrent_file: metainfo = bencode.bdecode(torrent_file.read())
-               infohash = hashlib.sha1(bencode.bencode(metainfo[b'info'])).hexdigest()
-            except: logger.error('The file %s may be corrupted. BencodeDecodeError!' % filename)
+               infohash = hashlib.sha1(bencode.bencode(metainfo['info'])).hexdigest()
+            except: self.logger.error('The file %s may be corrupted. BencodeDecodeError!' % filename)
             else:
                self.logger.debug('%s' % filename)
-               if b'files'in metainfo[b'info']:
+               if 'files'in metainfo['info']:
                   try:
-                     for files in metainfo[b'info'][b'files']:
-                        if ''.join(files[b'path']).endswith(self.videoextdefaults):
-                           self.playlist.append([''.join(files[b'path']).translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, str(idx), metainfo[b'info'][b'name']])
+                     for files in metainfo['info']['files']:
+                        if ''.join(files['path']).endswith(self.videoextdefaults):
+                           self.playlist.append([''.join(files['path']).translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, str(idx), metainfo['info']['name']])
                            idx+=1
                   except Exception as e:
                      self.logger.error("Can't decode content of: %s\r\n%s" % (filename,repr(e)))
                else:
                     try:
-                       self.playlist.append([metainfo[b'info'][b'name'].translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
+                       self.playlist.append([metainfo['info']['name'].translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
                     except:
-                       self.playlist.append([filename.decode('utf-8').translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
+                       try:
+                           self.playlist.append([filename.decode('utf-8').translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
+                       except AttributeError:
+                           self.playlist.append([filename.translate({ord(c): None for c in '%~}{][^$#@*,-!?&`|><+='}), infohash, '0', 'Other'])
 
         self.playlist.sort(key=lambda data: (data[3], data[0]))
         return True

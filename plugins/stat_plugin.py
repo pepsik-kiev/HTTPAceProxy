@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 Simple statistics plugin
 
@@ -29,7 +30,7 @@ class Stat(AceProxyPlugin):
     def bytes2human(self, n):
         # http://code.activestate.com/recipes/578019
         symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
-        prefix = {s:(1 << (i + 1)*10) for i,s in enumerate(symbols)}
+        prefix = { s:(1 << (i + 1)*10) for i,s in enumerate(symbols) }
         for s in reversed(symbols):
             if n >= prefix[s]:
                 value = float(n) / prefix[s]
@@ -66,7 +67,8 @@ class Stat(AceProxyPlugin):
                  Popen(['ping', '-n', '1', ip_address], **popen_params)
                  pid = Popen(['arp', '-a', ip_address], **popen_params)
            except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
-           try: mac_address = re.search(r"(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})", pid.communicate()[0]).group(0)
+
+           try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', pid.communicate()[0]).group(0)
            except: mac_address = None
 
         if mac_address:
@@ -136,7 +138,7 @@ class Stat(AceProxyPlugin):
 
                     response['clients_data'].append(client_data)
 
-            connection.wfile.write(json.dumps(response).encode('UTF8'))
+            connection.wfile.write(json.dumps(response).encode('utf-8'))
 
         else:
 
@@ -148,7 +150,7 @@ class Stat(AceProxyPlugin):
           connection.wfile.write(html_template)
 
 
-html_template = """
+html_template = b"""
 <!doctype html>
 <html lang="en">
   <head>

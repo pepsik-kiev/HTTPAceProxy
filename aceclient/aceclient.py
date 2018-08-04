@@ -1,24 +1,35 @@
 # -*- coding: utf-8 -*-
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import traceback
 import gevent
 from gevent.event import AsyncResult, Event
+import traceback
 import telnetlib
 import logging
 import requests
 import json
 import time
-import random
+import random, sys
 
 from aceconfig import AceConfig
-from acemessages import *
+from .acemessages import *
 
 class AceException(Exception):
     '''
     Exception from AceClient
     '''
     pass
+
+class Telnet(telnetlib.Telnet, object):
+    if sys.version > '3':
+        def read_until(self, expected, timeout=None):
+            expected = bytes(expected, encoding='utf-8')
+            received = super(Telnet, self).read_until(expected, timeout)
+            return str(received, encoding='utf-8')
+
+        def write(self, buffer):
+            buffer = bytes(buffer, encoding='utf-8')
+            super(Telnet, self).write(buffer)
 
 class AceClient(object):
 
@@ -66,7 +77,7 @@ class AceClient(object):
         # Try to connect AceStream engine
         for AceEngine in acehostslist:
            try:
-               self._socket = telnetlib.Telnet(AceEngine[0], AceEngine[1], connect_timeout)
+               self._socket = Telnet(AceEngine[0], AceEngine[1], connect_timeout)
                AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport = AceEngine[0], AceEngine[1], AceEngine[2]
                logger.debug('Successfully connected to AceStream on %s:%d' % (AceEngine[0], AceEngine[1]))
                break
@@ -301,7 +312,7 @@ class AceClient(object):
                 if self._recvbuffer.startswith(AceMessage.response.HELLO):
                     try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     except: logger.error("Can't parse HELLOTS"); params = {}
-                    self._engine_version_code = params['version_code'] if 'version_code' in params else None
+                    self._engine_version_code = int(params['version_code']) if 'version_code' in params else None
                     if 'key' in params:
                         self._write(AceMessage.request.READY_key(params['key'], self._product_key))
                         self._request_key = None

@@ -11,7 +11,8 @@ import xml.dom.minidom as dom
 import logging
 import time
 import gevent.lock
-from ConfigParser import RawConfigParser
+try: from ConfigParser import RawConfigParser
+except: from configparser import RawConfigParser
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -23,18 +24,18 @@ class TorrentTvApiException(Exception):
 
 class TorrentTvApi(object):
     CATEGORIES = {
-        1: 'Детские',
-        2: 'Музыка',
-        3: 'Фильмы',
-        4: 'Спорт',
-        5: 'Общие',
-        6: 'Познавательные',
-        7: 'Новостные',
-        8: 'Развлекательные',
-        9: 'Для взрослых',
-        10: 'Мужские',
-        11: 'Региональные',
-        12: 'Религиозные'
+        1: u'Детские',
+        2: u'Музыка',
+        3: u'Фильмы',
+        4: u'Спорт',
+        5: u'Общие',
+        6: u'Познавательные',
+        7: u'Новостные',
+        8: u'Развлекательные',
+        9: u'Для взрослых',
+        10: u'Мужские',
+        11: u'Региональные',
+        12: u'Религиозные'
     }
 
     API_URL = 'http://api.torrent-tv.ru/v3/' #http://1ttvxbmc.top/v3/

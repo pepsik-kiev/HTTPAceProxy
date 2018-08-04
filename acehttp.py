@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 '''
 
@@ -14,7 +14,6 @@ psutil >= 5.3.0
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import traceback
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
@@ -25,11 +24,12 @@ base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
-import logging
+import logging, traceback
 import psutil
 import time
 import requests
-from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+try: from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+except: from http.server import HTTPServer, BaseHTTPRequestHandler
 from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -147,7 +147,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         # Limit concurrent connections
         if 0 < AceConfig.maxconns <= AceStuff.clientcounter.total:
-            self.dieWithError(503, "Maximum client connections reached, can't serve this", logging.ERROR)  # 503 Service Unavailable
+            self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
             return
 
         # Pretend to work fine with Fake or HEAD request.
@@ -191,7 +191,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 # Getting URL from engine
                 self.url = self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
-                p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost+':%s' % AceConfig.aceHTTPport)
+                p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost + ':%s' % AceConfig.aceHTTPport)
                 self.url = requests.compat.urlunparse(p)
                 # Start streamreader for broadcast
                 stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, dict(self.headers))
@@ -200,7 +200,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
-            if not fmt: fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
+            fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
             # streaming to client
             logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
             self.client.handle(fmt)
@@ -216,8 +216,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         cid = None
         if reqtype == 'url' and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
             try:
-                headers={'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5', 'Range': 'bytes=0-', 'Connection': 'close', 'Icy-MetaData': '1'}
-                with requests.get(url, headers=headers, stream = True, timeout=5) as r:
+                headers={ 'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5', 'Range': 'bytes=0-', 'Connection': 'close', 'Icy-MetaData': '1' }
+                with requests.get(url, headers=headers, stream=True, timeout=5) as r:
                    headers={'User-Agent': 'Python-urllib/2.7', 'Content-Type': 'application/octet-stream', 'Connection': 'close'}
                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
             except: pass
@@ -332,7 +332,8 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 # Spawning procedures
 def spawnAce(cmd, delay=0.1):
     if AceConfig.osplatform == 'Windows':
-        from _winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
+        try: from _winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
+        except: from winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
         reg = ConnectRegistry(None, HKEY_CURRENT_USER)
         try: key = OpenKey(reg, 'Software\AceStream')
         except: logger.error("Can't find acestream!"); sys.exit(1)
@@ -371,7 +372,8 @@ def detectPort():
     except AttributeError:
         logger.error("Ace Engine is not running!")
         clean_proc(); sys.exit(1)
-        from _winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
+        try: from _winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
+        except: from winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
     reg = ConnectRegistry(None, HKEY_CURRENT_USER)
     try: key = OpenKey(reg, 'Software\AceStream')
     except: logger.error("Can't find AceStream!"); sys.exit(1)
