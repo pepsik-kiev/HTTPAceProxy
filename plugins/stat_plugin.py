@@ -68,8 +68,10 @@ class Stat(AceProxyPlugin):
                  pid = Popen(['arp', '-a', ip_address], **popen_params)
            except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
 
-           try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', pid.communicate()[0]).group(0)
-           except: mac_address = None
+           try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', pid.communicate()[0].decode('utf-8')).group(0)
+           except: 
+                mac_address = None
+                logger.error(traceback.format_exc())
 
         if mac_address:
            headers = {'User-Agent':'API Browser'}
