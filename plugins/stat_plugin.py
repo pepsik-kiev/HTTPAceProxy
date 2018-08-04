@@ -69,9 +69,7 @@ class Stat(AceProxyPlugin):
            except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
 
            try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', pid.communicate()[0].decode('utf-8')).group(0)
-           except: 
-                mac_address = None
-                logger.error(traceback.format_exc())
+           except: mac_address = None
 
         if mac_address:
            headers = {'User-Agent':'API Browser'}
