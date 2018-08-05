@@ -54,7 +54,7 @@ class AceMessage(object):
 
         @staticmethod
         def READY_key(request_key, product_key):
-            return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(request_key + product_key).hexdigest())
+            return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1((request_key + product_key).encode('utf-8')).hexdigest())
         # End READY_KEY
 
         @staticmethod
