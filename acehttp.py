@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 '''
 
@@ -15,7 +15,6 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
-gevent.config.loop = ['libev-cffi','libuv', 'libuv-cffi', 'libev-cext']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
