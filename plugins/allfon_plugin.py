@@ -9,6 +9,8 @@ __author__ = 'miltador, Dorik1972'
 import logging, re
 import requests
 import time
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.allfon as config
@@ -57,7 +59,7 @@ class Allfon(AceProxyPlugin):
         for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
 
         Allfon.logger.debug('Exporting m3u playlist')
-        params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        params = parse_qs(connection.query)
         fmt = params['fmt'][0] if 'fmt' in params else None
         add_ts = True if connection.path.endswith('/ts') else False
 

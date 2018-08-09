@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/local/bin/python2
 # -*- coding: utf-8 -*-
 '''
 
@@ -15,6 +15,7 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
+gevent.config.loop = ['libev-cffi','libuv', 'libuv-cffi', 'libev-cext']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
@@ -30,6 +31,8 @@ import time
 import requests
 try: from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 except: from http.server import HTTPServer, BaseHTTPRequestHandler
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -91,8 +94,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger.debug('Headers: %s' % dict(self.headers))
 
         params = requests.compat.urlparse(self.path)
-        self.query = params.query
-        self.path = params.path[:-1] if params.path.endswith('/') else params.path
+        self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
 
         # If firewall enabled
         if AceConfig.firewall and not checkFirewall(self.clientip):
@@ -123,9 +125,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
         logger = logging.getLogger('HandleRequest')
-
-        self.reqparams = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in self.query.split('&') for s2 in s1.split(';')] if '=' in x) }
-        self.path = self.path[:-1] if self.path.endswith('/') else self.path
+        self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
 
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',

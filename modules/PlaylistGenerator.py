@@ -78,7 +78,7 @@ class PlaylistGenerator(object):
                    item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
                 elif not archive and url.isdigit(): # For channel id's
                    item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
-                elif path == '/torrenttv/channel' : # For channel name fot torrenttv_pugin
+                elif path == '/torrenttv/channel' : # For channel name for torrenttv_plugin
                    item['url'] = 'http://%s%s/%s' % (hostport, path, url)
 
             if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt

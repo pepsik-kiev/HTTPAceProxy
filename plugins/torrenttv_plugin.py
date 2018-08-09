@@ -12,6 +12,8 @@ import logging, re
 import time
 import hashlib
 import requests
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -98,7 +100,7 @@ class Torrenttv(AceProxyPlugin):
 
             url = requests.compat.urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
-            params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+            params = parse_qs(connection.query)
             fmt = params['fmt'][0] if 'fmt' in params else None
 
             if path.startswith('/torrenttv/channel/'):

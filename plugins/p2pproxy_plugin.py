@@ -25,6 +25,8 @@ from datetime import timedelta, datetime
 
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 import config.p2pproxy as config
 
 class P2pproxy(AceProxyPlugin):
@@ -42,7 +44,7 @@ class P2pproxy(AceProxyPlugin):
         P2pproxy.logger.debug('Handling request')
 
         hostport = connection.headers['Host']
-        self.params = { k:[v] for k,v in (unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        self.params = parse_qs(connection.query)
 
         # /channels/ branch
         if connection.reqtype in ('channels', 'channels.m3u'):

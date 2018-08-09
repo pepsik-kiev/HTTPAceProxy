@@ -21,6 +21,8 @@ import requests
 import time
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 import config.torrenttelik as config
 
 class Torrenttelik(AceProxyPlugin):
@@ -53,7 +55,7 @@ class Torrenttelik(AceProxyPlugin):
             connection.end_headers()
             return
 
-        self.params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        self.params = parse_qs(connection.query)
         # 15 minutes cache
         if not Torrenttelik.playlist or (int(time.time()) - Torrenttelik.playlisttime > 15 * 60):
             if not self.downloadPlaylist(config.url): connection.dieWithError(); return
