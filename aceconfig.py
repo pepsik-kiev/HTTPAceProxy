@@ -155,3 +155,6 @@ class AceConfig(acedefconfig.AceDefConfig):
             return True
         elif useragent == 'samsung-agent/1.1' and 'Range' in headers and not 'accept-encoding' in headers:
             return True
+         # Dune 301
+        elif useragent == 'DuneHD/1.0' and headers.get('Range') != 'bytes=0-':
+            return True
