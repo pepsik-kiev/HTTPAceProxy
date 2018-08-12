@@ -190,8 +190,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 # Getting URL from engine
                 self.url = self.client.ace.getUrl(AceConfig.videotimeout)
                 # Rewriting host:port for remote Ace Stream Engine
-                p = requests.compat.urlparse(self.url)._replace(netloc=AceConfig.acehost + ':%s' % AceConfig.aceHTTPport)
-                self.url = requests.compat.urlunparse(p)
+                self.url = requests.compat.urlparse(self.url)._replace(netloc='%s:%s' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                 # Start streamreader for broadcast
                 stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, dict(self.headers))
                 logger.warning('Broadcast "%s" created' % self.client.channelName)

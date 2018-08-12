@@ -55,7 +55,7 @@ class Allfon(AceProxyPlugin):
 
         Allfon.logger.debug('Generating requested m3u playlist')
 
-        pattern = re.compile(r',(?P<name>\S.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
+        pattern = re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
         for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
 
         Allfon.logger.debug('Exporting m3u playlist')
