@@ -55,7 +55,7 @@ class Torrenttelik(AceProxyPlugin):
             connection.end_headers()
             return
 
-        self.params = parse_qs(connection.query)
+        params = parse_qs(connection.query)
         # 15 minutes cache
         if not Torrenttelik.playlist or (int(time.time()) - Torrenttelik.playlisttime > 15 * 60):
             if not self.downloadPlaylist(config.url): connection.dieWithError(); return
@@ -74,7 +74,7 @@ class Torrenttelik(AceProxyPlugin):
             return
 
         Torrenttelik.logger.debug('Exporting m3u playlist')
-        exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=self.getparam('fmt')).encode('utf-8')
+        exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=params.get('fmt', [''])[0]).encode('utf-8')
 
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
@@ -83,6 +83,3 @@ class Torrenttelik(AceProxyPlugin):
         connection.end_headers()
 
         connection.wfile.write(exported)
-
-    def getparam(self, key):
-        return self.params[key][0] if key in self.params else None

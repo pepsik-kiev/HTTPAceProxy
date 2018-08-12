@@ -14,6 +14,8 @@ import time
 import gevent
 from requests.compat import unquote
 from PluginInterface import AceProxyPlugin
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 import config.torrentfilms as config
 from aceconfig import AceConfig
 
@@ -110,10 +112,8 @@ class Torrentfilms(AceProxyPlugin):
                connection.end_headers()
                return
 
-            params = { k:[v] for k,v in (unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
-            fmt = params['fmt'][0] if 'fmt' in params else None
-
-            exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, fmt).encode('utf-8')
+            params = parse_qs(connection.query)
+            exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, params.get('fmt', [''])[0]).encode('utf-8')
 
             connection.send_response(200)
             connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

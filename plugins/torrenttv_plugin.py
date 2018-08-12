@@ -101,7 +101,6 @@ class Torrenttv(AceProxyPlugin):
             url = requests.compat.urlparse(connection.path)
             path = url.path[0:-1] if url.path.endswith('/') else url.path
             params = parse_qs(connection.query)
-            fmt = params['fmt'][0] if 'fmt' in params else None
 
             if path.startswith('/torrenttv/channel/'):
                 if not path.endswith('.ts'):
@@ -109,8 +108,8 @@ class Torrenttv(AceProxyPlugin):
                     return
                 try: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3]).decode('utf-8')
                 except AttributeError: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3])
-                url = self.channels.get(name)
-                if not url:
+                url = self.channels.get(name, None)
+                if url is None:
                     connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
                 elif url.startswith('acestream://'):
                     connection.path = '/content_id/%s/stream.ts' % url.split('/')[2]
@@ -132,7 +131,7 @@ class Torrenttv(AceProxyPlugin):
                 hostport = connection.headers['Host']
                 path = '' if len(self.channels) == 0 else '/torrenttv/channel'
                 add_ts = True if path.endswith('/ts') else False
-                exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=fmt).encode('utf-8')
+                exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
@@ -141,5 +140,5 @@ class Torrenttv(AceProxyPlugin):
                 connection.send_header('Connection', 'close')
                 connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=fmt)
+        if play: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only: connection.wfile.write(exported)

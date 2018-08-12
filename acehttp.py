@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/local/bin/python2
 # -*- coding: utf-8 -*-
 '''
 
@@ -198,10 +198,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
-            fmt = self.reqparams.get('fmt')[0] if 'fmt' in self.reqparams else None
             # streaming to client
             logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
-            self.client.handle(fmt)
+            self.client.handle(self.reqparams.get('fmt', [''])[0])
             logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
         finally:
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
