@@ -65,7 +65,7 @@ class Torrenttv(AceProxyPlugin):
                 except: self.updatelogos = False # p2pproxy plugin seems not configured
 
             self.logger.debug('Generating requested m3u playlist')
-            pattern = re.compile(r',(?P<name>\S.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
+            pattern = re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
 
             for match in pattern.finditer(origin, re.MULTILINE):
                 itemdict = match.groupdict()
