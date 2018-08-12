@@ -135,6 +135,7 @@ class Torrenttv(AceProxyPlugin):
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'application/x-mpegurl')
+                connection.send_header('Access-Control-Allow-Origin', '*')
                 connection.send_header('ETag', self.etag)
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.send_header('Connection', 'close')
