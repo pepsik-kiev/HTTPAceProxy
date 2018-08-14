@@ -31,6 +31,7 @@ class Telnet(telnetlib.Telnet, object):
             buffer = bytes(buffer, encoding='utf-8')
             super(Telnet, self).write(buffer)
 
+
 class AceClient(object):
 
     def __init__(self, acehostslist, connect_timeout=5, result_timeout=10):
@@ -202,7 +203,6 @@ class AceClient(object):
         logger.debug('Get headers from client: %s' % req_headers)
 
         with requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout)) as self._streamReaderConnection:
-
           try:
               self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
 
@@ -381,7 +381,6 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.STOP): pass
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
-                    self._recvbuffer = self._socket.read_all()
                     self._socket.close()
                     logger.debug('AceClient destroyed')
                     return
