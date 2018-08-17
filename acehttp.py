@@ -458,7 +458,7 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
 # setting signal handlers
 try:
     gevent.signal(gevent.signal.SIGHUP, _reloadconfig)
-    gevent.signal(gevent.signal.SIGTERM, shutdown)
+    gevent.signal(gevent.signal.SIGTERM or gevent.signal.SIGINT, shutdown)
 except AttributeError: pass  # not available on Windows
 
 # Creating ClientCounter

@@ -63,3 +63,4 @@ class AceDefConfig(object):
             return True
 
     osplatform = platform.system()
+    PyVersion = platform.python_version_tuple()[0]

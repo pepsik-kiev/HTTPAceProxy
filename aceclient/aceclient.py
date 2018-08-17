@@ -9,7 +9,7 @@ import logging
 import requests
 import json
 import time
-import random, sys
+import random
 
 from aceconfig import AceConfig
 from .acemessages import *
@@ -21,7 +21,8 @@ class AceException(Exception):
     pass
 
 class Telnet(telnetlib.Telnet, object):
-    if sys.version > '3':
+
+    if AceConfig.PyVersion == '3':
         def read_until(self, expected, timeout=None):
             expected = bytes(expected, encoding='utf-8')
             received = super(Telnet, self).read_until(expected, timeout)
@@ -40,7 +41,7 @@ class AceClient(object):
         # Ace stream socket
         self._socket = None
         # Result timeout
-        self._resulttimeout = result_timeout
+        self._resulttimeout = float(result_timeout)
         # Shutting down flag
         self._shuttingDown = Event()
         # Product key
@@ -126,11 +127,12 @@ class AceClient(object):
         self._age = age
         self._seekback = AceConfig.videoseekback
         self._started_again.clear()
+        self._authevent.clear()
 
         logger = logging.getLogger('AceClient_aceInit')
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
 
-        if not self._authevent.wait(self._resulttimeout):
+        if not self._authevent.wait(timeout=self._resulttimeout):
             errmsg = 'Authentication timeout during AceEngine init! Wrong acekey?' # HELLOTS not resived from engine or Wrong key!
             logger.error(errmsg)
             raise AceException(errmsg)
@@ -237,8 +239,10 @@ class AceClient(object):
                  if clients:
                      try:
                          data = out.read(requests.models.CONTENT_CHUNK_SIZE)
-                         if self._streamReaderQueue.qsize() >= self._CHUNK_NUM: self._streamReaderQueue.get()
-                         self._streamReaderQueue.put(data)
+                         try: self._streamReaderQueue.put_nowait(data)
+                         except gevent.queue.Full:
+                              self._streamReaderQueue.get_nowait()
+                              self._streamReaderQueue.put_nowait(data)
                      except requests.packages.urllib3.exceptions.ReadTimeoutError:
                          logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
                      except: break
@@ -320,12 +324,10 @@ class AceClient(object):
                 # NOTREADY
                 elif self._recvbuffer.startswith(AceMessage.response.NOTREADY): self._authevent.clear()
                 # AUTH
-                elif self._recvbuffer.startswith(AceMessage.response.AUTH):
-                    self._write(AceMessage.request.USERDATA(self._gender, self._age))
-                    self._authevent.set()
+                elif self._recvbuffer.startswith(AceMessage.response.AUTH): self._authevent.set()
                 # GETUSERDATA
                 elif self._recvbuffer.startswith(AceMessage.response.GETUSERDATA):
-                    raise AceException('You should init me first!')
+                    self._write(AceMessage.request.USERDATA(self._gender, self._age))
                 # LOADRESP
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
                     _contentinfo = json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:])))
