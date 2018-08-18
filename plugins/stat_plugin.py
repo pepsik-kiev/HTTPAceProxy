@@ -8,6 +8,8 @@ from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from gevent.subprocess import Popen, PIPE
+try: from urlparse import parse_qs
+except: from urllib.parse import parse_qs
 import psutil
 import json
 import time
@@ -83,7 +85,7 @@ class Stat(AceProxyPlugin):
         return self.params[key][0] if key in self.params else None
 
     def handle(self, connection, headers_only=False):
-        self.params = { k:[v] for k,v in (requests.compat.unquote(x).split('=') for x in [s2 for s1 in connection.query.split('&') for s2 in s1.split(';')] if '=' in x) }
+        self.params = parse_qs(connection.query)
 
         if self.get_param('action') == 'get_status':
 
@@ -125,7 +127,7 @@ class Stat(AceProxyPlugin):
                     if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
                        clientInfo = self.mac_lookup(c.handler.clientip)
                     else:
-                       clientInfo ='{country}, {city}&nbsp;<i class="flag {country_code}"></i>&nbsp;'.format(**self.geo_ip_lookup(c.handler.clientip))
+                       clientInfo =u'{country}, {city}&nbsp;<i class="flag {country_code}"></i>&nbsp;'.format(**self.geo_ip_lookup(c.handler.clientip))
 
                     client_data = {
                         'channelIcon': c.channelIcon,
@@ -138,7 +140,7 @@ class Stat(AceProxyPlugin):
 
                     response['clients_data'].append(client_data)
 
-            connection.wfile.write(json.dumps(response).encode('utf-8'))
+            connection.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
 
         else:
 
