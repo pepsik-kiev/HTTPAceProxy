@@ -49,7 +49,7 @@ class AceClient(object):
         # Current STATUS
         self._status = None
         # Current STATE
-        self._state = None
+        self._state_id = None
         # Current AUTH
         self._authevent = Event()
         self._gender = None
@@ -141,12 +141,22 @@ class AceClient(object):
         if self._engine_version_code >= 3003600: self._write(AceMessage.request.SETOPTIONS)
 
     def _getResult(self):
+        logger = logging.getLogger('AceClient_getResult') # Logger
         try:
-            result = self._result.get(timeout=self._resulttimeout)
-            if not result:
-                raise AceException('Result not received from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport))
-        except gevent.Timeout: raise AceException('gevent_Timeout')
-        return result
+            return self._result.get(timeout=self._resulttimeout)
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. getResult timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            logger.error(errmsg)
+            raise AceException(errmsg)
+
+    def getUrl(self, timeout=30):
+        logger = logging.getLogger('AceClient_getURL') # Logger
+        try:
+            return self._urlresult.get(timeout=timeout)
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. GetURL timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            logger.error(errmsg)
+            raise AceException(errmsg)
 
     def START(self, datatype, value, stream_type):
         '''
@@ -165,7 +175,7 @@ class AceClient(object):
         '''
         Stop video method
         '''
-        if self._state and self._state != '0':
+        if self._state_id and self._state_id is not '0':
             self._result = AsyncResult()
             self._write(AceMessage.request.STOP)
             self._getResult()
@@ -185,16 +195,6 @@ class AceClient(object):
         self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), '0', '0', '0'))
         cid = self._cidresult.get(True, 5)
         return '' if not cid or cid == '' else cid[2:]
-
-    def getUrl(self, timeout=30):
-        logger = logging.getLogger('AceClient_getURL') # Logger
-        try:
-            res = self._urlresult.get(timeout=timeout)
-            return res
-        except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. GetURL timeout!'
-            logger.error(errmsg)
-            raise AceException(errmsg)
 
     def startStreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger('StreamReader')
@@ -327,7 +327,7 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.START):
                     try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     except: params = {}; raise AceException("Can't parse START")
-                    if not self._seekback or (self._seekback and self._started_again.is_set()) or params.get('stream','') != '1':
+                    if not self._seekback or (self._seekback and self._started_again.isSet()) or params.get('stream','') != '1':
                         # If seekback is disabled, we use link in first START command.
                         # If seekback is enabled, we wait for first START command and
                         # ignore it, then do seekback in first EVENT position command
@@ -338,7 +338,7 @@ class AceClient(object):
                     else: logger.debug('START received. Waiting for %s.' % AceMessage.response.LIVEPOS)
                 # LIVEPOS
                 elif self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
-                    if self._seekback and not self._started_again.is_set():
+                    if self._seekback and not self._started_again.isSet():
                         try:
                              params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                              self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
@@ -353,8 +353,8 @@ class AceClient(object):
                     else: self._result.set(_contentinfo)
                 # STATE
                 elif self._recvbuffer.startswith(AceMessage.response.STATE):
-                    self._state = self._recvbuffer.split()[1]
-                    if self._state in ('0','1'): self._result.set(True) #idle, starting
+                    self._state_id = self._recvbuffer.split()[1]
+                    self._result.set(True) if self._state_id in ('0','1') else self._result.set(False) #idle, starting
                 # STATUS
                 elif self._recvbuffer.startswith(AceMessage.response.STATUS):
                     self._status = self._recvbuffer.split()[1].split(';')

@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 '''
 
@@ -7,7 +7,7 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 
 !!!!! Requirements !!!!!
 
-Python 2.x.x >= 2.7.10
+Python2 (>=2.7.10) or Python3 (>=3.4)
 gevent >= 1.2.2
 psutil >= 5.3.0
 

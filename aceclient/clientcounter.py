@@ -70,7 +70,6 @@ class ClientCounter(object):
                     return len(clients)
                 else:
                     del self.clients[cid]
-                    client.ace.stop_event()
                     if self.idleace is not None: client.ace.destroy()
                     else:
                         try:
@@ -89,7 +88,6 @@ class ClientCounter(object):
                 clients = self.clients[cid]
 
                 del self.clients[cid]
-                clients[0].ace.stop_event()
                 self.total -= len(clients)
                 if self.idleace is not None: clients[0].ace.destroy()
                 else:
