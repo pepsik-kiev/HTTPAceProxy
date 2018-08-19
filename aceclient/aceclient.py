@@ -48,8 +48,6 @@ class AceClient(object):
         self._product_key = None
         # Current STATUS
         self._status = None
-        # Current STATE
-        self._state_id = None
         # Current AUTH
         self._authevent = Event()
         self._gender = None
@@ -94,7 +92,7 @@ class AceClient(object):
         '''
         AceClient Destructor
         '''
-        if self._shuttingDown.isSet(): return   # Already in the middle of destroying
+        if self._shuttingDown.ready(): return   # Already in the middle of destroying
 
         logger = logging.getLogger('AceClient_destroy') # Logger
 
@@ -142,8 +140,7 @@ class AceClient(object):
 
     def _getResult(self):
         logger = logging.getLogger('AceClient_getResult') # Logger
-        try:
-            return self._result.get(timeout=self._resulttimeout)
+        try: return self._result.get(timeout=self._resulttimeout)
         except gevent.Timeout:
             errmsg = 'Engine response time exceeded. getResult timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
             logger.error(errmsg)
@@ -151,8 +148,7 @@ class AceClient(object):
 
     def getUrl(self, timeout=30):
         logger = logging.getLogger('AceClient_getURL') # Logger
-        try:
-            return self._urlresult.get(timeout=timeout)
+        try: return self._urlresult.get(timeout=timeout)
         except gevent.Timeout:
             errmsg = 'Engine response time exceeded. GetURL timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
             logger.error(errmsg)
@@ -161,6 +157,7 @@ class AceClient(object):
     def START(self, datatype, value, stream_type):
         '''
         Start video method
+        Returns the url provided by AceEngine
         '''
         if stream_type == 'hls' and self._engine_version_code >= 3010500:
            stream_type = 'output_format=hls transcode_audio=%s transcode_mp3=%s transcode_ac3=%s preferred_audio_language=%s' % \
@@ -169,16 +166,15 @@ class AceClient(object):
 
         self._urlresult = AsyncResult()
         self._write(AceMessage.request.START(datatype.upper(), value, stream_type))
-        self._getResult()
+        return self.getUrl(timeout=AceConfig.videotimeout)
 
     def STOP(self):
         '''
         Stop video method
         '''
-        if self._state_id and self._state_id is not '0':
-            self._result = AsyncResult()
-            self._write(AceMessage.request.STOP)
-            self._getResult()
+        self._result = AsyncResult()
+        self._write(AceMessage.request.STOP)
+        self._getResult()
 
     def LOADASYNC(self, datatype, params):
         self._result = AsyncResult()
@@ -307,7 +303,7 @@ class AceClient(object):
             except:
                 # If something happened during read, abandon reader.
                 logger.error('Exception at socket read. AceClient destroyed')
-                if not self._shuttingDown.isSet(): self._shuttingDown.set()
+                if not self._shuttingDown.ready(): self._shuttingDown.set()
                 return
             else: # Parsing everything only if the string is not empty
                 # HELLOTS
@@ -327,7 +323,7 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.START):
                     try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     except: params = {}; raise AceException("Can't parse START")
-                    if not self._seekback or (self._seekback and self._started_again.isSet()) or params.get('stream','') != '1':
+                    if not self._seekback or (self._seekback and self._started_again.ready()) or params.get('stream','') != '1':
                         # If seekback is disabled, we use link in first START command.
                         # If seekback is enabled, we wait for first START command and
                         # ignore it, then do seekback in first EVENT position command
@@ -338,7 +334,7 @@ class AceClient(object):
                     else: logger.debug('START received. Waiting for %s.' % AceMessage.response.LIVEPOS)
                 # LIVEPOS
                 elif self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
-                    if self._seekback and not self._started_again.isSet():
+                    if self._seekback and not self._started_again.ready():
                         try:
                              params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                              self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
@@ -353,12 +349,11 @@ class AceClient(object):
                     else: self._result.set(_contentinfo)
                 # STATE
                 elif self._recvbuffer.startswith(AceMessage.response.STATE):
-                    self._state_id = self._recvbuffer.split()[1]
-                    self._result.set(True) if self._state_id in ('0','1') else self._result.set(False) #idle, starting
+                    if self._recvbuffer.split()[1] in ('0','1'): self._result.set(True)
                 # STATUS
                 elif self._recvbuffer.startswith(AceMessage.response.STATUS):
                     self._status = self._recvbuffer.split()[1].split(';')
-                    if 'main:err' in set(self._status):  # main:err;error_id;error_message
+                    if 'main:err' in self._status: # main:err;error_id;error_message
                        logger.error('%s with message %s' % (self._status[0], self._status[2]))
                        self._result.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
                        self._urlresult.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))

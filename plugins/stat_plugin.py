@@ -127,7 +127,7 @@ class Stat(AceProxyPlugin):
                     if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
                        clientInfo = self.mac_lookup(c.handler.clientip)
                     else:
-                       clientInfo =u'{country}, {city}&nbsp;<i class="flag {country_code}"></i>&nbsp;'.format(**self.geo_ip_lookup(c.handler.clientip))
+                       clientInfo =u'<i class="flag {country_code}"></i>&nbsp;&nbsp;{country}, {city}'.format(**self.geo_ip_lookup(c.handler.clientip))
 
                     client_data = {
                         'channelIcon': c.channelIcon,

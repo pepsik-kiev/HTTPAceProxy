@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 '''
 
@@ -185,10 +185,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.add(CID, self.client) == 1:
                 logger.warning('Create a broadcast "%s"' % self.client.channelName)
-                # Send START commands to AceEngine
-                self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
-                # Getting URL from engine
-                self.url = self.client.ace.getUrl(AceConfig.videotimeout)
+                # Send START commands to AceEngine and Getting URL from engine
+                self.url = self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 # Rewriting host:port for remote Ace Stream Engine
                 self.url = requests.compat.urlparse(self.url)._replace(netloc='%s:%s' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                 # Start streamreader for broadcast
@@ -436,7 +434,7 @@ logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
 
-logger.info('Ace Stream HTTP Proxy server starting .....')
+logger.info('Ace Stream HTTP Proxy server on Python %s starting .....' % sys.version.split()[0])
 
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == '0.0.0.0':
