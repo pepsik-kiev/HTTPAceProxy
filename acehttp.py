@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 '''
 
@@ -215,16 +215,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 with requests.get(url, headers=headers, stream=True, timeout=5) as r:
                    headers={'User-Agent': 'Python-urllib/2.7', 'Content-Type': 'application/octet-stream', 'Connection': 'close'}
                    cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
-            except: pass
-            if cid is None:
+            except:
                 logging.error('Failed to get ContentID from WEB API')
                 try:
                     with AceStuff.clientcounter.lock:
                         if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
                         cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                except:
-                       logging.error('Failed to get ContentID from engine')
-                       logger.error(traceback.format_exc())
+                except: logging.error('Failed to get ContentID from engine')
 
         return None if not cid else cid
 
