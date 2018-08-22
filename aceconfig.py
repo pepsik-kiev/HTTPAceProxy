@@ -70,6 +70,8 @@ class AceConfig(acedefconfig.AceDefConfig):
     # HTTP AceProxy configuration
     # ----------------------------------------------------
     #
+    # Bind host. '' - autodetect, 0.0.0.0 - listen on all addresses, change to whatever IP you want to listen on this IP only
+    httphost = ''
     # HTTP Server port
     httpport = 8000
     # If started as root, drop privileges to this user.
@@ -116,9 +118,9 @@ class AceConfig(acedefconfig.AceDefConfig):
     #
     # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     loglevel = logging.DEBUG
-    # Log message forma
+    # Log message format
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'
-    # Log date forma
+    # Log date format
     logdatefmt='%d.%m %H:%M:%S'
     # Full path to a log file
     # For Windows OS something like that logfile = "c:\\Python27\\log_AceHttp.txt"
