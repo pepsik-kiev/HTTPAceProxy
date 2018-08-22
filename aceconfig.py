@@ -74,7 +74,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # 'auto' - autodetect
     # '' or '0.0.0.0' - listen on all addresses
     # Or change to whatever IP you want to listen on this IP only
-    #httphost = '127.0.0.1'
+    httphost = 'auto'
     # HTTP Server port
     httpport = 8000
     # If started as root, drop privileges to this user.
