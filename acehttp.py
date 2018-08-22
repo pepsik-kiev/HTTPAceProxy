@@ -204,7 +204,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if AceStuff.clientcounter.delete(CID, self.client) == 0:
                  logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
                  if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
-            self.client.destroy()
             return
 
     def getCID(self, reqtype, url):
@@ -239,9 +238,9 @@ class Client:
         logger = logging.getLogger("ClientHandler")
         self.connectionTime = time.time()
 
-        while self.handler.connection and not self.ace._streamReaderState.wait(timeout=5):
-              self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
-              return
+        if self.handler.connection and not self.ace._streamReaderState.wait(timeout=5.0):
+            self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
+            return
 
         # Sending client headers to videostream
         if self.handler.connection:
@@ -272,22 +271,19 @@ class Client:
             else:
                 logger.error("Can't found fmt key. Ffmpeg transcoding not started !")
         try:
-            while self.handler.connection and self.ace._streamReaderState.is_set():
+            while self.handler.connection and self.ace._streamReaderState.ready():
                 gevent.sleep()
-                try:
-                    data = self.queue.get(timeout=AceConfig.videotimeout)
-                    try: out.write(data)
-                    except: break
+                try: out.write(self.queue.get(timeout=AceConfig.videotimeout))
                 except gevent.queue.Empty:
                     logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
                     break
+                except: break
         finally:
+            self.queue.queue.clear()
             if transcoder is not None:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
             return
-
-    def destroy(self): self.queue.queue.clear()
 
 class AceStuff(object):
     '''
@@ -425,6 +421,9 @@ def _reloadconfig(signum=None, frame=None):
     from aceconfig import AceConfig
     logger.info('Ace Stream HTTP Proxy config reloaded')
 
+def get_ip_address():
+    return [(s.connect(('1.1.1.1', 80)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
@@ -433,8 +432,8 @@ if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
 logger.info('Ace Stream HTTP Proxy server on Python %s starting .....' % sys.version.split()[0])
 
 #### Initial settings for AceHTTPproxy host IP
-if AceConfig.httphost == '0.0.0.0':
-    AceConfig.httphost = [(s.connect(('1.1.1.1', 53)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+if AceConfig.httphost == 'auto':
+    AceConfig.httphost = get_ip_address()
     logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
@@ -466,13 +465,13 @@ if not ace_pid and AceConfig.acespawn:
    if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
        ace_pid = AceStuff.ace.pid
        AceStuff.ace = psutil.Process(ace_pid)
-       AceConfig.acehostslist[0][0] = AceConfig.httphost
+       AceConfig.acehostslist[0][0] = get_ip_address() if AceConfig.httphost in ('', '0.0.0.0') else AceConfig.httphost
        AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
        logger.info('Ace Stream engine spawned with pid %s' % AceStuff.ace.pid)
 elif ace_pid:
    logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
    AceStuff.ace = psutil.Process(ace_pid)
-   AceConfig.acehostslist[0][0] = AceConfig.httphost
+   AceConfig.acehostslist[0][0] = get_ip_address() if AceConfig.httphost in ('', '0.0.0.0') else AceConfig.httphost
    AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
    AceConfig.acespawn = False
 else:
@@ -513,6 +512,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
 
 # Start complite. Wating for requests
 server = GeventHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
-logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
+s = server.socket.getsockname()
+logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (s[0], s[1]))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()
