@@ -460,20 +460,16 @@ AceStuff.clientcounter = ClientCounter()
 #### AceEngine startup
 name = 'ace_engine.exe' if AceConfig.osplatform == 'Windows' else os.path.basename(AceConfig.acecmd)
 ace_pid = findProcess(name)
+AceStuff.ace = None
 if not ace_pid and AceConfig.acespawn:
    AceStuff.aceProc = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
    if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
        ace_pid = AceStuff.ace.pid
        AceStuff.ace = psutil.Process(ace_pid)
-       AceConfig.acehostslist[0][0] = get_ip_address() if AceConfig.httphost in ('', '0.0.0.0') else AceConfig.httphost
-       AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
        logger.info('Ace Stream engine spawned with pid %s' % AceStuff.ace.pid)
 elif ace_pid:
-   logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
    AceStuff.ace = psutil.Process(ace_pid)
-   AceConfig.acehostslist[0][0] = get_ip_address() if AceConfig.httphost in ('', '0.0.0.0') else AceConfig.httphost
-   AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
-   AceConfig.acespawn = False
+   logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
 else:
    Engine_found = False
    for engine in AceConfig.acehostslist:
@@ -485,6 +481,10 @@ else:
              break
      except requests.exceptions.ConnectionError: pass
    if not Engine_found: logger.error('Not found any Ace Stream engine!')
+
+if AceStuff.ace:
+   AceConfig.acehostslist[0][0] = get_ip_address() if AceConfig.httphost in ('', '0.0.0.0') else AceConfig.httphost
+   AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
 
 # Refreshes the acestream.port file .....
 if ace_pid and AceConfig.osplatform == 'Windows': detectPort()
