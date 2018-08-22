@@ -287,8 +287,7 @@ class Client:
                except: pass
             return
 
-    def destroy(self):
-            if self.queue: self.queue.queue.clear()
+    def destroy(self): self.queue.queue.clear()
 
 class AceStuff(object):
     '''

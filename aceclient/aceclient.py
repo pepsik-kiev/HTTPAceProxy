@@ -95,7 +95,6 @@ class AceClient(object):
         logger = logging.getLogger('AceClient_destroy') # Logger
 
         self._urlresult.set()   # And to prevent getUrl deadlock
-        self._result.set()      # We should resume video to prevent read greenlet deadlock
 
         # Trying to disconnect
         try:
@@ -142,7 +141,7 @@ class AceClient(object):
             errmsg = 'Engine response time exceeded. getResult timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
-    def getUrl(self, timeout=30):
+    def getUrl(self, timeout=30.0):
         logger = logging.getLogger('AceClient_getURL') # Logger
         try: return self._urlresult.get(timeout=timeout)
         except gevent.Timeout:
@@ -161,7 +160,7 @@ class AceClient(object):
 
         self._urlresult = AsyncResult()
         self._write(AceMessage.request.START(datatype.upper(), value, stream_type))
-        return self.getUrl(timeout=AceConfig.videotimeout) #url for play
+        return self.getUrl(timeout=float(AceConfig.videotimeout)) #url for play
 
     def STOP(self):
         '''
@@ -186,7 +185,7 @@ class AceClient(object):
         if contentinfo:
            self._cidresult = AsyncResult()
            self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), '0', '0', '0'))
-           cid = self._cidresult.get(True, 5)
+           cid = self._cidresult.get(block=True, timeout=5.0)
         return '' if cid is None or cid == '' else cid[2:]
 
     def startStreamReader(self, url, cid, counter, req_headers=None):
@@ -313,15 +312,14 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.START):
                     try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     except: params = {}; raise AceException("Can't parse START")
-                    if not self._seekback or (self._seekback and self._started_again.ready()) or params.get('stream','') != '1':
+                    if not self._seekback or (self._seekback and self._started_again.ready()) or params.get('stream','') is not '1':
                         # If seekback is disabled, we use link in first START command.
                         # If seekback is enabled, we wait for first START command and
                         # ignore it, then do seekback in first EVENT position command
                         # AceStream sends us STOP and START again with new link.
                         # We use only second link then.
-                        try: self._urlresult.set(self._recvbuffer.split()[1])
-                        except IndexError as e: self._url = None
-                        finally: self._started_again.clear()
+                        self._urlresult.set(self._recvbuffer.split()[1])
+                        self._started_again.clear()
                     else: logger.debug('START received. Waiting for %s.' % AceMessage.response.LIVEPOS)
                 # LIVEPOS
                 if self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
