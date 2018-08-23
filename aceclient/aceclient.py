@@ -49,13 +49,10 @@ class AceClient(object):
         # Current STATUS
         self._status = None
         # Current AUTH
-        self._authevent = Event()
         self._gender = None
         self._age = None
         # Result (Created with AsyncResult() on call)
         self._result = AsyncResult()
-        # Result for getURL()
-        self._urlresult = AsyncResult()
         # Result for GETCID()
         self._cidresult = AsyncResult()
         # Seekback seconds.
@@ -66,8 +63,7 @@ class AceClient(object):
         self._idleSince = time.time()
         self._streamReaderConnection = None
         self._streamReaderState = Event()
-        self._CHUNK_NUM = 1024 # Max number of chunks in queue
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=self._CHUNK_NUM) # Ring buffer
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=1024) # Ring buffer with max number of chunks in queue
         self._engine_version_code = None
 
         # Logger
@@ -90,12 +86,9 @@ class AceClient(object):
         '''
         AceClient Destructor
         '''
-        if self._shuttingDown.ready(): return   # Already in the middle of destroying
-
         logger = logging.getLogger('AceClient_destroy') # Logger
-
-        self._urlresult.set()   # And to prevent getUrl deadlock
-
+        if self._shuttingDown.ready(): return   # Already in the middle of destroying
+        self._result.set()
         # Trying to disconnect
         try:
             logger.debug('Destroying AceStream client.....')
@@ -108,6 +101,7 @@ class AceClient(object):
         self._idleSince = time.time()
         self._started_again.clear()
         self._streamReaderState.clear()
+        self._result.set()
 
     def _write(self, message):
         try:
@@ -122,30 +116,23 @@ class AceClient(object):
         self._age = age
         self._seekback = AceConfig.videoseekback
         self._started_again.clear()
-        self._authevent.clear()
+        self._result.set()
 
         logger = logging.getLogger('AceClient_aceInit')
+        self._result = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
-
-        if not self._authevent.wait(timeout=self._resulttimeout):
+        if not self._getResult(timeout=self._resulttimeout):
             errmsg = 'Authentication timeout during AceEngine init! Wrong acekey?' # HELLOTS not resived from engine or Wrong key!
             raise AceException(errmsg)
             return
         # Display download_stopped massage
         if self._engine_version_code >= 3003600: self._write(AceMessage.request.SETOPTIONS)
 
-    def _getResult(self):
+    def _getResult(self, timeout=10.0):
         logger = logging.getLogger('AceClient_getResult') # Logger
-        try: return self._result.get(timeout=self._resulttimeout)
+        try: return self._result.get(timeout=timeout)
         except gevent.Timeout:
             errmsg = 'Engine response time exceeded. getResult timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
-            raise AceException(errmsg)
-
-    def getUrl(self, timeout=30.0):
-        logger = logging.getLogger('AceClient_getURL') # Logger
-        try: return self._urlresult.get(timeout=timeout)
-        except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. GetURL timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def START(self, datatype, value, stream_type):
@@ -158,9 +145,9 @@ class AceClient(object):
                          (AceConfig.transcode_audio, AceConfig.transcode_mp3, AceConfig.transcode_ac3, AceConfig.preferred_audio_language)
         else: stream_type = 'output_format=http'
 
-        self._urlresult = AsyncResult()
+        self._result = AsyncResult()
         self._write(AceMessage.request.START(datatype.upper(), value, stream_type))
-        return self.getUrl(timeout=float(AceConfig.videotimeout)) #url for play
+        return self._getResult(timeout=float(AceConfig.videotimeout)) #url for play
 
     def STOP(self):
         '''
@@ -168,12 +155,12 @@ class AceClient(object):
         '''
         self._result = AsyncResult()
         self._write(AceMessage.request.STOP)
-        self._getResult()
+        self._getResult(timeout=self._resulttimeout)
 
     def LOADASYNC(self, datatype, params):
         self._result = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
-        return self._getResult() # _contentinfo or False
+        return self._getResult(timeout=self._resulttimeout) # _contentinfo or False
 
     def GETCONTENTINFO(self, datatype, value):
         paramsdict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
@@ -222,8 +209,6 @@ class AceClient(object):
               else: out = self._streamReaderConnection.raw
 
               self._streamReaderState.set()
-              self.play_event()
-
               while 1:
                  gevent.sleep()
                  clients = counter.getClients(cid)
@@ -240,9 +225,9 @@ class AceClient(object):
                      else:
                          for c in clients:
                             try: c.queue.put(data, timeout=5)
-                            except gevent.queue.Full:  #Queue.Full client does not read data from buffer until 5sec - disconnect it
+                            except gevent.queue.Full:
                                 if len(clients) > 1:
-                                    logger.debug('Disconnecting client: %s' % c.handler.clientip)
+                                    logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
                                     c.destroy()
                             except gevent.GreenletExit: pass
 
@@ -265,18 +250,11 @@ class AceClient(object):
 
     def closeStreamReader(self):
         logger = logging.getLogger('StreamReader')
-        c = self._streamReaderConnection
-        if c:
-           logger.debug('Close video stream: %s' % c.url)
-           c.close()
+        if self._streamReaderConnection:
+           logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
+           self._streamReaderConnection.close()
         self._streamReaderConnection = None
         self._streamReaderQueue.queue.clear()
-
-    # EVENTS from client to AceEngine
-    def play_event(self): self._write(AceMessage.request.PLAYEVENT)
-    def pause_event(self): self._write(AceMessage.request.PAUSEEVENT)
-    def stop_event(self): self._write(AceMessage.request.STOPEVENT)
-    # END EVENTS
 
     def _recvData(self):
         '''
@@ -302,9 +280,9 @@ class AceClient(object):
                     self._engine_version_code = int(params.get('version_code', 0))
                     self._write(AceMessage.request.READY_key(params.get('key',''), self._product_key))
                 # NOTREADY
-                elif self._recvbuffer.startswith(AceMessage.response.NOTREADY): self._authevent.clear()
+                elif self._recvbuffer.startswith(AceMessage.response.NOTREADY): self._result.set(False)
                 # AUTH
-                elif self._recvbuffer.startswith(AceMessage.response.AUTH): self._authevent.set()
+                elif self._recvbuffer.startswith(AceMessage.response.AUTH): self._result.set(True)
                 # GETUSERDATA
                 elif self._recvbuffer.startswith(AceMessage.response.GETUSERDATA):
                     self._write(AceMessage.request.USERDATA(self._gender, self._age))
@@ -318,9 +296,9 @@ class AceClient(object):
                         # ignore it, then do seekback in first EVENT position command
                         # AceStream sends us STOP and START again with new link.
                         # We use only second link then.
-                        self._urlresult.set(self._recvbuffer.split()[1])
+                        self._result.set(self._recvbuffer.split()[1])
                         self._started_again.clear()
-                    else: logger.debug('START received. Waiting for %s.' % AceMessage.response.LIVEPOS)
+                    else: logger.debug('START received. Waiting for %s' % AceMessage.response.LIVEPOS)
                 # LIVEPOS
                 if self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
                     if self._seekback and not self._started_again.ready(): # if seekback
@@ -333,25 +311,20 @@ class AceClient(object):
                 elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
                     _contentinfo = json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:])))
                     if _contentinfo.get('status') == 100:
-                        logger.error('LOADASYNC returned error with message: %s' % _contentinfo.get('message'))
                         self._result.set(False)
+                        self._result.set_exception(AceException('LOADASYNC returned error with message: %s' % _contentinfo.get('message')))
                     else: self._result.set(_contentinfo)
                 # STATE
                 elif self._recvbuffer.startswith(AceMessage.response.STATE):
-                    if self._recvbuffer.split()[1] in ('0', '1'): self._result.set(True)
+                    if self._recvbuffer.split()[1] is '0': self._result.set(True) #state_id: 0(IDLE)
                 # STATUS
                 elif self._recvbuffer.startswith(AceMessage.response.STATUS):
                     self._status = self._recvbuffer.split()[1].split(';')
                     if 'main:err' in self._status: # main:err;error_id;error_message
                        logger.error('%s with message %s' % (self._status[0], self._status[2]))
                        self._result.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
-                       self._urlresult.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
                 # CID
                 elif self._recvbuffer.startswith('##') or not self._recvbuffer: self._cidresult.set(self._recvbuffer)
-                # PAUSE
-                elif self._recvbuffer.startswith(AceMessage.response.PAUSE): self.pause_event()
-                # RESUME
-                elif self._recvbuffer.startswith(AceMessage.response.RESUME): self.play_event()
                 # SHUTDOWN
                 elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
                     self._socket.close()

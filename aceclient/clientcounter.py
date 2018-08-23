@@ -41,6 +41,7 @@ class ClientCounter(object):
             clients = self.clients.get(cid)
             if clients:
                 client.ace = clients[0].ace
+                client.queue = client.ace._streamReaderQueue.copy()
                 clients.append(client)
             else:
                 if self.idleace is not None:
@@ -50,12 +51,10 @@ class ClientCounter(object):
                     try: client.ace = self.createAce()
                     except Exception as e:
                         logging.error('Failed to create AceClient: %s' % repr(e))
-                        raise e
                         return 0
 
                 clients = [client]
                 self.clients[cid] = clients
-            client.queue = client.ace._streamReaderQueue.copy()
             self.total += 1
             return len(clients)
 
@@ -86,7 +85,6 @@ class ClientCounter(object):
             with self.lock:
                 if not cid in self.clients: return
                 clients = self.clients[cid]
-
                 del self.clients[cid]
                 self.total -= len(clients)
                 if self.idleace is not None: clients[0].ace.destroy()

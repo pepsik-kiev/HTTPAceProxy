@@ -34,7 +34,7 @@ try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
-from socket import socket, AF_INET, SOCK_DGRAM
+from socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR
 from base64 import b64encode
 from modules.PluginInterface import AceProxyPlugin
 
@@ -52,7 +52,7 @@ class GeventHTTPServer(HTTPServer):
 
     def process_request_thread(self, request, client_address):
         try: self.finish_request(request, client_address)
-        except SocketException: pass
+        except SocketException: logging.debug(traceback.format_exc()) #pass
         except Exception: self.handle_error(request, client_address)
         finally: self.close_request(request)
 
@@ -231,7 +231,8 @@ class Client:
         self.handler = handler
         self.channelName = channelName
         self.channelIcon = channelIcon
-        self.ace = self.queue = None
+        self.queue = gevent.queue.Queue(maxsize=1024) # buffer with max number of chunks in queue
+        self.ace = None
         self.connectionTime = time.time()
 
     def handle(self, fmt=None):
@@ -279,11 +280,15 @@ class Client:
                     break
                 except: break
         finally:
-            self.queue.queue.clear()
+            self.destroy()
             if transcoder is not None:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
             return
+
+    def destroy(self):
+            self.queue.queue.clear()
+            self.handler.connection.close()
 
 class AceStuff(object):
     '''
@@ -459,8 +464,7 @@ AceStuff.clientcounter = ClientCounter()
 
 #### AceEngine startup
 name = 'ace_engine.exe' if AceConfig.osplatform == 'Windows' else os.path.basename(AceConfig.acecmd)
-ace_pid = findProcess(name)
-AceStuff.ace = None
+ace_pid = findProcess(name); AceStuff.ace = None
 if not ace_pid and AceConfig.acespawn:
    AceStuff.aceProc = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
    if spawnAce(AceStuff.aceProc, AceConfig.acestartuptimeout):
@@ -470,7 +474,8 @@ if not ace_pid and AceConfig.acespawn:
 elif ace_pid:
    AceStuff.ace = psutil.Process(ace_pid)
    logger.info('Local Ace Stream engine found with pid %s' % ace_pid)
-else:
+
+if not AceStuff.ace:
    Engine_found = False
    for engine in AceConfig.acehostslist:
      try:
@@ -481,8 +486,7 @@ else:
              break
      except requests.exceptions.ConnectionError: pass
    if not Engine_found: logger.error('Not found any Ace Stream engine!')
-
-if AceStuff.ace:
+else:
    AceConfig.acehostslist[0][0] = get_ip_address() if AceConfig.httphost in ('', '0.0.0.0') else AceConfig.httphost
    AceConfig.acehost, AceConfig.aceHTTPport = AceConfig.acehostslist[0][0], AceConfig.acehostslist[0][2]
 
