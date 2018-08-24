@@ -52,7 +52,7 @@ class GeventHTTPServer(HTTPServer):
 
     def process_request_thread(self, request, client_address):
         try: self.finish_request(request, client_address)
-        except SocketException: logging.debug(traceback.format_exc()) #pass
+        except SocketException: pass
         except Exception: self.handle_error(request, client_address)
         finally: self.close_request(request)
 
