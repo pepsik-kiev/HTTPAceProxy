@@ -22,10 +22,9 @@ class ClientCounter(object):
 
     def createAce(self):
         logger = logging.getLogger('CreateAce')
+        logger.debug('Create connection to AceEngine.....')
         ace = AceClient(AceConfig.acehostslist, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-        logger.debug("AceClient created")
         ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey)
-        logger.debug("AceClient initialized")
         return ace
 
     def count(self, cid):

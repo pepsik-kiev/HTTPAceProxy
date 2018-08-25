@@ -39,7 +39,14 @@ class PlaylistConfig():
     # Playlist sorting options.
     sort = False
     sortByName = False
-    sortByGroupName = False
+    sortByGroup = False
+
+    # This comparator is used for the playlist sorting.
+    @staticmethod
+    def sortItems(itemlist):
+        if PlaylistConfig.sortByGroup: return sorted(itemlist, key=lambda x:x['group'])
+        elif PlaylistConfig.sortByName: return sorted(itemlist, key=lambda x:x['name'])
+        else: return itemlist
 
     # This method can be used to change a channel info such as name, group etc.
     # The following fields can be changed:
@@ -68,20 +75,6 @@ class PlaylistConfig():
             elif type(value) == unicode:
                 value = replacementsDict.get(value.encode('utf8'))
                 if value: item[setKey] = value.decode('utf8')
-
-    # This comparator is used for the playlist sorting.
-    @staticmethod
-    def compareItems(i1, i2):
-        result = -1
-        if PlaylistConfig.sortByGroupName:
-            result = cmp(i1.get('group', ''), i2.get('group', ''))
-            if result != 0: return result
-
-        if PlaylistConfig.sortByName:
-            result = cmp(i1.get('name', ''), i2.get('name', ''))
-
-        return result
-
 
     xml_template = """<?xml version="1.0" encoding="utf-8"?>
     <items>

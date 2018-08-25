@@ -62,7 +62,6 @@ class GeventHTTPServer(HTTPServer):
 
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
-    protocol_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -86,6 +85,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
+        if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
         logger = logging.getLogger('do_GET')
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
@@ -168,15 +168,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 
-        content_id = self.getCID(self.reqtype, paramsdict[self.reqtype])
-        CID = content_id if content_id else paramsdict[self.reqtype]
-        if not channelName and self.reqtype in ('content_id', 'url', 'infohash'):
-           try:
-               url = 'http://%s:%s/server/api' % (AceConfig.acehost, AceConfig.aceHTTPport)
-               headers = {'User-Agent': 'Magic Browser'}
-               params = {'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype]}
-               channelName = requests.get(url, headers=headers, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
-           except: channelName = CID
+        CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
+        if not channelName: channelName = NAME
         if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Create client
         stream_reader = None
@@ -206,24 +199,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
             return
 
-    def getCID(self, reqtype, url):
-        cid = None
-        if reqtype == 'url' and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
-            try:
-                headers={ 'User-Agent': 'VLC/2.0.5 LibVLC/2.0.5', 'Range': 'bytes=0-', 'Connection': 'close', 'Icy-MetaData': '1' }
-                with requests.get(url, headers=headers, stream=True, timeout=5) as r:
-                   headers={'User-Agent': 'Python-urllib/2.7', 'Content-Type': 'application/octet-stream', 'Connection': 'close'}
-                   cid = requests.post('http://api.torrentstream.net/upload/raw', data=b64encode(r.raw.read()), headers=headers, timeout=5).json()['content_id']
-            except:
-                logging.error('Failed to get ContentID from WEB API')
-                try:
-                    with AceStuff.clientcounter.lock:
-                        if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-                        cid = AceStuff.clientcounter.idleace.GETCID(reqtype, url)
-                except: logging.error('Failed to get ContentID from engine')
-
-        return None if not cid else cid
-
+    def getINFOHASH(self, reqtype, url, idx):
+        if reqtype not in ('direct_url', 'efile_url'):
+          with AceStuff.clientcounter.lock:
+              if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+              contentinfo = AceStuff.clientcounter.idleace.GETCONTENTINFO(reqtype, url)
+              if contentinfo['status'] in (1, 2):
+                 return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
+              else:
+                 logging.error('Failed to get INFOHASH from engine')
+                 return None, None
 class Client:
 
     def __init__(self, cid, handler, channelName, channelIcon):
@@ -245,13 +230,11 @@ class Client:
 
         # Sending client headers to videostream
         if self.handler.connection:
-            SKIP_HEADERS = ['Server', 'Date', 'Accept-Ranges', 'Transfer-Encoding']
-            response_headers = { k:v for (k, v) in list(self.ace._streamReaderConnection.headers.items()) if k not in SKIP_HEADERS }
-
+            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Content-Type': 'application/octet-stream'}
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
+            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
             for k,v in list(response_headers.items()): self.handler.send_header(k,v)
             self.handler.end_headers()
-            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
 
         transcoder = None
         out = self.handler.wfile
@@ -516,7 +499,6 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
 
 # Start complite. Wating for requests
 server = GeventHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
-s = server.socket.getsockname()
-logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (s[0], s[1]))
+logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()

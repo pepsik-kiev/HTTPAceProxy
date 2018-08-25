@@ -39,22 +39,19 @@ class AceConst(object):
 class AceMessage(object):
 
     class request(object):
-        # Requests (from client to acestream)
-        # API Version
-        HELLO = 'HELLOBG version=%s' % AceConst.APIVERSION  # Hello
-        SHUTDOWN = 'SHUTDOWN'
-        SETOPTIONS = 'SETOPTIONS use_stop_notifications=1'
-        STOP = 'STOP'
         # Events form client to engine
-        PAUSEEVENT = 'EVENT pause'
-        PLAYEVENT  = 'EVENT play'
-        STOPEVENT  = 'EVENT stop'
-        SEEKEVENT  = 'EVENT seek'
+        @staticmethod
+        def EVENT(command, params_dict={}):
+            return 'EVENT %s %s' % (command, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
+        # End EVENT
+
+        # Commands from client to acestream
+        HELLO = 'HELLOBG version=%s' % AceConst.APIVERSION
 
         @staticmethod
-        def READY_key(request_key='', product_key=''):
+        def READY(request_key='', product_key=''):
             return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1((request_key + product_key).encode('utf-8')).hexdigest())
-        # End READY_KEY
+        # End READY
 
         @staticmethod
         def LOADASYNC(command, request_id, params_dict):
@@ -93,35 +90,34 @@ class AceMessage(object):
                 return 'START EFILE {efile_url} {stream_type}'.format(**params_dict)
         # End START
 
+        STOP = 'STOP'
+
         @staticmethod
-        def GETCID(checksum, infohash, developer, affiliate, zone):
-            return 'GETCID checksum=%s infohash=%s developer=%s affilate=%s zone=%s' % (checksum, infohash, developer, affiliate, zone)
+        def GETCID(params_dict):
+            return 'GETCID %s' % ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])
+        # End GETCID
+
+        @staticmethod
+        def GETADURL(width, height, infohash, action): pass
+        # End GETADURL
 
         @staticmethod
         def USERDATA(gender, age):
             return 'USERDATA [{"gender": %s}, {"age": %s}]' % (gender, age)
+        # End USERDATA
+
+        @staticmethod
+        def SAVE(infohash, index, path): pass
+        # End SAVE
 
         @staticmethod
         def LIVESEEK(timestamp):
             return 'LIVESEEK %s' % timestamp
+        # End LIVESEEK
 
-    class response(object):
-        # Responses (from acestream to client)
-        HELLO = 'HELLOTS'
-        NOTREADY = 'NOTREADY'
-        START = 'START'
-        STOP = 'STOP'
-        PAUSE = 'PAUSE'
-        RESUME = 'RESUME'
-        LOADRESP = 'LOADRESP'
         SHUTDOWN = 'SHUTDOWN'
-        # Events (from AceEngine to client)
-        AUTH = 'AUTH'
-        GETUSERDATA = 'EVENT getuserdata'
-        LIVEPOS = 'EVENT livepos'
-        DOWNLOADSTOP = 'EVENT download_stopped'
-        SHOWURL = 'EVENT showurl'
-        CANSAVE = 'EVENT cansave'
-        STATE = 'STATE'
-        STATUS = 'STATUS'
-        INFO = 'INFO'
+
+        @staticmethod
+        def SETOPTIONS(params_dict):
+            return 'SETOPTIONS %s' % ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])
+        # End SETOPTIONS

@@ -16,13 +16,13 @@ class PlaylistGenerator(object):
                  m3uheader=config.m3uheader,
                  m3uchanneltemplate=config.m3uchanneltemplate,
                  changeItem=config.changeItem,
-                 comparator=config.compareItems if config.sort else None):
+                 sort=config.sortItems if config.sort else None):
         self.itemlist = list()
         self.m3uemptyheader = m3uemptyheader
         self.m3uheader = m3uheader
         self.m3uchanneltemplate = m3uchanneltemplate
         self.changeItem = changeItem
-        self.comparator = comparator
+        self.sort = sort
 
     def addItem(self, itemdict):
         '''
@@ -61,7 +61,7 @@ class PlaylistGenerator(object):
         else: itemlist = header
 
         self._changeItems()
-        items = sorted(self.itemlist, cmp=self.comparator) if self.comparator else self.itemlist
+        items = self.sort(self.itemlist) if self.sort else self.itemlist
 
         for i in items:
             item = i.copy()

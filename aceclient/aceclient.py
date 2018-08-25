@@ -22,7 +22,7 @@ class AceException(Exception):
 
 class Telnet(telnetlib.Telnet, object):
 
-    if AceConfig.PyVersion == '3':
+    if AceConfig.is_py3:
         def read_until(self, expected, timeout=None):
             expected = bytes(expected, encoding='utf-8')
             received = super(Telnet, self).read_until(expected, timeout)
@@ -48,13 +48,15 @@ class AceClient(object):
         self._product_key = None
         # Current STATUS
         self._status = None
+        # Current EVENT
+        self._event = None
+        # Current STATE
+        self._state = None
         # Current AUTH
         self._gender = None
         self._age = None
         # Result (Created with AsyncResult() on call)
         self._result = AsyncResult()
-        # Result for GETCID()
-        self._cidresult = AsyncResult()
         # Seekback seconds.
         self._seekback = None
         # Did we get START command again? For seekback.
@@ -121,12 +123,14 @@ class AceClient(object):
         logger = logging.getLogger('AceClient_aceInit')
         self._result = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
-        if not self._getResult(timeout=self._resulttimeout):
+        if self._getResult(timeout=self._resulttimeout) is 'NOTREADY': # Get HELLOTS from AceEngine
             errmsg = 'Authentication timeout during AceEngine init! Wrong acekey?' # HELLOTS not resived from engine or Wrong key!
             raise AceException(errmsg)
             return
-        # Display download_stopped massage
-        if self._engine_version_code >= 3003600: self._write(AceMessage.request.SETOPTIONS)
+        else:
+             if self._engine_version_code >= 3003600: # Display download_stopped massage
+                 params_dict = {'use_stop_notifications':'1'}
+                 self._write(AceMessage.request.SETOPTIONS(params_dict))
 
     def _getResult(self, timeout=10.0):
         logger = logging.getLogger('AceClient_getResult') # Logger
@@ -147,7 +151,7 @@ class AceClient(object):
 
         self._result = AsyncResult()
         self._write(AceMessage.request.START(datatype.upper(), value, stream_type))
-        return self._getResult(timeout=float(AceConfig.videotimeout)) #url for play
+        return self._getResult(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
 
     def STOP(self):
         '''
@@ -155,24 +159,29 @@ class AceClient(object):
         '''
         self._result = AsyncResult()
         self._write(AceMessage.request.STOP)
-        self._getResult(timeout=self._resulttimeout)
+        self._getResult(timeout=self._resulttimeout) # Get STATE 0(IDLE) after sendig STOP to AceEngine
 
     def LOADASYNC(self, datatype, params):
         self._result = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
-        return self._getResult(timeout=self._resulttimeout) # _contentinfo or False
+        return self._getResult(timeout=self._resulttimeout) # Get _contentinfo json or False from AceEngine
 
     def GETCONTENTINFO(self, datatype, value):
-        paramsdict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
-        return self.LOADASYNC(datatype, paramsdict)
+        params_dict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
+        return self.LOADASYNC(datatype, params_dict)
 
     def GETCID(self, datatype, url):
         contentinfo = self.GETCONTENTINFO(datatype, url)
-        cid = None
-        if contentinfo:
-           self._cidresult = AsyncResult()
-           self._write(AceMessage.request.GETCID(contentinfo.get('checksum'), contentinfo.get('infohash'), '0', '0', '0'))
-           cid = self._cidresult.get(block=True, timeout=5.0)
+        if contentinfo['status'] in (1, 2):
+            params_dict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
+            self._result = AsyncResult()
+            self._write(AceMessage.request.GETCID(params_dict))
+            cid = self._result.get(timeout=5.0)
+        else:
+            cid = None
+            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
+            raise AceException(errmsg)
+
         return '' if cid is None or cid == '' else cid[2:]
 
     def startStreamReader(self, url, cid, counter, req_headers=None):
@@ -188,7 +197,6 @@ class AceClient(object):
               self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
 
               if url.endswith('.m3u8'):
-                 self._streamReaderConnection.headers = {'Content-Type': 'application/octet-stream', 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100'}
                  popen_params = { "bufsize": requests.models.CONTENT_CHUNK_SIZE,
                                   "stdout" : gevent.subprocess.PIPE,
                                   "stderr" : None,
@@ -209,6 +217,8 @@ class AceClient(object):
               else: out = self._streamReaderConnection.raw
 
               self._streamReaderState.set()
+              self._write(AceMessage.request.EVENT('play'))
+
               while 1:
                  gevent.sleep()
                  clients = counter.getClients(cid)
@@ -242,7 +252,6 @@ class AceClient(object):
                 logger.error(traceback.format_exc())
           finally:
                 self.closeStreamReader()
-                self._streamReaderState.clear()
                 if transcoder:
                    try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                    except: pass
@@ -255,6 +264,7 @@ class AceClient(object):
            self._streamReaderConnection.close()
         self._streamReaderConnection = None
         self._streamReaderQueue.queue.clear()
+        self._streamReaderState.clear()
 
     def _recvData(self):
         '''
@@ -274,59 +284,68 @@ class AceClient(object):
                 return
             else: # Parsing everything only if the string is not empty
                 # HELLOTS
-                if self._recvbuffer.startswith(AceMessage.response.HELLO):
-                    try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
-                    except: params = {}; raise AceException("Can't parse HELLOTS")
+                if self._recvbuffer.startswith('HELLOTS'):
+                    params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     self._engine_version_code = int(params.get('version_code', 0))
-                    self._write(AceMessage.request.READY_key(params.get('key',''), self._product_key))
+                    self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
                 # NOTREADY
-                elif self._recvbuffer.startswith(AceMessage.response.NOTREADY): self._result.set(False)
+                elif self._recvbuffer.startswith('NOTREADY'): self._result.set('NOTREADY')
                 # AUTH
-                elif self._recvbuffer.startswith(AceMessage.response.AUTH): self._result.set(True)
-                # GETUSERDATA
-                elif self._recvbuffer.startswith(AceMessage.response.GETUSERDATA):
-                    self._write(AceMessage.request.USERDATA(self._gender, self._age))
+                elif self._recvbuffer.startswith('AUTH'): self._result.set(self._recvbuffer.split()[1]) # user_auth_level
                 # START
-                elif self._recvbuffer.startswith(AceMessage.response.START):
-                    try: params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
-                    except: params = {}; raise AceException("Can't parse START")
-                    if not self._seekback or (self._seekback and self._started_again.ready()) or params.get('stream','') is not '1':
+                elif self._recvbuffer.startswith('START'):
+                    params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
+                    if not self._seekback or self._started_again.ready() or params.get('stream','') is not '1':
                         # If seekback is disabled, we use link in first START command.
                         # If seekback is enabled, we wait for first START command and
                         # ignore it, then do seekback in first EVENT position command
                         # AceStream sends us STOP and START again with new link.
                         # We use only second link then.
                         self._result.set(self._recvbuffer.split()[1])
-                        self._started_again.clear()
-                    else: logger.debug('START received. Waiting for %s' % AceMessage.response.LIVEPOS)
-                # LIVEPOS
-                if self._recvbuffer.startswith(AceMessage.response.LIVEPOS):
-                    if self._seekback and not self._started_again.ready(): # if seekback
-                        try:
-                             params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
-                             self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
-                             self._started_again.set()
-                        except: raise AceException("Can't parse %s" % AceMessage.response.LIVEPOS)
                 # LOADRESP
-                elif self._recvbuffer.startswith(AceMessage.response.LOADRESP):
-                    _contentinfo = json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:])))
-                    if _contentinfo.get('status') == 100:
-                        self._result.set(False)
-                        self._result.set_exception(AceException('LOADASYNC returned error with message: %s' % _contentinfo.get('message')))
-                    else: self._result.set(_contentinfo)
+                elif self._recvbuffer.startswith('LOADRESP'):
+                        self._result.set(json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:]))))
                 # STATE
-                elif self._recvbuffer.startswith(AceMessage.response.STATE):
-                    if self._recvbuffer.split()[1] is '0': self._result.set(True) #state_id: 0(IDLE)
+                elif self._recvbuffer.startswith('STATE'):
+                    self._state = self._recvbuffer.split()[1] # state_id
+                    if self._state is '0': # 0(IDLE)
+                        self._result.set(self._write(AceMessage.request.EVENT('stop')))
+                    elif self._state is '1': pass # 1 (PREBUFFERING)
+                    elif self._state is '2': pass # 2 (DOWNLOADING)
+                    elif self._state is '3': pass # 3 (BUFFERING)
+                    elif self._state is '4': pass # 4 (COMPLETED)
+                    elif self._state is '5': pass # 5 (CHECKING)
+                    elif self._state is '6': pass # 6 (ERROR)
+
                 # STATUS
-                elif self._recvbuffer.startswith(AceMessage.response.STATUS):
+                elif self._recvbuffer.startswith('STATUS'):
                     self._status = self._recvbuffer.split()[1].split(';')
                     if 'main:err' in self._status: # main:err;error_id;error_message
-                       logger.error('%s with message %s' % (self._status[0], self._status[2]))
                        self._result.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
                 # CID
-                elif self._recvbuffer.startswith('##') or not self._recvbuffer: self._cidresult.set(self._recvbuffer)
+                elif self._recvbuffer.startswith('##'): self._result.set(self._recvbuffer)
+                # INFO
+                elif self._recvbuffer.startswith('INFO'): pass
+                # EVENT
+                elif self._recvbuffer.startswith('EVENT'):
+                    self._event = self._recvbuffer.split()
+                    if 'livepos' in self._event:
+                       if self._seekback and not self._started_again.ready(): # if seekback
+                           params = { k:v for k,v in (x.split('=') for x in self._event if '=' in x) }
+                           self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
+                           self._started_again.set()
+                    elif 'getuserdata' in self._event: self._write(AceMessage.request.USERDATA(self._gender, self._age))
+                    elif 'cansave' in self._event: pass
+                    elif 'showurl' in self._event: pass
+                    elif 'download_stopped' in self._event: pass
+                # PAUSE
+                elif self._recvbuffer.startswith('PAUSE'): self._write(AceMessage.request.EVENT('pause'))
+                # RESUME
+                elif self._recvbuffer.startswith('RESUME'): self._write(AceMessage.request.EVENT('play'))
+                # STOP
+                elif self._recvbuffer.startswith('STOP'): pass
                 # SHUTDOWN
-                elif self._recvbuffer.startswith(AceMessage.response.SHUTDOWN):
+                elif self._recvbuffer.startswith('SHUTDOWN'):
                     self._socket.close()
                     logger.debug('AceClient destroyed')
                     return
