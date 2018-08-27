@@ -109,7 +109,7 @@ class AceClient(object):
         try:
             logger = logging.getLogger('AceClient_write')
             logger.debug('>>> %s' % message)
-            self._socket.write( '{}\r\n'.format(message) )
+            self._socket.write('%s\r\n' % message)
         except EOFError as e: raise AceException('Write error! %s' % repr(e))
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=AceConfig.acekey):
@@ -121,16 +121,26 @@ class AceClient(object):
         self._result.set()
 
         logger = logging.getLogger('AceClient_aceInit')
+
         self._result = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
-        if self._getResult(timeout=self._resulttimeout) is 'NOTREADY': # Get HELLOTS from AceEngine
-            errmsg = 'Authentication timeout during AceEngine init! Wrong acekey?' # HELLOTS not resived from engine or Wrong key!
+        try: params = self._getResult(timeout=self._resulttimeout)
+        except:
+            errmsg = 'HELLOTS not resived from engine!'
             raise AceException(errmsg)
             return
-        else:
-             if self._engine_version_code >= 3003600: # Display download_stopped massage
-                 params_dict = {'use_stop_notifications':'1'}
-                 self._write(AceMessage.request.SETOPTIONS(params_dict))
+        self._engine_version_code = int(params.get('version_code', 0))
+
+        self._result = AsyncResult()
+        self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
+        if self._getResult(timeout=self._resulttimeout) is 'NOTREADY': # Get AUTH ot NOTREADY
+            errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
+            raise AceException(errmsg)
+            return
+
+        if self._engine_version_code >= 3003600: # Display download_stopped massage
+            params_dict = {'use_stop_notifications':'1'}
+            self._write(AceMessage.request.SETOPTIONS(params_dict))
 
     def _getResult(self, timeout=10.0):
         logger = logging.getLogger('AceClient_getResult') # Logger
@@ -164,7 +174,7 @@ class AceClient(object):
     def LOADASYNC(self, datatype, params):
         self._result = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
-        return self._getResult(timeout=self._resulttimeout) # Get _contentinfo json or False from AceEngine
+        return self._getResult(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
 
     def GETCONTENTINFO(self, datatype, value):
         params_dict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
@@ -181,15 +191,25 @@ class AceClient(object):
             cid = None
             errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
             raise AceException(errmsg)
-
         return '' if cid is None or cid == '' else cid[2:]
+
+    def GETINFOHASH(self, datatype, url, idx):
+        contentinfo = self.GETCONTENTINFO(datatype, url)
+        if contentinfo['status'] in (1, 2):
+            return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
+        elif contentinfo['status'] == 0:
+           errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
+           raise AceException(errmsg)
+        else:
+           errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
+           raise AceException(errmsg)
+        return None, None
 
     def startStreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger('StreamReader')
         logger.debug('Open video stream: %s' % url)
         transcoder = None
 
-        if 'range' in req_headers: del req_headers['range']
         logger.debug('Get headers from client: %s' % req_headers)
 
         with requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout)) as self._streamReaderConnection:
@@ -247,9 +267,8 @@ class AceClient(object):
                 logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
           except requests.exceptions.RequestException:
                 logger.error('There was an ambiguous exception that occurred while handling request')
-          except:
-                logger.error('Unexpected error in streamreader')
-                logger.error(traceback.format_exc())
+          except Exception as err:
+                logger.error('Unexpected error in streamreader %s' % repr(err))
           finally:
                 self.closeStreamReader()
                 if transcoder:
@@ -285,15 +304,15 @@ class AceClient(object):
             else: # Parsing everything only if the string is not empty
                 # HELLOTS
                 if self._recvbuffer.startswith('HELLOTS'):
-                    params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
-                    self._engine_version_code = int(params.get('version_code', 0))
-                    self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
+                    # version=engine_version version_code=version_code key=request_key http_port=http_port
+                    self._result.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
                 # NOTREADY
                 elif self._recvbuffer.startswith('NOTREADY'): self._result.set('NOTREADY')
                 # AUTH
                 elif self._recvbuffer.startswith('AUTH'): self._result.set(self._recvbuffer.split()[1]) # user_auth_level
                 # START
                 elif self._recvbuffer.startswith('START'):
+                    # url [ad=1 [interruptable=1]] [stream=1] [pos=position]
                     params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
                     if not self._seekback or self._started_again.ready() or params.get('stream','') is not '1':
                         # If seekback is disabled, we use link in first START command.
@@ -301,7 +320,7 @@ class AceClient(object):
                         # ignore it, then do seekback in first EVENT position command
                         # AceStream sends us STOP and START again with new link.
                         # We use only second link then.
-                        self._result.set(self._recvbuffer.split()[1])
+                        self._result.set(self._recvbuffer.split()[1]) # url for play
                 # LOADRESP
                 elif self._recvbuffer.startswith('LOADRESP'):
                         self._result.set(json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:]))))
@@ -316,12 +335,8 @@ class AceClient(object):
                     elif self._state is '4': pass # 4 (COMPLETED)
                     elif self._state is '5': pass # 5 (CHECKING)
                     elif self._state is '6': pass # 6 (ERROR)
-
                 # STATUS
-                elif self._recvbuffer.startswith('STATUS'):
-                    self._status = self._recvbuffer.split()[1].split(';')
-                    if 'main:err' in self._status: # main:err;error_id;error_message
-                       self._result.set_exception(AceException('%s with message %s' % (self._status[0], self._status[2])))
+                elif self._recvbuffer.startswith('STATUS'): pass
                 # CID
                 elif self._recvbuffer.startswith('##'): self._result.set(self._recvbuffer)
                 # INFO

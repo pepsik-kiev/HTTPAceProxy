@@ -167,23 +167,23 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-
-        CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-        if not channelName: channelName = NAME
-        if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
-        # Create client
-        stream_reader = None
-        self.client = Client(CID, self, channelName, channelIcon)
+        CID = None
         try:
+            CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
+            if not channelName: channelName = NAME
+            if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
+            # Create client
+            stream_reader = None
+            self.client = Client(CID, self, channelName, channelIcon)
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.add(CID, self.client) == 1:
                 logger.warning('Create a broadcast "%s"' % self.client.channelName)
                 # Send START commands to AceEngine and Getting URL from engine
-                self.url = self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
+                url = self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 # Rewriting host:port for remote Ace Stream Engine
-                self.url = requests.compat.urlparse(self.url)._replace(netloc='%s:%s' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
+                url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                 # Start streamreader for broadcast
-                stream_reader = gevent.spawn(self.client.ace.startStreamReader, self.url, CID, AceStuff.clientcounter, dict(self.headers))
+                stream_reader = gevent.spawn(self.client.ace.startStreamReader, url, CID, AceStuff.clientcounter, dict(self.headers))
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
@@ -194,21 +194,17 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.client.handle(self.reqparams.get('fmt', [''])[0])
             logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
         finally:
-            if AceStuff.clientcounter.delete(CID, self.client) == 0:
-                 logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
-                 if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
-            return
+            if CID and AceStuff.clientcounter.delete(CID, self.client) == 0:
+                logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
+                if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
+        return
 
     def getINFOHASH(self, reqtype, url, idx):
         if reqtype not in ('direct_url', 'efile_url'):
           with AceStuff.clientcounter.lock:
-              if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
-              contentinfo = AceStuff.clientcounter.idleace.GETCONTENTINFO(reqtype, url)
-              if contentinfo['status'] in (1, 2):
-                 return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
-              else:
-                 logging.error('Failed to get INFOHASH from engine')
-                 return None, None
+             if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = AceStuff.clientcounter.createAce()
+          return AceStuff.clientcounter.idleace.GETINFOHASH(reqtype, url, idx)
+
 class Client:
 
     def __init__(self, cid, handler, channelName, channelIcon):
@@ -228,7 +224,7 @@ class Client:
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
 
-        # Sending client headers to videostream
+        # Sending videostream headers to client
         if self.handler.connection:
             response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Content-Type': 'application/octet-stream'}
             self.handler.send_response(self.ace._streamReaderConnection.status_code)
