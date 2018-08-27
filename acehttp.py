@@ -167,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        CID = None
+        self.client = None
         try:
             CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
             if not channelName: channelName = NAME
@@ -194,7 +194,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.client.handle(self.reqparams.get('fmt', [''])[0])
             logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
         finally:
-            if CID and AceStuff.clientcounter.delete(CID, self.client) == 0:
+            if self.client and AceStuff.clientcounter.delete(CID, self.client) == 0:
                 logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
                 if stream_reader and not stream_reader.ready(): stream_reader.join(timeout=3)
         return
