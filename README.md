@@ -8,3 +8,5 @@ Installed ffmpeg is an optional, but highly recommended, for fine tuning for you
 HTTPAceProxy supports Ace Stream Content-ID hashes (PIDs), .acelive files, infohash, usual torrent files
 and has a different plugins for simple use with SmartTV, KODI, VLC etc. for [TorrentTV](http://torrent-tv.ru/), [AllFon](http://allfon-tv.com/),
 [Torrent monitor](https://github.com/ElizarovEugene/TorrentMonitor) and other.
+
+**Be careful with viewing torrent files. You can get copyright abuse with a huge fines ! It depends on the copyright legislation of your country !**

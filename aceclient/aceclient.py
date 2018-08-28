@@ -7,7 +7,6 @@ import traceback
 import telnetlib
 import logging
 import requests
-import json
 import time
 import random
 
@@ -22,7 +21,7 @@ class AceException(Exception):
 
 class Telnet(telnetlib.Telnet, object):
 
-    if AceConfig.is_py3:
+    if requests.compat.is_py3:
         def read_until(self, expected, timeout=None):
             expected = bytes(expected, encoding='utf-8')
             received = super(Telnet, self).read_until(expected, timeout)
@@ -118,7 +117,6 @@ class AceClient(object):
         self._age = age
         self._seekback = AceConfig.videoseekback
         self._started_again.clear()
-        self._result.set()
 
         logger = logging.getLogger('AceClient_aceInit')
 
@@ -133,13 +131,13 @@ class AceClient(object):
 
         self._result = AsyncResult()
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
-        if self._getResult(timeout=self._resulttimeout) is 'NOTREADY': # Get AUTH ot NOTREADY
+        if not self._getResult(timeout=self._resulttimeout): # Get NOTREADY instead AUTH user_auth_level
             errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
             raise AceException(errmsg)
             return
 
         if self._engine_version_code >= 3003600: # Display download_stopped massage
-            params_dict = {'use_stop_notifications':'1'}
+            params_dict = {'use_stop_notifications': '1'}
             self._write(AceMessage.request.SETOPTIONS(params_dict))
 
     def _getResult(self, timeout=10.0):
@@ -155,12 +153,12 @@ class AceClient(object):
         Returns the url provided by AceEngine
         '''
         if stream_type == 'hls' and self._engine_version_code >= 3010500:
-           stream_type = 'output_format=hls transcode_audio=%s transcode_mp3=%s transcode_ac3=%s preferred_audio_language=%s' % \
-                         (AceConfig.transcode_audio, AceConfig.transcode_mp3, AceConfig.transcode_ac3, AceConfig.preferred_audio_language)
-        else: stream_type = 'output_format=http'
-
+           params_dict = { 'output_format': stream_type, 'transcode_audio': AceConfig.transcode_audio,
+                           'transcode_mp3': AceConfig.transcode_mp3, 'transcode_ac3': AceConfig.transcode_ac3,
+                           'preferred_audio_language': AceConfig.preferred_audio_language }
+        else: params_dict = { 'output_format': 'http' }
         self._result = AsyncResult()
-        self._write(AceMessage.request.START(datatype.upper(), value, stream_type))
+        self._write(AceMessage.request.START(datatype.upper(), value, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])))
         return self._getResult(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
 
     def STOP(self):
@@ -193,7 +191,7 @@ class AceClient(object):
             raise AceException(errmsg)
         return '' if cid is None or cid == '' else cid[2:]
 
-    def GETINFOHASH(self, datatype, url, idx):
+    def GETINFOHASH(self, datatype, url, idx=0):
         contentinfo = self.GETCONTENTINFO(datatype, url)
         if contentinfo['status'] in (1, 2):
             return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
@@ -244,17 +242,17 @@ class AceClient(object):
                  clients = counter.getClients(cid)
                  if clients:
                      try:
-                         data = out.read(requests.models.CONTENT_CHUNK_SIZE)
-                         try: self._streamReaderQueue.put_nowait(data)
+                         chunk = out.read(requests.models.CONTENT_CHUNK_SIZE)
+                         try: self._streamReaderQueue.put_nowait(chunk)
                          except gevent.queue.Full:
                               self._streamReaderQueue.get_nowait()
-                              self._streamReaderQueue.put_nowait(data)
+                              self._streamReaderQueue.put_nowait(chunk)
                      except requests.packages.urllib3.exceptions.ReadTimeoutError:
                          logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
                      except: break
                      else:
                          for c in clients:
-                            try: c.queue.put(data, timeout=5)
+                            try: c.queue.put(chunk, timeout=5)
                             except gevent.queue.Full:
                                 if len(clients) > 1:
                                     logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
@@ -278,12 +276,11 @@ class AceClient(object):
 
     def closeStreamReader(self):
         logger = logging.getLogger('StreamReader')
+        self._streamReaderState.clear()
         if self._streamReaderConnection:
            logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
            self._streamReaderConnection.close()
-        self._streamReaderConnection = None
         self._streamReaderQueue.queue.clear()
-        self._streamReaderState.clear()
 
     def _recvData(self):
         '''
@@ -307,7 +304,7 @@ class AceClient(object):
                     # version=engine_version version_code=version_code key=request_key http_port=http_port
                     self._result.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
                 # NOTREADY
-                elif self._recvbuffer.startswith('NOTREADY'): self._result.set('NOTREADY')
+                elif self._recvbuffer.startswith('NOTREADY'): self._result.set(False)
                 # AUTH
                 elif self._recvbuffer.startswith('AUTH'): self._result.set(self._recvbuffer.split()[1]) # user_auth_level
                 # START
@@ -323,18 +320,18 @@ class AceClient(object):
                         self._result.set(self._recvbuffer.split()[1]) # url for play
                 # LOADRESP
                 elif self._recvbuffer.startswith('LOADRESP'):
-                        self._result.set(json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:]))))
+                        self._result.set(requests.compat.json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:]))))
                 # STATE
                 elif self._recvbuffer.startswith('STATE'):
                     self._state = self._recvbuffer.split()[1] # state_id
-                    if self._state is '0': # 0(IDLE)
+                    if self._state == '0': # 0(IDLE)
                         self._result.set(self._write(AceMessage.request.EVENT('stop')))
-                    elif self._state is '1': pass # 1 (PREBUFFERING)
-                    elif self._state is '2': pass # 2 (DOWNLOADING)
-                    elif self._state is '3': pass # 3 (BUFFERING)
-                    elif self._state is '4': pass # 4 (COMPLETED)
-                    elif self._state is '5': pass # 5 (CHECKING)
-                    elif self._state is '6': pass # 6 (ERROR)
+                    elif self._state == '1': pass # 1 (PREBUFFERING)
+                    elif self._state == '2': pass # 2 (DOWNLOADING)
+                    elif self._state == '3': pass # 3 (BUFFERING)
+                    elif self._state == '4': pass # 4 (COMPLETED)
+                    elif self._state == '5': pass # 5 (CHECKING)
+                    elif self._state == '6': pass # 6 (ERROR)
                 # STATUS
                 elif self._recvbuffer.startswith('STATUS'): pass
                 # CID

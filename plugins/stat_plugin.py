@@ -11,7 +11,6 @@ from gevent.subprocess import Popen, PIPE
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 import psutil
-import json
 import time
 import logging, re
 import requests
@@ -140,7 +139,7 @@ class Stat(AceProxyPlugin):
 
                     response['clients_data'].append(client_data)
 
-            connection.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+            connection.wfile.write(requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8'))
 
         else:
 

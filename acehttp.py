@@ -266,8 +266,8 @@ class Client:
             return
 
     def destroy(self):
+            if self.handler.connection: self.handler.connection.close()
             self.queue.queue.clear()
-            self.handler.connection.close()
 
 class AceStuff(object):
     '''

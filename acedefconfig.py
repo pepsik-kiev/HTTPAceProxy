@@ -63,5 +63,3 @@ class AceDefConfig(object):
             return True
 
     osplatform = platform.system()
-    #: Python 3.x?
-    is_py3 = (platform.python_version_tuple()[0] == '3')

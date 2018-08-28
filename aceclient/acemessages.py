@@ -55,17 +55,18 @@ class AceMessage(object):
 
         @staticmethod
         def LOADASYNC(command, request_id, params_dict):
+            params_dict['request_id'] = request_id
             if command == 'URL':
-                return 'LOADASYNC %s TORRENT ' % request_id + '{url} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
+                return 'LOADASYNC {request_id} TORRENT {url} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
             elif command == 'INFOHASH':
-                return 'LOADASYNC %s INFOHASH ' % request_id + '{infohash} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
+                return 'LOADASYNC {request_id} INFOHASH {infohash} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
             elif command == 'DATA':
-                return 'LOADASYNC %s RAW ' % request_id + '{data} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
+                return 'LOADASYNC {request_id} RAW {data} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
             elif command == 'CONTENT_ID':
-                return 'LOADASYNC %s PID ' % request_id + '{content_id}'.format(**params_dict)
+                return 'LOADASYNC {request_id} PID {content_id}'.format(**params_dict)
         # End LOADASYNC
 
         @staticmethod
