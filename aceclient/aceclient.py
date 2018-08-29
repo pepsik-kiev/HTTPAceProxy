@@ -210,66 +210,66 @@ class AceClient(object):
 
         logger.debug('Get headers from client: %s' % req_headers)
 
-        with requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout)) as self._streamReaderConnection:
-          try:
+        try:
+           if url.endswith('.m3u8'):
+              logger.warning('HLS stream detected. Ffmpeg transcoding started')
+              popen_params = { 'bufsize': requests.models.CONTENT_CHUNK_SIZE,
+                               'stdout' : gevent.subprocess.PIPE,
+                               'stderr' : None,
+                               'shell'  : False }
+
+              if AceConfig.osplatform == 'Windows':
+                    ffmpeg_cmd = 'ffmpeg.exe '
+                    CREATE_NO_WINDOW = 0x08000000
+                    CREATE_NEW_PROCESS_GROUP = 0x00000200
+                    DETACHED_PROCESS = 0x00000008
+                    popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+              else: ffmpeg_cmd = 'ffmpeg '
+
+              ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+              transcoder = gevent.subprocess.Popen(ffmpeg_cmd.split(), **popen_params)
+              out = transcoder.stdout
+           else:
+              self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout))
               self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
+              out = self._streamReaderConnection.raw
 
-              if url.endswith('.m3u8'):
-                 popen_params = { "bufsize": requests.models.CONTENT_CHUNK_SIZE,
-                                  "stdout" : gevent.subprocess.PIPE,
-                                  "stderr" : None,
-                                  "shell"  : False }
+           self._streamReaderState.set()
+           self._write(AceMessage.request.EVENT('play'))
 
-                 if AceConfig.osplatform == 'Windows':
-                       ffmpeg_cmd = 'ffmpeg.exe '
-                       CREATE_NO_WINDOW = 0x08000000
-                       CREATE_NEW_PROCESS_GROUP = 0x00000200
-                       DETACHED_PROCESS = 0x00000008
-                       popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                 else: ffmpeg_cmd = 'ffmpeg '
-
-                 ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
-                 transcoder = gevent.subprocess.Popen(ffmpeg_cmd.split(), **popen_params)
-                 out = transcoder.stdout
-                 logger.warning('HLS stream detected. Ffmpeg transcoding started')
-              else: out = self._streamReaderConnection.raw
-
-              self._streamReaderState.set()
-              self._write(AceMessage.request.EVENT('play'))
-
-              while 1:
-                 gevent.sleep()
-                 clients = counter.getClients(cid)
-                 if clients:
-                     try:
-                         chunk = out.read(requests.models.CONTENT_CHUNK_SIZE)
-                         try: self._streamReaderQueue.put_nowait(chunk)
+           while 1:
+              gevent.sleep()
+              clients = counter.getClients(cid)
+              if clients:
+                  try:
+                      chunk = out.read(requests.models.CONTENT_CHUNK_SIZE)
+                      try: self._streamReaderQueue.put_nowait(chunk)
+                      except gevent.queue.Full:
+                           self._streamReaderQueue.get_nowait()
+                           self._streamReaderQueue.put_nowait(chunk)
+                  except requests.packages.urllib3.exceptions.ReadTimeoutError:
+                      logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+                  except: break
+                  else:
+                      for c in clients:
+                         try: c.queue.put(chunk, timeout=5)
                          except gevent.queue.Full:
-                              self._streamReaderQueue.get_nowait()
-                              self._streamReaderQueue.put_nowait(chunk)
-                     except requests.packages.urllib3.exceptions.ReadTimeoutError:
-                         logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
-                     except: break
-                     else:
-                         for c in clients:
-                            try: c.queue.put(chunk, timeout=5)
-                            except gevent.queue.Full:
-                                if len(clients) > 1:
-                                    logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
-                                    c.destroy()
-                            except gevent.GreenletExit: pass
+                             if len(clients) > 1:
+                                 logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
+                                 c.destroy()
+                         except gevent.GreenletExit: pass
 
-                 else: logger.debug('All clients disconnected - broadcast stoped'); break
+              else: logger.debug('All clients disconnected - broadcast stoped'); break
 
-          except requests.exceptions.HTTPError as err:
+        except requests.exceptions.HTTPError as err:
                 logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
-          except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException:
                 logger.error('There was an ambiguous exception that occurred while handling request')
-          except Exception as err:
+        except Exception as err:
                 logger.error('Unexpected error in streamreader %s' % repr(err))
-          finally:
+        finally:
                 self.closeStreamReader()
-                if transcoder:
+                if transcoder is not None:
                    try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                    except: pass
                 counter.deleteAll(cid)
