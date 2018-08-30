@@ -64,7 +64,7 @@ class AceClient(object):
         self._idleSince = time.time()
         self._streamReaderConnection = None
         self._streamReaderState = Event()
-        self._streamReaderBufferSize = AsyncResult()
+        self._streamReaderBufferSize = AsyncResult() # Streamreader buffer current length
         self._streamReaderQueue = gevent.queue.Queue(maxsize=1024) # Ring buffer with max number of chunks in queue
         self._engine_version_code = None
 
@@ -244,8 +244,7 @@ class AceClient(object):
               if clients:
                   try:
                       chunk = out.read(requests.models.CONTENT_CHUNK_SIZE)
-                      try:
-                          self._streamReaderQueue.put_nowait(chunk)
+                      try: self._streamReaderQueue.put_nowait(chunk)
                       except gevent.queue.Full:
                            self._streamReaderQueue.get_nowait()
                            self._streamReaderQueue.put_nowait(chunk)

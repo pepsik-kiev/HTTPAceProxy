@@ -223,9 +223,9 @@ class Client:
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
 
-        start = time.time()
+        start = time.time() + 5.0
         while self.handler.connection and self.ace._streamReaderState.ready():
-            remaining = start + 5.0 - time.time()
+            remaining = start - time.time()
             self.ace._streamReaderBufferSize = gevent.event.AsyncResult()
             try:
                 if self.ace._streamReaderBufferSize.get(timeout=5.0) >= 1024: break
