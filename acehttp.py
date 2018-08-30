@@ -212,8 +212,7 @@ class Client:
         self.handler = handler
         self.channelName = channelName
         self.channelIcon = channelIcon
-        self.queue = gevent.queue.Queue(maxsize=1024) # buffer with max number of chunks in queue
-        self.ace = None
+        self.ace = self.queue = None
         self.connectionTime = time.time()
 
     def handle(self, fmt=None):
@@ -223,6 +222,18 @@ class Client:
         if self.handler.connection and not self.ace._streamReaderState.wait(timeout=5.0):
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
+
+        start = time.time()
+        while self.handler.connection and self.ace._streamReaderState.ready():
+            remaining = start + 5.0 - time.time()
+            self.ace._streamReaderBufferSize = gevent.event.AsyncResult()
+            try:
+                if self.ace._streamReaderBufferSize.get(timeout=5.0) >= 1024: break
+            except gevent.Timeout: break
+            else:
+                 if remaining > 0: pass
+                 else: break
+        logger.debug('Broadcast start buffer size: %s' % self.queue.qsize())
 
         # Sending videostream headers to client
         if self.handler.connection:
@@ -266,7 +277,7 @@ class Client:
 
     def destroy(self):
             if self.handler.connection: self.handler.connection.close()
-            self.queue.queue.clear()
+            if self.queue is not None: self.queue.queue.clear()
 
 class AceStuff(object):
     '''

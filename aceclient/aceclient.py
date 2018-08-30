@@ -64,6 +64,7 @@ class AceClient(object):
         self._idleSince = time.time()
         self._streamReaderConnection = None
         self._streamReaderState = Event()
+        self._streamReaderBufferSize = AsyncResult()
         self._streamReaderQueue = gevent.queue.Queue(maxsize=1024) # Ring buffer with max number of chunks in queue
         self._engine_version_code = None
 
@@ -243,10 +244,12 @@ class AceClient(object):
               if clients:
                   try:
                       chunk = out.read(requests.models.CONTENT_CHUNK_SIZE)
-                      try: self._streamReaderQueue.put_nowait(chunk)
+                      try:
+                          self._streamReaderQueue.put_nowait(chunk)
                       except gevent.queue.Full:
                            self._streamReaderQueue.get_nowait()
                            self._streamReaderQueue.put_nowait(chunk)
+                      finally: self._streamReaderBufferSize.set(self._streamReaderQueue.qsize())
                   except requests.packages.urllib3.exceptions.ReadTimeoutError:
                       logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
                   except: break
@@ -281,6 +284,7 @@ class AceClient(object):
            logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
            self._streamReaderConnection.close()
         self._streamReaderQueue.queue.clear()
+        self._streamReaderBufferSize.set()
 
     def _recvData(self):
         '''
