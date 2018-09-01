@@ -167,13 +167,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        self.client = None
+        stream_reader = self.client = None
         try:
             CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
             if not channelName: channelName = NAME
             if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
             # Create client
-            stream_reader = None
             self.client = Client(CID, self, channelName, channelIcon)
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.add(CID, self.client) == 1:
@@ -212,7 +211,8 @@ class Client:
         self.handler = handler
         self.channelName = channelName
         self.channelIcon = channelIcon
-        self.ace = self.queue = None
+        self.ace = None
+        self.queue = gevent.queue.Queue(maxsize=1024) # buffer with max number of chunks in queue
         self.connectionTime = time.time()
 
     def handle(self, fmt=None):
@@ -223,17 +223,18 @@ class Client:
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
 
-        start = time.time() + 5.0
-        while self.handler.connection and self.ace._streamReaderState.ready():
-            remaining = start - time.time()
-            self.ace._streamReaderBufferSize = gevent.event.AsyncResult()
-            try:
-                if self.ace._streamReaderBufferSize.get(timeout=5.0) >= 1024: break
-            except gevent.Timeout: break
-            else:
-                 if remaining > 0: pass
-                 else: break
-        logger.debug('Broadcast start buffer size: %s' % self.queue.qsize())
+        if 1 <= AceConfig.videostartbuffertime <= 5:
+            start = time.time() + AceConfig.startbuffertime
+            while self.handler.connection and self.ace._streamReaderState.ready():
+                remaining = start - time.time()
+                self.ace._streamReaderQueueSize = gevent.event.AsyncResult()
+                try:
+                    if self.ace._streamReaderQueueSize.get(timeout=5.0) >= 1024: break
+                except gevent.Timeout: break
+                else:
+                    if remaining > 0: pass
+                    else: break
+            logger.debug('Broadcast start buffer size: %s' % self.queue.qsize())
 
         # Sending videostream headers to client
         if self.handler.connection:
@@ -277,7 +278,7 @@ class Client:
 
     def destroy(self):
             if self.handler.connection: self.handler.connection.close()
-            if self.queue is not None: self.queue.queue.clear()
+            self.queue.queue.clear()
 
 class AceStuff(object):
     '''
