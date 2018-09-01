@@ -224,7 +224,7 @@ class Client:
             return
 
         if 1 <= AceConfig.videostartbuffertime <= 5:
-            start = time.time() + AceConfig.startbuffertime
+            start = time.time() + AceConfig.videostartbuffertime
             while self.handler.connection and self.ace._streamReaderState.ready():
                 remaining = start - time.time()
                 self.ace._streamReaderQueueSize = gevent.event.AsyncResult()
