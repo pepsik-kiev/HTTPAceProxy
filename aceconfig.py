@@ -66,7 +66,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Waiting time response from AceEngine server for playable url or data In seconds.
     videotimeout = 60
     # Time in seconds allocated to fill the start buffer of the broadcast
-    # Valid values ​​are from 1 to 5 sec  
+    # Valid values from 1 to 50 sec
     # 0 - disable
     videostartbuffertime = 5
     #
