@@ -31,7 +31,6 @@ class Telnet(telnetlib.Telnet, object):
             buffer = bytes(buffer, encoding='utf-8')
             super(Telnet, self).write(buffer)
 
-
 class AceClient(object):
 
     def __init__(self, acehostslist, connect_timeout=5, result_timeout=10):
@@ -45,28 +44,29 @@ class AceClient(object):
         self._shuttingDown = Event()
         # Product key
         self._product_key = None
+        # Result (Created with AsyncResult() on call)
+        self._result = AsyncResult()
         # Current STATUS
-        self._status = None
+        self._status = AsyncResult()
         # Current EVENT
-        self._event = None
+        self._event = AsyncResult()
         # Current STATE
-        self._state = None
+        self._state = AsyncResult()
         # Current AUTH
         self._gender = None
         self._age = None
-        # Result (Created with AsyncResult() on call)
-        self._result = AsyncResult()
         # Seekback seconds.
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
-
+        # AceEngine version code
+        self._engine_version_code = None
+        # AceEngine idle time
         self._idleSince = time.time()
+        # AceClient Streamreader settings
         self._streamReaderConnection = None
         self._streamReaderState = Event()
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=1024) # Ring buffer with max number of chunks in queue
-        self._streamReaderQueueSize = AsyncResult() # Streamreader buffer current length
-        self._engine_version_code = None
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=1000) # Ring buffer with max number of chunks in queue
 
         # Logger
         logger = logging.getLogger('AceClient')
@@ -82,7 +82,10 @@ class AceClient(object):
                pass
         # Spawning recvData greenlet
         if self._socket: gevent.spawn(self._recvData)
-        else: logger.error('The are no alive AceStream Engines found'); return
+        else:
+               errmsg = 'The are no alive AceStream Engines found!'
+               raise AceException(errmsg)
+               return
 
     def destroy(self):
         '''
@@ -123,30 +126,27 @@ class AceClient(object):
 
         self._result = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
-        try: params = self._getResult(timeout=self._resulttimeout)
-        except:
-            errmsg = 'HELLOTS not resived from engine!'
+        try: params = self._result.get(timeout=self._resulttimeout)
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. HELLOTS not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
             return
         self._engine_version_code = int(params.get('version_code', 0))
 
         self._result = AsyncResult()
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
-        if not self._getResult(timeout=self._resulttimeout): # Get NOTREADY instead AUTH user_auth_level
-            errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
+        try:
+            if self._result.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
+               errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
+               raise AceException(errmsg)
+               return
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. AUTH not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
-            return
 
         if self._engine_version_code >= 3003600: # Display download_stopped massage
             params_dict = {'use_stop_notifications': '1'}
             self._write(AceMessage.request.SETOPTIONS(params_dict))
-
-    def _getResult(self, timeout=10.0):
-        logger = logging.getLogger('AceClient_getResult') # Logger
-        try: return self._result.get(timeout=timeout)
-        except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. getResult timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
-            raise AceException(errmsg)
 
     def START(self, datatype, value, stream_type):
         '''
@@ -160,20 +160,29 @@ class AceClient(object):
         else: params_dict = { 'output_format': 'http' }
         self._result = AsyncResult()
         self._write(AceMessage.request.START(datatype.upper(), value, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])))
-        return self._getResult(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
+        try: return self._result.get(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. URL not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            raise AceException(errmsg)
 
     def STOP(self):
         '''
         Stop video method
         '''
-        self._result = AsyncResult()
+        self._state = AsyncResult()
         self._write(AceMessage.request.STOP)
-        self._getResult(timeout=self._resulttimeout) # Get STATE 0(IDLE) after sendig STOP to AceEngine
+        try: self._state.get(timeout=self._resulttimeout)
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. getResult timeout from %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            raise AceException(errmsg)
 
     def LOADASYNC(self, datatype, params):
         self._result = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
-        return self._getResult(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
+        try: return self._result.get(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
+        except gevent.Timeout:
+            errmsg = 'Engine response time exceeded. LOADARESP not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            raise AceException(errmsg)
 
     def GETCONTENTINFO(self, datatype, value):
         params_dict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
@@ -229,11 +238,11 @@ class AceClient(object):
 
               ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
               transcoder = gevent.subprocess.Popen(ffmpeg_cmd.split(), **popen_params)
-              out = transcoder.stdout
+              stream = transcoder.stdout
            else:
               self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True, timeout=(5, AceConfig.videotimeout))
               self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
-              out = self._streamReaderConnection.raw
+              stream = self._streamReaderConnection.raw
 
            self._streamReaderState.set()
            self._write(AceMessage.request.EVENT('play'))
@@ -243,12 +252,11 @@ class AceClient(object):
               clients = counter.getClients(cid)
               if clients:
                   try:
-                      chunk = out.read(requests.models.CONTENT_CHUNK_SIZE)
+                      chunk = stream.read(requests.models.CONTENT_CHUNK_SIZE)
                       try: self._streamReaderQueue.put_nowait(chunk)
                       except gevent.queue.Full:
                            self._streamReaderQueue.get_nowait()
                            self._streamReaderQueue.put_nowait(chunk)
-                      finally: self._streamReaderQueueSize.set(self._streamReaderQueue.qsize())
                   except requests.packages.urllib3.exceptions.ReadTimeoutError:
                       logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
                   except: break
@@ -260,7 +268,6 @@ class AceClient(object):
                                  logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
                                  c.destroy()
                          except gevent.GreenletExit: pass
-
               else: logger.debug('All clients disconnected - broadcast stoped'); break
 
         except requests.exceptions.HTTPError as err:
@@ -274,7 +281,7 @@ class AceClient(object):
                 if transcoder is not None:
                    try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                    except: pass
-                counter.deleteAll(cid)
+#                counter.deleteAll(cid)
 
     def closeStreamReader(self):
         logger = logging.getLogger('StreamReader')
@@ -283,7 +290,6 @@ class AceClient(object):
            logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
            self._streamReaderConnection.close()
         self._streamReaderQueue.queue.clear()
-        self._streamReaderQueueSize.set()
 
     def _recvData(self):
         '''
@@ -307,7 +313,7 @@ class AceClient(object):
                     # version=engine_version version_code=version_code key=request_key http_port=http_port
                     self._result.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
                 # NOTREADY
-                elif self._recvbuffer.startswith('NOTREADY'): self._result.set(False)
+                elif self._recvbuffer.startswith('NOTREADY'): self._result.set('NOTREADY')
                 # AUTH
                 elif self._recvbuffer.startswith('AUTH'): self._result.set(self._recvbuffer.split()[1]) # user_auth_level
                 # START
@@ -325,34 +331,48 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('LOADRESP'):
                         self._result.set(requests.compat.json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:]))))
                 # STATE
-                elif self._recvbuffer.startswith('STATE'):
-                    self._state = self._recvbuffer.split()[1] # state_id
-                    if self._state == '0': # 0(IDLE)
-                        self._result.set(self._write(AceMessage.request.EVENT('stop')))
-                    elif self._state == '1': pass # 1 (PREBUFFERING)
-                    elif self._state == '2': pass # 2 (DOWNLOADING)
-                    elif self._state == '3': pass # 3 (BUFFERING)
-                    elif self._state == '4': pass # 4 (COMPLETED)
-                    elif self._state == '5': pass # 5 (CHECKING)
-                    elif self._state == '6': pass # 6 (ERROR)
+                elif self._recvbuffer.startswith('STATE'): # state_id
+                    self._tempstate = self._recvbuffer.split()[1]
+                    if self._tempstate == '0': # 0(IDLE)
+                        self._write(AceMessage.request.EVENT('stop'))
+                        self._state.set('0')
+                    elif self._tempstate == '1': pass # 1 (PREBUFFERING)
+                    elif self._tempstate == '2': pass # 2 (DOWNLOADING)
+                    elif self._tempstate == '3': pass # 3 (BUFFERING)
+                    elif self._tempstate == '4': pass # 4 (COMPLETED)
+                    elif self._tempstate == '5': pass # 5 (CHECKING)
+                    elif self._tempstate == '6': pass # 6 (ERROR)
                 # STATUS
-                elif self._recvbuffer.startswith('STATUS'): pass
+                elif self._recvbuffer.startswith('STATUS'):
+                    self._tempstatus = self._recvbuffer.split()[1]
+                    if self._tempstatus.startswith('main:idle'): pass
+                    elif self._tempstatus.startswith('main:loading'): pass
+                    elif self._tempstatus.startswith('main:starting'): pass
+                    elif self._tempstatus.startswith('main:check'): pass
+                    elif self._tempstatus.startswith('main:wait'): pass
+                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): # STATUS main:prebuf;progress;time
+                       values = list(map(int, self._tempstatus.split(';')[3:]))
+                       self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith('main:dl'):
+                       values = list(map(int, self._tempstatus.split(';')[1:]))
+                       self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
                 # CID
                 elif self._recvbuffer.startswith('##'): self._result.set(self._recvbuffer)
                 # INFO
                 elif self._recvbuffer.startswith('INFO'): pass
                 # EVENT
                 elif self._recvbuffer.startswith('EVENT'):
-                    self._event = self._recvbuffer.split()
-                    if 'livepos' in self._event:
+                    self._tempevent = self._recvbuffer.split()
+                    if 'livepos' in self._tempevent:
                        if self._seekback and not self._started_again.ready(): # if seekback
-                           params = { k:v for k,v in (x.split('=') for x in self._event if '=' in x) }
+                           params = { k:v for k,v in (x.split('=') for x in self._tempevent if '=' in x) }
                            self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
                            self._started_again.set()
-                    elif 'getuserdata' in self._event: self._write(AceMessage.request.USERDATA(self._gender, self._age))
-                    elif 'cansave' in self._event: pass
-                    elif 'showurl' in self._event: pass
-                    elif 'download_stopped' in self._event: pass
+                    elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(self._gender, self._age))
+                    elif 'cansave' in self._tempevent: pass
+                    elif 'showurl' in self._tempevent: pass
+                    elif 'download_stopped' in self._tempevent: pass
                 # PAUSE
                 elif self._recvbuffer.startswith('PAUSE'): self._write(AceMessage.request.EVENT('pause'))
                 # RESUME

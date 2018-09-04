@@ -30,6 +30,17 @@ class AceConst(object):
              6: 'ERROR'
              }
 
+    STATUS = ('total_progress',
+              'immediate_progress',
+              'speed_down',
+              'http_speed_down',
+              'speed_up',
+              'peers',
+              'http_peers',
+              'downloaded',
+              'http_downloaded',
+              'uploaded')
+
     START_PARAMS = ('file_indexes',
                     'developer_id',
                     'affiliate_id',

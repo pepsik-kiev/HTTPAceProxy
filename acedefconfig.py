@@ -42,12 +42,24 @@ class AceDefConfig(object):
     preferred_audio_language = 'rus'
     videoseekback = 0
     videotimeout = 30
+    videostartbuffertime = 5
     useacelive = True
     fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
     loglevel = logging.DEBUG
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'
     logdatefmt='%d.%m %H:%M:%S'
     logfile = None
+
+    @staticmethod
+    def bytes2human(n):
+        # http://code.activestate.com/recipes/578019
+        symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+        prefix = { s:(1 << (i + 1)*10) for i,s in enumerate(symbols) }
+        for s in reversed(symbols):
+            if n >= prefix[s]:
+                value = float(n) / prefix[s]
+                return '%.1f%s' % (value, s)
+        return '%sB' % n
 
     @staticmethod
     def isFakeRequest(path, params, headers):

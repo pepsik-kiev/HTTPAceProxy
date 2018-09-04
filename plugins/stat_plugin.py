@@ -28,17 +28,6 @@ class Stat(AceProxyPlugin):
         self.stuff = AceStuff
         self.params = None
 
-    def bytes2human(self, n):
-        # http://code.activestate.com/recipes/578019
-        symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
-        prefix = { s:(1 << (i + 1)*10) for i,s in enumerate(symbols) }
-        for s in reversed(symbols):
-            if n >= prefix[s]:
-                value = float(n) / prefix[s]
-                return '%.1f%s' % (value, s)
-        return '%sB' % n
-
-
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
         headers = {'User-Agent':'API Browser'}
@@ -106,12 +95,12 @@ class Stat(AceProxyPlugin):
                  'os_platform': AceConfig.osplatform,
                  'cpu_nums': psutil.cpu_count(),
                  'cpu_percent': psutil.cpu_percent(interval=1),
-                 'total_ram': self.bytes2human(max_mem.total),
-                 'used_ram': self.bytes2human(max_mem.used),
-                 'free_ram': self.bytes2human(max_mem.available),
-                 'total_disk': self.bytes2human(disk.total),
-                 'used_disk': self.bytes2human(disk.used),
-                 'free_disk': self.bytes2human(disk.free),
+                 'total_ram': AceConfig.bytes2human(max_mem.total),
+                 'used_ram': AceConfig.bytes2human(max_mem.used),
+                 'free_ram': AceConfig.bytes2human(max_mem.available),
+                 'total_disk': AceConfig.bytes2human(disk.total),
+                 'used_disk': AceConfig.bytes2human(disk.used),
+                 'free_disk': AceConfig.bytes2human(disk.free),
                   }
 
             response['connection_info'] = {

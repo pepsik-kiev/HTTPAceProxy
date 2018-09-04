@@ -43,7 +43,6 @@ from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
 
-
 class GeventHTTPServer(HTTPServer):
 
     def process_request(self, request, client_address):
@@ -189,7 +188,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
             # streaming to client
-            logger.info('Streaming "%s" to %s started' % (self.client.channelName, self.clientip))
             self.client.handle(self.reqparams.get('fmt', [''])[0])
             logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
         finally:
@@ -211,30 +209,22 @@ class Client:
         self.handler = handler
         self.channelName = channelName
         self.channelIcon = channelIcon
-        self.ace = None
-        self.queue = gevent.queue.Queue(maxsize=1024) # buffer with max number of chunks in queue
+        self.ace = self.queue = None
         self.connectionTime = time.time()
 
     def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
-        self.connectionTime = time.time()
 
         if self.handler.connection and not self.ace._streamReaderState.wait(timeout=5.0):
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
 
-        if 1 <= AceConfig.videostartbuffertime <= 5:
-            start = time.time() + AceConfig.videostartbuffertime
-            while self.handler.connection and self.ace._streamReaderState.ready():
-                remaining = start - time.time()
-                self.ace._streamReaderQueueSize = gevent.event.AsyncResult()
-                try:
-                    if self.ace._streamReaderQueueSize.get(timeout=5.0) >= 1024: break
-                except gevent.Timeout: break
-                else:
-                    if remaining > 0: pass
-                    else: break
-            logger.debug('Broadcast start buffer size: %s' % self.queue.qsize())
+        self.connectionTime = time.time()
+
+        remaining = self.connectionTime + AceConfig.videostartbuffertime
+        while self.handler.connection and self.ace._streamReaderState.ready() and remaining >= time.time():
+           gevent.sleep()
+           if self.queue.qsize() >= self.ace._streamReaderQueue.maxsize: break
 
         # Sending videostream headers to client
         if self.handler.connection:
@@ -262,6 +252,8 @@ class Client:
             else:
                 logger.error("Can't found fmt key. Ffmpeg transcoding not started !")
         try:
+            logger.info('Streaming "%s" to %s started. Start buffer size: %s' % \
+                 (self.channelName, self.handler.clientip, AceConfig.bytes2human(self.queue.qsize()*requests.models.CONTENT_CHUNK_SIZE)))
             while self.handler.connection and self.ace._streamReaderState.ready():
                 gevent.sleep()
                 try: out.write(self.queue.get(timeout=AceConfig.videotimeout))
@@ -270,15 +262,15 @@ class Client:
                     break
                 except: break
         finally:
-            self.destroy()
             if transcoder is not None:
                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                except: pass
+            self.destroy()
             return
 
     def destroy(self):
             if self.handler.connection: self.handler.connection.close()
-            self.queue.queue.clear()
+            if self.queue: self.queue.queue.clear()
 
 class AceStuff(object):
     '''
