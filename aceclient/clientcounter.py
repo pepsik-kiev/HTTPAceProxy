@@ -42,11 +42,13 @@ class ClientCounter(object):
                 client.ace = clients[0].ace
                 clients.append(client)
             else:
-                if self.idleace is not None:
+                if self.idleace:
                     client.ace = self.idleace
                     self.idleace = None
                 else:
-                    try: client.ace = self.createAce()
+                    try:
+                        client.ace = self.createAce()
+                        self.idleace = client.ace
                     except Exception as e:
                         logging.error('Failed to create AceClient: %s' % repr(e))
                         return 0
@@ -69,7 +71,7 @@ class ClientCounter(object):
                     return len(clients)
                 else:
                     del self.clients[cid]
-                    if self.idleace is not None: client.ace.destroy()
+                    if self.idleace: client.ace.destroy()
                     else:
                         try:
                             client.ace.STOP()
@@ -87,7 +89,7 @@ class ClientCounter(object):
                 clients = self.clients[cid]
                 del self.clients[cid]
                 self.total -= len(clients)
-                if self.idleace is not None: clients[0].ace.destroy()
+                if self.idleace: clients[0].ace.destroy()
                 else:
                     try:
                         clients[0].ace.STOP()
@@ -101,7 +103,7 @@ class ClientCounter(object):
     def destroyIdle(self):
         with self.lock:
             try:
-                if self.idleace is not None: self.idleace.destroy()
+                if self.idleace: self.idleace.destroy()
             finally: self.idleace = None
 
     def checkIdle(self):
@@ -111,4 +113,4 @@ class ClientCounter(object):
                 if ace and (ace._idleSince + 60.0 <= time.time()):
                     self.idleace = None
                     ace.destroy()
-            gevent.sleep(60.0)
+            gevent.sleep(60)
