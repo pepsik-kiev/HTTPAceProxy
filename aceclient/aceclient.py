@@ -128,7 +128,7 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try: params = self._result.get(timeout=self._resulttimeout)
         except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. HELLOTS not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
             return
         self._engine_version_code = int(params.get('version_code', 0))
@@ -141,7 +141,7 @@ class AceClient(object):
                raise AceException(errmsg)
                return
         except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. AUTH not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. AUTH not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
         if self._engine_version_code >= 3003600: # Display download_stopped massage
@@ -162,7 +162,7 @@ class AceClient(object):
         self._write(AceMessage.request.START(datatype.upper(), value, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])))
         try: return self._result.get(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
         except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. URL not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. URL not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def STOP(self):
@@ -173,7 +173,7 @@ class AceClient(object):
         self._write(AceMessage.request.STOP)
         try: self._state.get(timeout=self._resulttimeout)
         except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. STATE 0 not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. STATE 0 not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def LOADASYNC(self, datatype, params):
@@ -181,7 +181,7 @@ class AceClient(object):
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
         try: return self._result.get(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
         except gevent.Timeout:
-            errmsg = 'Engine response time exceeded. LOADARESP not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def GETCONTENTINFO(self, datatype, value):
@@ -196,7 +196,7 @@ class AceClient(object):
             self._write(AceMessage.request.GETCID(params_dict))
             try: cid = self._result.get(timeout=5.0)
             except gevent.Timeout:
-                 errmsg = 'Engine response time exceeded. CID not resived from engine %s:%s' % (AceConfig.acehost, AceConfig.aceAPIport)
+                 errmsg = 'Engine response time %ssec exceeded. CID not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
                  raise AceException(errmsg)
         else:
             cid = None

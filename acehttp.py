@@ -47,6 +47,7 @@ class GeventHTTPServer(HTTPServer):
 
     def process_request(self, request, client_address):
         checkAce() # Check is AceStream engine alive
+        gevent.sleep()
         gevent.spawn(self.process_request_thread, request, client_address)
 
     def process_request_thread(self, request, client_address):
@@ -411,12 +412,38 @@ def _reloadconfig(signum=None, frame=None):
 def get_ip_address():
     return [(s.connect(('1.1.1.1', 80)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
 
+def check_compatibility(gevent_version, psutil_version):
+
+    # Check gevent for compatibility.
+    major, minor, patch = gevent_version.split('.')[:3]
+    major, minor, patch = int(major), int(minor), int(patch)
+    # gevent >= 1.2.2
+    assert major == 1
+    assert minor >= 2
+    assert minor >= 2
+
+    # Check psutil for compatibility.
+    major, minor, patch = psutil_version.split('.')[:3]
+    major, minor, patch = int(major), int(minor), int(patch)
+    # psutil >= 5.3.0
+    assert major == 5
+    assert minor >= 3
+    assert patch >= 0
+
+
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
 if AceConfig.acespawn or AceConfig.transcode: DEVNULL = open(os.devnull, 'wb')
 
 logger.info('Ace Stream HTTP Proxy server on Python %s starting .....' % sys.version.split()[0])
+logger.debug('Using: gevent %s, psutil %s' % (gevent.__version__, psutil.__version__))
+
+try: check_compatibility(gevent.__version__, psutil.__version__)
+except (AssertionError, ValueError):
+    logger.error("gevent %s or psutil %s doesn't match a supported version!" % (gevent.__version__, psutil.__version__))
+    logger.info('Bye Bye .....')
+    sys.exit()
 
 #### Initial settings for AceHTTPproxy host IP
 if AceConfig.httphost == 'auto':
