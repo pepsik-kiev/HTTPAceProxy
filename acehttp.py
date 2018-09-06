@@ -248,6 +248,7 @@ class Client:
                                  'shell'  : False }
 
                 transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                gevent.wait([transcoder], timeout=2)
                 out = transcoder.stdin
                 logger.warning('Ffmpeg transcoding started')
             else:
@@ -415,16 +416,14 @@ def get_ip_address():
 def check_compatibility(gevent_version, psutil_version):
 
     # Check gevent for compatibility.
-    major, minor, patch = gevent_version.split('.')[:3]
-    major, minor, patch = int(major), int(minor), int(patch)
+    major, minor, patch = list(map(int, gevent_version.split('.')[:3]))
     # gevent >= 1.2.2
     assert major == 1
     assert minor >= 2
     assert minor >= 2
 
     # Check psutil for compatibility.
-    major, minor, patch = psutil_version.split('.')[:3]
-    major, minor, patch = int(major), int(minor), int(patch)
+    major, minor, patch = list(map(int, psutil_version.split('.')[:3]))
     # psutil >= 5.3.0
     assert major == 5
     assert minor >= 3

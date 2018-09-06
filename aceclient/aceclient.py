@@ -196,7 +196,7 @@ class AceClient(object):
             self._write(AceMessage.request.GETCID(params_dict))
             try: cid = self._result.get(timeout=5.0)
             except gevent.Timeout:
-                 errmsg = 'Engine response time %ssec exceeded. CID not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
+                 errmsg = 'Engine response time %ssec exceeded. CID not resived from engine %s:%s' % ('5', AceConfig.acehost, AceConfig.aceAPIport)
                  raise AceException(errmsg)
         else:
             cid = None

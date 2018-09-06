@@ -38,15 +38,16 @@ class Stat(AceProxyPlugin):
 
     def mac_lookup(self,ip_address):
 
+        mac_address = None
         if ip_address == AceConfig.httphost:
            from uuid import getnode
            try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6))))
-           except: mac_address = None
+           except: pass
         else:
            try:
               if AceConfig.osplatform != 'Windows':
-                 Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
-                 pid = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
+                 p1 = Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
+                 p2 = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
               else:
                  popen_params = { 'stdout' : PIPE,
                                   'shell'  : False }
@@ -54,12 +55,15 @@ class Stat(AceProxyPlugin):
                  CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
                  DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
                  popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
-                 Popen(['ping', '-n', '1', ip_address], **popen_params)
-                 pid = Popen(['arp', '-a', ip_address], **popen_params)
+                 p1 = Popen(['ping', '-n', '1', ip_address], **popen_params)
+                 p2 = Popen(['arp', '-a', ip_address], **popen_params)
+                 gevent.wait([p1, p2], timeout=2)
            except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
 
-           try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', pid.communicate()[0].decode('utf-8')).group(0)
-           except: mac_address = None
+           try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', p2.stdout.read().decode('utf-8')).group(0)
+           except: pass
+
+           p1.stdout.close(); p2.stdout.close()
 
         if mac_address:
            headers = {'User-Agent':'API Browser'}
