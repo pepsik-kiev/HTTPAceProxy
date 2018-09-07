@@ -128,7 +128,7 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try: params = self._result.get(timeout=self._resulttimeout)
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived from engine %s:%s' % (timeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
             return
         self._engine_version_code = int(params.get('version_code', 0))
@@ -141,7 +141,7 @@ class AceClient(object):
                raise AceException(errmsg)
                return
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. AUTH not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. AUTH not resived from engine %s:%s' % (timeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
         if self._engine_version_code >= 3003600: # Display download_stopped massage
@@ -162,7 +162,7 @@ class AceClient(object):
         self._write(AceMessage.request.START(datatype.upper(), value, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])))
         try: return self._result.get(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. URL not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. URL not resived from engine %s:%s' % (timeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def STOP(self):
@@ -173,7 +173,7 @@ class AceClient(object):
         self._write(AceMessage.request.STOP)
         try: self._state.get(timeout=self._resulttimeout)
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. STATE 0 not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response time %ssec exceeded. STATE 0 not resived from engine %s:%s' % (timeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def LOADASYNC(self, datatype, params):
@@ -181,7 +181,7 @@ class AceClient(object):
         self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
         try: return self._result.get(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
         except gevent.Timeout:
-            errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived from engine %s:%s' % (AceConfig.videotimeout, AceConfig.acehost, AceConfig.aceAPIport)
+            errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived from engine %s:%s' % (timeout, AceConfig.acehost, AceConfig.aceAPIport)
             raise AceException(errmsg)
 
     def GETCONTENTINFO(self, datatype, value):
@@ -196,7 +196,7 @@ class AceClient(object):
             self._write(AceMessage.request.GETCID(params_dict))
             try: cid = self._result.get(timeout=5.0)
             except gevent.Timeout:
-                 errmsg = 'Engine response time %ssec exceeded. CID not resived from engine %s:%s' % ('5', AceConfig.acehost, AceConfig.aceAPIport)
+                 errmsg = 'Engine response time %ssec exceeded. CID not resived from engine %s:%s' % (timeout, AceConfig.acehost, AceConfig.aceAPIport)
                  raise AceException(errmsg)
         else:
             cid = None
@@ -240,7 +240,9 @@ class AceClient(object):
               else: ffmpeg_cmd = 'ffmpeg '
 
               ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+
               transcoder = gevent.subprocess.Popen(ffmpeg_cmd.split(), **popen_params)
+              gevent.wait([transcoder], timeout=2)
               stream = transcoder.stdout
            else:
               self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True, timeout=(5,None))
@@ -271,8 +273,10 @@ class AceClient(object):
                                      logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
                                      c.destroy()
                              except gevent.GreenletExit: pass
-                  elif STATE[0] == '3' and (time.time() - STATE[1]) >= AceConfig.videotimeout:
+
+                  elif STATE[0] == '3' and (time.time() - STATE[1]) >= AceConfig.videotimeout: # STATE 3 (BUFFERING)
                       logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+
               else: logger.debug('All clients disconnected - broadcast stoped'); break
 
         except requests.exceptions.HTTPError as err:
@@ -285,16 +289,12 @@ class AceClient(object):
                 if transcoder is not None:
                    try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                    except: pass
-                self.closeStreamReader()
+                if self._streamReaderConnection:
+                   logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
+                   self._streamReaderConnection.close()
+                self._streamReaderState.clear()
+                self._streamReaderQueue.queue.clear()
                 counter.deleteAll(cid)
-
-    def closeStreamReader(self):
-        logger = logging.getLogger('StreamReader')
-        self._streamReaderState.clear()
-        if self._streamReaderConnection:
-           logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
-           self._streamReaderConnection.close()
-        self._streamReaderQueue.queue.clear()
 
     def _recvData(self):
         '''

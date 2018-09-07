@@ -4,7 +4,6 @@ Simple statistics plugin
 
 To use it, go to http://acehttp_proxy_ip:port/stat
 '''
-from __future__ import division
 from PluginInterface import AceProxyPlugin
 from aceconfig import AceConfig
 from gevent.subprocess import Popen, PIPE
