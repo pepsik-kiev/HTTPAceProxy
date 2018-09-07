@@ -15,9 +15,10 @@ class ClientCounter(object):
 
     def __init__(self):
         self.lock = gevent.lock.RLock()
-        self.clients = {}
+        self.clients = {} # {'CID': [client1, client2,....]}
         self.idleace = None
-        self.total = 0
+        self.idleSince = 30 # Send SHUTDOWN to AceEngine if it in IDLE more than
+        self.total = 0 # Total clients сounter
         gevent.spawn(self.checkIdle)
 
     def createAce(self):
@@ -38,9 +39,7 @@ class ClientCounter(object):
     def add(self, cid, client):
         with self.lock:
             clients = self.clients.get(cid)
-            if clients:
-                client.ace = clients[0].ace
-                clients.append(client)
+            if clients: client.ace = clients[0].ace
             else:
                 if self.idleace:
                     client.ace = self.idleace
@@ -48,17 +47,15 @@ class ClientCounter(object):
                 else:
                     try:
                         client.ace = self.createAce()
-                        self.idleace = client.ace
                     except Exception as e:
                         logging.error('Failed to create AceClient: %s' % repr(e))
                         return 0
 
-                clients = [client]
-                self.clients[cid] = clients
-
             client.queue = client.ace._streamReaderQueue.copy()
+            self.clients[cid].append(client) if cid in self.clients else self.clients.update({cid:[client]})
+
             self.total += 1
-            return len(clients)
+            return len(self.clients[cid])
 
     def delete(self, cid, client):
         with self.lock:
@@ -71,13 +68,15 @@ class ClientCounter(object):
                     return len(clients)
                 else:
                     del self.clients[cid]
+                    client.ace._streamReaderState.clear()
                     if self.idleace: client.ace.destroy()
                     else:
-                        try:
+                         try:
                             client.ace.STOP()
                             self.idleace = client.ace
+                            client.ace = None
                             self.idleace.reset()
-                        except: client.ace.destroy()
+                         except: client.ace.destroy()
                     return 0
             finally: self.total -= 1
 
@@ -89,11 +88,13 @@ class ClientCounter(object):
                 clients = self.clients[cid]
                 del self.clients[cid]
                 self.total -= len(clients)
+                clients[0].ace._streamReaderState.clear()
                 if self.idleace: clients[0].ace.destroy()
                 else:
                     try:
                         clients[0].ace.STOP()
                         self.idleace = clients[0].ace
+                        clients[0].ace = None
                         self.idleace.reset()
                     except: clients[0].ace.destroy()
         finally:
@@ -108,9 +109,7 @@ class ClientCounter(object):
 
     def checkIdle(self):
         while 1:
-            with self.lock:
-                ace = self.idleace
-                if ace and (ace._idleSince + 60.0 <= time.time()):
-                    self.idleace = None
-                    ace.destroy()
-            gevent.sleep(60)
+            gevent.sleep(1)
+            if self.idleace and self.idleace._state.ready():
+                STATE = self.idleace._state.get_nowait()
+                if STATE[0] == '0' and (time.time() - STATE[1]) >= self.idleSince: self.destroyIdle()

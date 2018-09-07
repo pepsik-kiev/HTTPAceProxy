@@ -57,7 +57,7 @@ class GeventHTTPServer(HTTPServer):
         finally: self.close_request(request)
 
     def handle_error(self, request, client_address):
-        logging.debug(traceback.format_exc())
+        logging.error(traceback.format_exc())
         pass
 
 class HTTPHandler(BaseHTTPRequestHandler):
@@ -167,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        stream_reader = self.client = None
+        self.client = stream_reader = None
         try:
             CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
             if not channelName: channelName = NAME
@@ -180,7 +180,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 # Send START commands to AceEngine and Getting URL from engine
                 url = self.client.ace.START(self.reqtype, paramsdict, AceConfig.streamtype)
                 # Rewriting host:port for remote Ace Stream Engine
-                url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
+                url = requests.compat.urlparse(url)._replace(netloc='%s:%d' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                 # Start streamreader for broadcast
                 stream_reader = gevent.spawn(self.client.ace.startStreamReader, url, CID, AceStuff.clientcounter, dict(self.headers))
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
@@ -248,7 +248,6 @@ class Client:
                                  'shell'  : False }
 
                 transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
-                gevent.wait([transcoder], timeout=2)
                 out = transcoder.stdin
                 logger.warning('Ffmpeg transcoding started')
             else:

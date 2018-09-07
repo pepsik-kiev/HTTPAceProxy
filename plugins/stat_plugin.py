@@ -56,7 +56,6 @@ class Stat(AceProxyPlugin):
                  popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
                  p1 = Popen(['ping', '-n', '1', ip_address], **popen_params)
                  p2 = Popen(['arp', '-a', ip_address], **popen_params)
-                 gevent.wait([p1, p2], timeout=2)
            except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
 
            try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', p2.stdout.read().decode('utf-8')).group(0)
