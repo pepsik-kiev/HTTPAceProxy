@@ -74,7 +74,6 @@ class ClientCounter(object):
                          try:
                             client.ace.STOP()
                             self.idleace = client.ace
-                            client.ace = None
                             self.idleace.reset()
                          except: client.ace.destroy()
                     return 0
@@ -94,7 +93,6 @@ class ClientCounter(object):
                     try:
                         clients[0].ace.STOP()
                         self.idleace = clients[0].ace
-                        clients[0].ace = None
                         self.idleace.reset()
                     except: clients[0].ace.destroy()
         finally:
