@@ -182,7 +182,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 # Rewriting host:port for remote Ace Stream Engine
                 url = requests.compat.urlparse(url)._replace(netloc='%s:%d' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                 # Start streamreader for broadcast
-                stream_reader = gevent.spawn(self.client.ace.startStreamReader, url, CID, AceStuff.clientcounter) #, dict(self.headers))
+                stream_reader = gevent.spawn(self.client.ace.startStreamReader, url, CID, AceStuff.clientcounter)
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))

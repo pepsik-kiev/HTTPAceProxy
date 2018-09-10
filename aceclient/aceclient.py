@@ -225,16 +225,14 @@ class AceClient(object):
         self._streamReaderState.set()
 
         with requests.Session() as session:
-           session = requests.Session()
            if req_headers: session.headers.update(req_headers)
-
            try:
               # AceEngine return link for HLS stream
               if url.endswith('.m3u8'):
                   _used_chunks = []
                   while self._streamReaderState.ready():
                      for chunk in session.get(url, stream=True, timeout = (5,None)).iter_lines():
-                       if chunk.startswith(b'http://'):
+                       if chunk and chunk.startswith(b'http://'):
                            chunk = requests.compat.urlparse(chunk.decode('utf-8'))._replace(netloc='%s:%d' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                            if chunk not in _used_chunks:
                                if len(_used_chunks) <= 15: _used_chunks.append(chunk)
