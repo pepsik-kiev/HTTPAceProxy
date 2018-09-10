@@ -66,7 +66,6 @@ class AceClient(object):
         # AceEngine version code
         self._engine_version_code = None
         # AceClient Streamreader settings
-        self._streamReaderConnection = None
         self._streamReaderState = Event()
         self._streamReaderQueue = gevent.queue.Queue(maxsize=1000) # Ring buffer with max number of chunks in queue
 
@@ -219,83 +218,69 @@ class AceClient(object):
 
     def startStreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger('StreamReader')
-        logger.debug('Open video stream: %s' % url)
-        transcoder = None
-
         logger.debug('Get headers from client: %s' % req_headers)
+        logger.debug('Open video stream: %s' % url)
 
-        try:
-           if url.endswith('.m3u8'):
-              logger.warning('HLS stream detected. Ffmpeg transcoding started')
-              popen_params = { 'bufsize': requests.models.CONTENT_CHUNK_SIZE,
-                               'stdout' : gevent.subprocess.PIPE,
-                               'stderr' : None,
-                               'shell'  : False }
+        self._write(AceMessage.request.EVENT('play'))
+        self._streamReaderState.set()
 
-              if AceConfig.osplatform == 'Windows':
-                    ffmpeg_cmd = 'ffmpeg.exe '
-                    CREATE_NO_WINDOW = 0x08000000
-                    CREATE_NEW_PROCESS_GROUP = 0x00000200
-                    DETACHED_PROCESS = 0x00000008
-                    popen_params.update(creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-              else: ffmpeg_cmd = 'ffmpeg '
+        with requests.Session() as session:
+           session = requests.Session()
+           if req_headers: session.headers.update(req_headers)
 
-              ffmpeg_cmd += '-hwaccel auto -hide_banner -loglevel fatal -re -i %s -c copy -f mpegts -' % url
+           try:
+              # AceEngine return link for HLS stream
+              if url.endswith('.m3u8'):
+                  _used_chunks = []
+                  while self._streamReaderState.ready():
+                     for chunk in session.get(url, stream=True, timeout = (5,None)).iter_lines():
+                       if chunk.startswith(b'http://'):
+                           chunk = requests.compat.urlparse(chunk.decode('utf-8'))._replace(netloc='%s:%d' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
+                           if chunk not in _used_chunks:
+                               if len(_used_chunks) <= 15: _used_chunks.append(chunk)
+                               else: _used_chunks.pop(0); _used_chunks.append(chunk)
+                               with requests.get(chunk, stream=True, timeout=(5,None)) as stream:
+                                  self.RAWDataReader(stream.raw, cid, counter)
+              # AceStream return link for HTTP stream
+              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5,None)).raw, cid, counter)
 
-              transcoder = gevent.subprocess.Popen(ffmpeg_cmd.split(), **popen_params)
-              stream = transcoder.stdout
-           else:
-              self._streamReaderConnection = requests.get(url, headers=req_headers, stream=True, timeout=(5,None))
-              self._streamReaderConnection.raise_for_status() # raise an exception for error codes (4xx or 5xx)
-              stream = self._streamReaderConnection.raw
+           except requests.exceptions.HTTPError as err:
+                   logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
+           except requests.exceptions.RequestException:
+                   logger.error('There was an ambiguous exception that occurred while handling request')
+           except Exception as err:
+                   logger.error('Unexpected error in streamreader %s' % repr(err))
+           finally:
+                   _used_chunks = None
+                   self._streamReaderQueue.queue.clear()
+                   counter.deleteAll(cid)
 
-           self._streamReaderState.set()
-           self._write(AceMessage.request.EVENT('play'))
+    def RAWDataReader(self, stream, cid, counter):
+        logger = logging.getLogger('RAWDataReader')
 
-           while self._streamReaderState.ready():
-              gevent.sleep()
-              clients = counter.getClients(cid)
-              if clients:
-                  STATE = self._state.get_nowait()
-                  if STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
-                      try:
-                          chunk = stream.read(requests.models.CONTENT_CHUNK_SIZE)
-                          try: self._streamReaderQueue.put_nowait(chunk)
+        while self._streamReaderState.ready():
+           gevent.sleep()
+           clients = counter.getClients(cid)
+           if clients:
+               STATE = self._state.get_nowait()
+               if STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
+                  chunk = stream.read(requests.models.CONTENT_CHUNK_SIZE)
+                  if chunk:
+                       try: self._streamReaderQueue.put_nowait(chunk)
+                       except gevent.queue.Full:
+                           self._streamReaderQueue.get_nowait()
+                           self._streamReaderQueue.put_nowait(chunk)
+                       for c in clients:
+                          try: c.queue.put(chunk, timeout=5)
                           except gevent.queue.Full:
-                               self._streamReaderQueue.get_nowait()
-                               self._streamReaderQueue.put_nowait(chunk)
-                      except: break
-                      else:
-                          for c in clients:
-                             try: c.queue.put(chunk, timeout=5)
-                             except gevent.queue.Full:
-                                 if len(clients) > 1:
-                                     logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
-                                     c.destroy()
-                             except gevent.GreenletExit: pass
-
-                  elif STATE[0] == '3' and (time.time() - STATE[1]) >= AceConfig.videotimeout: # STATE 3 (BUFFERING)
-                      logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
-
-              else: logger.debug('All clients disconnected - broadcast stoped'); break
-
-        except requests.exceptions.HTTPError as err:
-                logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
-        except requests.exceptions.RequestException:
-                logger.error('There was an ambiguous exception that occurred while handling request')
-        except Exception as err:
-                logger.error('Unexpected error in streamreader %s' % repr(err))
-        finally:
-                if transcoder is not None:
-                   try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-                   except: pass
-                if self._streamReaderConnection:
-                   logger.debug('Close video stream: %s' % self._streamReaderConnection.url)
-                   self._streamReaderConnection.close()
-                   self._streamReaderConnection = None
-                self._streamReaderState.clear()
-                self._streamReaderQueue.queue.clear()
-                counter.deleteAll(cid)
+                              if len(clients) > 1:
+                                  logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
+                                  c.destroy()
+                          except gevent.GreenletExit: pass
+                  else: break
+               elif STATE[0] == '3' and (time.time() - STATE[1]) >= AceConfig.videotimeout: # STATE 3 (BUFFERING)
+                   logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+           else: logger.debug('All clients disconnected - broadcast stoped'); break
 
     def _recvData(self):
         '''
