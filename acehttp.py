@@ -30,6 +30,7 @@ import time
 import requests
 try: from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 except: from http.server import HTTPServer, BaseHTTPRequestHandler
+from gevent.baseserver import BaseServer
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
@@ -44,11 +45,10 @@ import aceconfig
 from aceconfig import AceConfig
 
 class GeventHTTPServer(HTTPServer):
-
     def process_request(self, request, client_address):
         checkAce() # Check is AceStream engine alive
-        gevent.sleep()
         gevent.spawn(self.process_request_thread, request, client_address)
+        gevent.sleep()
 
     def process_request_thread(self, request, client_address):
         try: self.finish_request(request, client_address)
@@ -182,7 +182,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 # Rewriting host:port for remote Ace Stream Engine
                 url = requests.compat.urlparse(url)._replace(netloc='%s:%d' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                 # Start streamreader for broadcast
-                stream_reader = gevent.spawn(self.client.ace.startStreamReader, url, CID, AceStuff.clientcounter)
+                stream_reader = gevent.spawn(self.client.ace.StreamReader, url, CID, AceStuff.clientcounter)
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
@@ -319,8 +319,9 @@ def spawnAce(cmd, delay=0.1):
             cmd = engine[0].split()
     try:
         AceStuff.ace = psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)
-        gevent.sleep(delay)
-        return True
+        logger.debug('AceEngine starts .....')
+        time.sleep(delay)
+        return isRunning(AceStuff.ace)
     except: return False
 
 def checkFirewall(clientip):
