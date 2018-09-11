@@ -34,7 +34,7 @@ class Telnet(telnetlib.Telnet, object):
 class AceClient(object):
 
     def __init__(self, acehostslist, connect_timeout=5, result_timeout=10):
-        # Receive buffer
+        # Telnet response buffer
         self._recvbuffer = None
         # Ace stream socket
         self._socket = None
@@ -42,7 +42,7 @@ class AceClient(object):
         self._resulttimeout = float(result_timeout)
         # Shutting down flag
         self._shuttingDown = Event()
-        # Product key
+        # AceEngine product key
         self._product_key = None
         # Result (Created with AsyncResult() on call)
         self._result = AsyncResult()
@@ -65,9 +65,10 @@ class AceClient(object):
         self._started_again = Event()
         # AceEngine version code
         self._engine_version_code = None
-        # AceClient Streamreader settings
+        # AceClient Streamreader state flag
         self._streamReaderState = Event()
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=1000) # Ring buffer with max number of chunks in queue
+        # AceClient Streamreader ring buffer with max number of chunks in queue
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=1000)
 
         # Logger
         logger = logging.getLogger('AceClient')
@@ -216,16 +217,17 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def startStreamReader(self, url, cid, counter, req_headers=None):
+    def StreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger('StreamReader')
-        logger.debug('Get headers from client: %s' % req_headers)
-        logger.debug('Open video stream: %s' % url)
+        logger.debug('Open the url received from AceEngine: %s' % url)
 
         self._write(AceMessage.request.EVENT('play'))
         self._streamReaderState.set()
 
         with requests.Session() as session:
-           if req_headers: session.headers.update(req_headers)
+           if req_headers:
+               logger.debug('Sending headers from client to AceEngine: %s' % req_headers)
+               session.headers.update(req_headers)
            try:
               # AceEngine return link for HLS stream
               if url.endswith('.m3u8'):
@@ -262,14 +264,14 @@ class AceClient(object):
            if clients:
                STATE = self._state.get_nowait()
                if STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
-                  chunk = stream.read(requests.models.CONTENT_CHUNK_SIZE)
-                  if chunk:
-                       try: self._streamReaderQueue.put_nowait(chunk)
+                  data = stream.read(requests.models.CONTENT_CHUNK_SIZE)
+                  if data:
+                       try: self._streamReaderQueue.put_nowait(data)
                        except gevent.queue.Full:
                            self._streamReaderQueue.get_nowait()
-                           self._streamReaderQueue.put_nowait(chunk)
+                           self._streamReaderQueue.put_nowait(data)
                        for c in clients:
-                          try: c.queue.put(chunk, timeout=5)
+                          try: c.queue.put(data, timeout=5)
                           except gevent.queue.Full:
                               if len(clients) > 1:
                                   logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
@@ -318,7 +320,7 @@ class AceClient(object):
                         self._urlresult.set(self._recvbuffer.split()[1]) # url for play
                 # LOADRESP
                 elif self._recvbuffer.startswith('LOADRESP'):
-                    self._result.set(requests.compat.json.loads(requests.compat.unquote(' '.join(self._recvbuffer.split()[2:]))))
+                    self._result.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
                 # STATE
                 elif self._recvbuffer.startswith('STATE'): # (state_id, time of appearance)
                     self._state.set((self._recvbuffer.split()[1], time.time()))
