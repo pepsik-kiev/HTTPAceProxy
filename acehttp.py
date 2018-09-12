@@ -371,7 +371,7 @@ def detectPort():
         try:
             gevent.sleep(AceConfig.acestartuptimeout)
             AceConfig.ace['aceAPIport'] = open(AceStuff.acedir + '\\acestream.port', 'r').read()
-            logger.info("Detected ace port: %s" % AceConfig.AceConfig.ace['aceAPIport'])
+            logger.info("Detected ace port: %s" % AceConfig.ace['aceAPIport'])
         except IOError:
             logger.error("Couldn't detect port! acestream.port file doesn't exist?")
             clean_proc(); sys.exit(1)
