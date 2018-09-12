@@ -8,66 +8,48 @@ import gevent
 import logging
 import time
 
-from aceconfig import AceConfig
-from aceclient import AceClient
-
 class ClientCounter(object):
 
     def __init__(self):
         self.lock = gevent.lock.RLock()
-        self.clients = {} # {'CID': [client1, client2,....]}
+        self.streams = {}   # {'CID': [client1, client2,....]} dict of current broadcasts and clients
         self.idleace = None
         self.idleSince = 30 # Send SHUTDOWN to AceEngine if it in IDLE more than
-        self.total = 0 # Total clients сounter
+        self.total = 0      # Client counter total
         gevent.spawn(self.checkIdle)
-
-    def createAce(self):
-        logger = logging.getLogger('CreateAce')
-        logger.debug('Create connection to AceEngine.....')
-        ace = AceClient(AceConfig.acehostslist, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-        ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey)
-        return ace
 
     def count(self, cid):
         with self.lock:
-            clients = self.clients.get(cid)
+            clients = self.streams.get(cid)
             return len(clients) if clients else 0
 
     def getClients(self, cid):
-        with self.lock: return self.clients.get(cid)
+        with self.lock: return self.streams.get(cid)
 
     def add(self, cid, client):
         with self.lock:
-            clients = self.clients.get(cid)
+            clients = self.streams.get(cid)
             if clients: client.ace = clients[0].ace
-            else:
-                if self.idleace:
-                    client.ace = self.idleace
-                    self.idleace = None
-                else:
-                    try:
-                        client.ace = self.createAce()
-                    except Exception as e:
-                        logging.error('Failed to create AceClient: %s' % repr(e))
-                        return 0
+            else: client.ace = self.idleace
+            self.idleace = None
 
             client.queue = client.ace._streamReaderQueue.copy()
-            self.clients[cid].append(client) if cid in self.clients else self.clients.update({cid:[client]})
+            self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
 
             self.total += 1
-            return len(self.clients[cid])
+            return len(self.streams[cid])
 
     def delete(self, cid, client):
         with self.lock:
-            if not cid in self.clients: return 0
-            clients = self.clients[cid]
+            if not cid in self.streams: return 0
+            clients = self.streams[cid]
             if client not in clients: return len(clients)
             try:
                 if len(clients) > 1:
                     clients.remove(client)
                     return len(clients)
                 else:
-                    del self.clients[cid]
+                    del self.streams[cid]
                     client.ace._streamReaderState.clear()
                     if self.idleace: client.ace.destroy()
                     else:
@@ -83,9 +65,9 @@ class ClientCounter(object):
         clients = None
         try:
             with self.lock:
-                if not cid in self.clients: return
-                clients = self.clients[cid]
-                del self.clients[cid]
+                if not cid in self.streams: return
+                clients = self.streams[cid]
+                del self.streams[cid]
                 self.total -= len(clients)
                 clients[0].ace._streamReaderState.clear()
                 if self.idleace: clients[0].ace.destroy()

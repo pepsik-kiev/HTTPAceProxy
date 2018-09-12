@@ -112,8 +112,8 @@ class Stat(AceProxyPlugin):
 
             response['clients_data'] = []
             with self.stuff.clientcounter.lock:
-              for i in self.stuff.clientcounter.clients:
-                 for c in self.stuff.clientcounter.clients[i]:
+              for i in self.stuff.clientcounter.streams:
+                 for c in self.stuff.clientcounter.streams[i]:
                     if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
                        clientInfo = self.mac_lookup(c.handler.clientip)
                     else:

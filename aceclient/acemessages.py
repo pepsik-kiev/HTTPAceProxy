@@ -81,8 +81,7 @@ class AceMessage(object):
         # End LOADASYNC
 
         @staticmethod
-        def START(command, params_dict, stream_type):
-            params_dict['stream_type'] = stream_type
+        def START(command, params_dict):
             if command == 'URL':
                 return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} {stream_type}'.format(**params_dict)
 

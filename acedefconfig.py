@@ -13,16 +13,15 @@ logging.getLogger("chardet").setLevel(logging.WARNING)
 
 class AceDefConfig(object):
     acespawn = False
-    acecmd = "acestreamengine --client-console --live-buffer 25 --vod-buffer 10 --vod-drop-max-age 120"
+    acecmd = 'acestreamengine --client-console --live-buffer 25 --vod-buffer 10 --vod-drop-max-age 120'
     acekey = 'n51LvQoTlJzNGaFxseRK-uvnvX-sD4Vm5Axwmc4UcoD-jruxmKsuJaH0eVgE'
-    acehost=aceAPIport=aceHTTPport=None
-    acehostslist = (['127.0.0.1', '62062', '6878'])
+    ace = { 'aceHostIP': '127.0.0.1', 'aceAPIport': '62062', 'aceHTTPport': '6878' }
     aceage = AceConst.AGE_18_24
     acesex = AceConst.SEX_MALE
     acestartuptimeout = 10
     aceconntimeout = 5
     aceresulttimeout = 5
-    httphost=''
+    httphost = ''
     httpport = 8000
     aceproxyuser = ''
     firewall = False
@@ -32,18 +31,14 @@ class AceDefConfig(object):
         '192.168.0.0/16',
         )
     maxconns = 10
-    streamtype = 'http'
-    transcode = False
-    transcodecmd = dict()
-    transcodecmd['default'] = 'ffmpeg -i - -c:a copy -c:v copy -f mpegts -'.split()
-    transcode_audio = 0
-    transcode_mp3 = 0
-    transcode_ac3 = 0
-    preferred_audio_language = 'rus'
+    acestreamtype = {'output_format': 'http'}
+    # Example for hls-steam request from AceEngine
+    #acestreamtype = {'output_format': 'hls', 'transcode_audio': 0, 'transcode_mp3': 0, 'transcode_ac3': 0, 'preferred_audio_language': 'rus'}
+    transcodecmd = {}
+    #transcodecmd['default'] = 'ffmpeg -i - -c:a copy -c:v copy -f mpegts -'.split()
     videoseekback = 0
     videotimeout = 30
-    videostartbuffertime = 5
-    useacelive = True
+    videostartbuffertime = 0
     fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
     loglevel = logging.DEBUG
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'

@@ -69,11 +69,11 @@ class PlaylistGenerator(object):
             url = item['url']
             if process_url and url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                   item['url'] = 'http://%s/url/%s/stream.mp4' % (hostport, quote(url,''))
+                   item['url'] = 'http://%s/url/%s/stream.ts' % (hostport, quote(url,''))
                 elif url.startswith('infohash://'): # For INFOHASHes
-                   item['url'] = 'http://%s/infohash/%s/stream.mp4' % (hostport, url.split('/')[2])
+                   item['url'] = 'http://%s/infohash/%s/stream.ts' % (hostport, url.split('/')[2])
                 elif url.startswith('acestream://'): # For PIDs
-                   item['url'] = 'http://%s/content_id/%s/stream.mp4' % (hostport, url.split('/')[2])
+                   item['url'] = 'http://%s/content_id/%s/stream.ts' % (hostport, url.split('/')[2])
                 elif archive and url.isdigit(): # For archive channel id's
                    item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
                 elif not archive and url.isdigit(): # For channel id's

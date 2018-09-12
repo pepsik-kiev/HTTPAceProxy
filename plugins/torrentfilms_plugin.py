@@ -17,7 +17,6 @@ from PluginInterface import AceProxyPlugin
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 import config.torrentfilms as config
-from aceconfig import AceConfig
 
 class Torrentfilms(AceProxyPlugin):
 
@@ -93,10 +92,8 @@ class Torrentfilms(AceProxyPlugin):
                  else: ln += '/stream.mp4\n'
              else:
                   ln += 'http://%s:%s/ace/%s?infohash=%s&transcode_audio=%s&transcode_mp3=%s&transcode_ac3=%s&preferred_audio_language=%s&_idx=%s\n' % \
-                        (AceConfig.acehostslist[0][0] if not AceConfig.acehost else AceConfig.acehost ,
-                         AceConfig.acehostslist[0][2] if not AceConfig.aceHTTPport else AceConfig.aceHTTPport,
-                         config.streamtype, infohash,AceConfig.transcode_audio, AceConfig.transcode_mp3,
-                         AceConfig.transcode_ac3, AceConfig.preferred_audio_language, key)
+                        (AceConfig.httphost, AceConfig.ace['aceHTTPport'], config.streamtype, infohash, AceConfig.transcode_audio,
+                         AceConfig.transcode_mp3, AceConfig.transcode_ac3, AceConfig.preferred_audio_language, key)
 
         self.logger.info('Torrent  playlist created')
         return ln

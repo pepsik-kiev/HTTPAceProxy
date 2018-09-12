@@ -9,8 +9,6 @@ import logging
 import requests
 import time
 import random
-
-from aceconfig import AceConfig
 from .acemessages import *
 
 class AceException(Exception):
@@ -33,12 +31,12 @@ class Telnet(telnetlib.Telnet, object):
 
 class AceClient(object):
 
-    def __init__(self, acehostslist, connect_timeout=5, result_timeout=10):
+    def __init__(self, ace, connect_timeout=5, result_timeout=10):
         # Telnet response buffer
         self._recvbuffer = None
-        # Ace stream socket
+        # AceEngine socket
         self._socket = None
-        # Result timeout
+        # AceEngine read result timeout
         self._resulttimeout = float(result_timeout)
         # Shutting down flag
         self._shuttingDown = Event()
@@ -48,6 +46,8 @@ class AceClient(object):
         self._result = AsyncResult()
         # Result for START URL
         self._urlresult = AsyncResult()
+        # URL response time from AceEngine
+        self._videotimeout = None
         # Result for CID
         self._cidresult = AsyncResult()
         # Current STATUS
@@ -63,31 +63,23 @@ class AceClient(object):
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
-        # AceEngine version code
-        self._engine_version_code = None
-        # AceClient Streamreader state flag
+        # AceEngine Streamreader state flag
         self._streamReaderState = Event()
-        # AceClient Streamreader ring buffer with max number of chunks in queue
+        # AceEngine Streamreader ring buffer with max number of chunks in queue
         self._streamReaderQueue = gevent.queue.Queue(maxsize=1000)
 
         # Logger
         logger = logging.getLogger('AceClient')
         # Try to connect AceStream engine
-        for AceEngine in acehostslist:
-           try:
-               self._socket = Telnet(AceEngine[0], AceEngine[1], connect_timeout)
-               AceConfig.acehost, AceConfig.aceAPIport, AceConfig.aceHTTPport = AceEngine[0], AceEngine[1], AceEngine[2]
-               logger.debug('Successfully connected to AceStream on %s:%d' % (AceEngine[0], AceEngine[1]))
-               break
-           except:
-               logger.debug('The are no alive AceStream on %s:%d' % (AceEngine[0], AceEngine[1]))
-               pass
-        # Spawning recvData greenlet
-        if self._socket: gevent.spawn(self._recvData)
-        else:
-               errmsg = 'The are no alive AceStream Engines found!'
-               raise AceException(errmsg)
-               return
+        try:
+           self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
+           # Spawning recvData greenlet
+           if self._socket: gevent.spawn(self._recvData)
+           logger.debug('Successfully connected to AceStream on %s:%s' % (ace['aceHostIP'], ace['aceAPIport']))
+        except:
+           errmsg = 'The are no alive AceStream Engines found!'
+           raise AceException(errmsg)
+           return
 
     def destroy(self):
         '''
@@ -116,11 +108,12 @@ class AceClient(object):
             self._socket.write('%s\r\n' % message)
         except EOFError as e: raise AceException('Write error! %s' % repr(e))
 
-    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=AceConfig.acekey):
-        self._product_key = product_key
+    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=0):
         self._gender = gender
         self._age = age
-        self._seekback = AceConfig.videoseekback
+        self._product_key = product_key
+        self._seekback = videoseekback
+        self._videotimeout = float(videotimeout)
         self._started_again.clear()
 
         logger = logging.getLogger('AceClient_aceInit')
@@ -132,7 +125,6 @@ class AceClient(object):
             errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived.' % self._resulttimeout
             raise AceException(errmsg)
             return
-        self._engine_version_code = int(params.get('version_code', 0))
 
         self._result = AsyncResult()
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
@@ -145,25 +137,21 @@ class AceClient(object):
             errmsg = 'Engine response time %ssec exceeded. AUTH not resived.' % self._resulttimeout
             raise AceException(errmsg)
 
-        if self._engine_version_code >= 3003600: # Display download_stopped massage
+        if int(params.get('version_code', 0)) >= 3003600: # Display download_stopped massage
             params_dict = {'use_stop_notifications': '1'}
             self._write(AceMessage.request.SETOPTIONS(params_dict))
 
-    def START(self, datatype, value, stream_type):
+    def START(self, command, paramsdict, acestreamtype):
         '''
         Start video method
         Returns the url provided by AceEngine
         '''
-        if stream_type == 'hls' and self._engine_version_code >= 3010500:
-           params_dict = { 'output_format': stream_type, 'transcode_audio': AceConfig.transcode_audio,
-                           'transcode_mp3': AceConfig.transcode_mp3, 'transcode_ac3': AceConfig.transcode_ac3,
-                           'preferred_audio_language': AceConfig.preferred_audio_language }
-        else: params_dict = { 'output_format': 'http' }
+        paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
         self._urlresult = AsyncResult()
-        self._write(AceMessage.request.START(datatype.upper(), value, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])))
-        try: return self._urlresult.get(timeout=float(AceConfig.videotimeout)) # Get url for play from AceEngine
+        self._write(AceMessage.request.START(command.upper(), paramsdict))
+        try: return self._urlresult.get(timeout=self._videotimeout) # Get url for play from AceEngine
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. START URL not resived.' % AceConfig.videotimeout
+            errmsg = 'Engine response time %ssec exceeded. START URL not resived.' % self._videotimeout
             raise AceException(errmsg)
 
     def STOP(self):
@@ -177,24 +165,24 @@ class AceClient(object):
             errmsg = 'Engine response time %ssec exceeded. STATE 0 (IDLE) not resived.' % self._resulttimeout
             raise AceException(errmsg)
 
-    def LOADASYNC(self, datatype, params):
+    def LOADASYNC(self, command, params):
         self._result = AsyncResult()
-        self._write(AceMessage.request.LOADASYNC(datatype.upper(), random.randint(1, AceConfig.maxconns * 10000), params))
+        self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1, 100000), params))
         try: return self._result.get(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
         except gevent.Timeout:
             errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived.' % self._resulttimeout
             raise AceException(errmsg)
 
-    def GETCONTENTINFO(self, datatype, value):
-        params_dict = { datatype:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
-        return self.LOADASYNC(datatype, params_dict)
+    def GETCONTENTINFO(self, command, value):
+        paramsdict = { command:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
+        return self.LOADASYNC(command, paramsdict)
 
-    def GETCID(self, datatype, url):
-        contentinfo = self.GETCONTENTINFO(datatype, url)
+    def GETCID(self, command, value):
+        contentinfo = self.GETCONTENTINFO(command, value)
         if contentinfo['status'] in (1, 2):
-            params_dict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
+            paramsdict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
             self._cidresult = AsyncResult()
-            self._write(AceMessage.request.GETCID(params_dict))
+            self._write(AceMessage.request.GETCID(paramsdict))
             try:
                 cid = self._cidresult.get(timeout=self._resulttimeout)
                 return '' if cid is None or cid == '' else cid[2:]
@@ -206,8 +194,8 @@ class AceClient(object):
             errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
             raise AceException(errmsg)
 
-    def GETINFOHASH(self, datatype, url, idx=0):
-        contentinfo = self.GETCONTENTINFO(datatype, url)
+    def GETINFOHASH(self, command, value, idx=0):
+        contentinfo = self.GETCONTENTINFO(command, value)
         if contentinfo['status'] in (1, 2):
             return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
         elif contentinfo['status'] == 0:
@@ -219,7 +207,7 @@ class AceClient(object):
 
     def StreamReader(self, url, cid, counter, req_headers=None):
         logger = logging.getLogger('StreamReader')
-        logger.debug('Open the url received from AceEngine: %s' % url)
+        logger.debug('Start StreamReader for url: %s' % url)
 
         self._write(AceMessage.request.EVENT('play'))
         self._streamReaderState.set()
@@ -235,7 +223,6 @@ class AceClient(object):
                   while self._streamReaderState.ready():
                      for chunk in session.get(url, stream=True, timeout = (5,None)).iter_lines():
                        if chunk and chunk.startswith(b'http://'):
-                           chunk = requests.compat.urlparse(chunk.decode('utf-8'))._replace(netloc='%s:%d' % (AceConfig.acehost, AceConfig.aceHTTPport)).geturl()
                            if chunk not in _used_chunks:
                                if len(_used_chunks) <= 15: _used_chunks.append(chunk)
                                else: _used_chunks.pop(0); _used_chunks.append(chunk)
@@ -278,8 +265,8 @@ class AceClient(object):
                                   c.destroy()
                           except gevent.GreenletExit: pass
                   else: break
-               elif STATE[0] == '3' and (time.time() - STATE[1]) >= AceConfig.videotimeout: # STATE 3 (BUFFERING)
-                   logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % AceConfig.videotimeout); break
+               elif STATE[0] == '3' and (time.time() - STATE[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
+                   logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); break
            else: logger.debug('All clients disconnected - broadcast stoped'); break
 
     def _recvData(self):

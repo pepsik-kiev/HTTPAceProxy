@@ -1,6 +1,4 @@
-'''
-AceProxy configuration scrip Edit this file.
-'''
+''' AceProxy configuration scrip Edit this file. '''
 
 import acedefconfig, logging
 from aceclient.acemessages import AceConst
@@ -14,19 +12,14 @@ class AceConfig(acedefconfig.AceDefConfig):
     acespawn = False
     # Ace Stream cmd line (use `--log-file filepath` to write log)
     # You need to set it only on Linux based systems. Autodetect for Windows!
-    acecmd = "acestreamengine --client-console --live-buffer 25 --vod-buffer 10 --vod-drop-max-age 120"
+    acecmd = 'acestreamengine --client-console --live-buffer 25 --vod-buffer 10 --vod-drop-max-age 120'
     # Ace Stream API key
     # You probably shouldn't touch this
     acekey = 'n51LvQoTlJzNGaFxseRK-uvnvX-sD4Vm5Axwmc4UcoD-jruxmKsuJaH0eVgE'
-    # List of available AceStream Engines
-    # Remember that by default Ace Stream Engine listens only Local host IP, so start it with --bind-all parameter
-    # if you want to use it in remote access mode
-    # Example string for AceEngine parameters ['AceEngineIP', aceAPIport, aceHTTPport]
-    # You can change Engine API port or Engine HTTP port by using --api-port= or --http-port= in startup parameters.
-    # Default values is --api-port=62062 --http-port=6878
-    acehostslist =(
-                   ['127.0.0.1', 62062, 6878],
-                   )
+    # By default Ace Stream Engine listens only Localhost IP, so if you want to use a running
+    # somewhere (remotely) AceEngine - start it  with --bind-all parameter, set acespawn=False
+    # and enter your settings below
+    ace = { 'aceHostIP': '192.168.1.10', 'aceAPIport': '62062', 'aceHTTPport': '6878' }
     # Ace Stream age parameter (LT_13, 13_17, 18_24, 25_34, 35_44, 45_54,
     # 55_64, GT_65)
     aceage = AceConst.AGE_35_44
@@ -41,21 +34,15 @@ class AceConfig(acedefconfig.AceDefConfig):
     aceconntimeout = 5
     # Ace Stream Engine authentication result & API port answers timeout
     aceresulttimeout = 10
+    # ----------------------------------------------------
     # Ace Stream Engine stream type hls or http
-    # Support if AceEngine version_code >= 3010500
-    # !!!! Note ! If you want use hls you need to install ffmpeg !!!!
-    streamtype = 'http'
     # ----------------------------------------------------
-    # Transcoding configuration for HLS
-    # ----------------------------------------------------
-    # Transcode All audio to AAC
-    transcode_audio = 0
+    # For HLS transcode options is avalible:
+    # Transcode All audio to AAC (transcode_audio=1)
     # Transcode MP3 (use only when transcode_audio=1)
-    transcode_mp3 = 0
     # Transcode only AC3 to AAC (use only when transcode_audio=0)
-    transcode_ac3 = 0
-    # Prefered audio language in translation on start http://xml.coverpages.org/nisoLang3-1994.html
-    preferred_audio_language = 'rus'
+    acestreamtype = {'output_format': 'http'}
+    #acestreamtype = {'output_format': 'hls', 'transcode_audio': 0, 'transcode_mp3': 0, 'transcode_ac3': 0, 'preferred_audio_language': 'rus'}
     # ----------------------------------------------------
     # Seek back feature.
     # Seeks stream back for specified amount of seconds.
@@ -68,7 +55,6 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Time in seconds allocated to fill the start buffer of the broadcast
     # 0 - disable
     videostartbuffertime = 3
-    #
     # ----------------------------------------------------
     # HTTP AceProxy configuration
     # ----------------------------------------------------
@@ -100,21 +86,17 @@ class AceConfig(acedefconfig.AceDefConfig):
     #       Transcoding configuration for HTTP AceProxy
     # (Lnux based OS Only!!! This solution didn't work on Windows OS)
     # ----------------------------------------------------
-    #
-    # Enable/disable transcoding
-    transcode = False
-    # Dictionary with a set of transcoding commands. Transcoding command is an executable commandline expression
+    # Transcoding Dictionary with a set of transcoding commands. Transcoding command is an executable commandline expression
     # that reads an input stream from STDIN and writes a transcoded stream to STDOUT. The commands are selected
     # according to the value of the 'fmt' request parameter. For example, the following url:
     # http://loclahost:8000/channels/?type=m3u&fmt=mp2
     # contains the fmt=mp2. It means that the 'mp2' command will be used for transcoding. You may add any number
     # of commands to this dictionary.
-    transcodecmd = dict()
-    # transcodecmd['100k'] = 'ffmpeg -i - -c:a copy -b 100k -f mpegts -'
-    # transcodecmd['mp2'] = 'ffmpeg -i - -c:a mp2 -c:v mpeg2video -f mpegts -qscale:v 2 -'.split()
-    transcodecmd['mkv'] = 'ffmpeg -hide_banner -nostats -loglevel info -i - -map 0 -c:v copy -c:a copy -f matroska -'.split()
-    transcodecmd['hls'] = 'ffmpeg -nostats -loglevel info -i - -map 0 -c copy -force_key_frames "expr:gte(t,n_forced*2)" -f hls -start_number 0 -hls_time 6 -hls_playlist_type event -hls_allow_cache 1 -hls_flags single_file+split_by_time+delete_segments+omit_endlist+append_list -'.split()
-    transcodecmd['default'] = 'ffmpeg -i - -map 0 -c:a copy -c:v copy -f mpegts -'.split()
+    # !!!!!! Ffmpeg instaled is required !!!!!!
+    #transcodecmd['100k'] = 'ffmpeg -i - -c:a copy -b 100k -f mpegts -'.split()
+    #transcodecmd['mp2'] = 'ffmpeg -i - -c:a mp2 -c:v mpeg2video -f mpegts -qscale:v 2 -'.split()
+    #transcodecmd['mkv'] = 'ffmpeg -i - -map 0 -c:v copy -c:a copy -f matroska -'.split()
+    #transcodecmd['default'] = 'ffmpeg -i - -map 0 -c:a copy -c:v copy -f mpegts -'.split()
     #
     # ----------------------------------------------------
     # Other settings
@@ -125,9 +107,11 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     loglevel = logging.DEBUG
     # Log message format
-    logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'
+    logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s] %(message)s'
+    #logfmt = '%(filename)s - %(name)s - %(threadName)s - [LINE:%(lineno)s]# - %(levelname)s - [%(asctime)s] - %(message)s' # for debug
+    #logfmt = '%(asctime)s{%(name)s}%(filename)s[line:%(lineno)d]<%(funcName)s> pid:%(process)d %(threadName)s %(levelname)s : %(message)s'
     # Log date format
-    logdatefmt='%d.%m %H:%M:%S'
+    logdatefmt = '%d.%m %H:%M:%S'
     # Full path to a log file
     # For Windows OS something like that logfile = "c:\\Python27\\log_AceHttp.txt"
     logfile = None
