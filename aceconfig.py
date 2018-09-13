@@ -93,6 +93,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # contains the fmt=mp2. It means that the 'mp2' command will be used for transcoding. You may add any number
     # of commands to this dictionary.
     # !!!!!! Ffmpeg instaled is required !!!!!!
+    transcodecmd = {}
     #transcodecmd['100k'] = 'ffmpeg -i - -c:a copy -b 100k -f mpegts -'.split()
     #transcodecmd['mp2'] = 'ffmpeg -i - -c:a mp2 -c:v mpeg2video -f mpegts -qscale:v 2 -'.split()
     #transcodecmd['mkv'] = 'ffmpeg -i - -map 0 -c:v copy -c:a copy -f matroska -'.split()
