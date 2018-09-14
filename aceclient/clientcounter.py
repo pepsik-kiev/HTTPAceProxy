@@ -50,7 +50,6 @@ class ClientCounter(object):
                     return len(clients)
                 else:
                     del self.streams[cid]
-                    client.ace._streamReaderState.clear()
                     if self.idleace: client.ace.destroy()
                     else:
                          try:
@@ -69,7 +68,6 @@ class ClientCounter(object):
                 clients = self.streams[cid]
                 del self.streams[cid]
                 self.total -= len(clients)
-                clients[0].ace._streamReaderState.clear()
                 if self.idleace: clients[0].ace.destroy()
                 else:
                     try:
@@ -91,5 +89,5 @@ class ClientCounter(object):
         while 1:
             gevent.sleep(self.idleSince)
             if self.idleace and self.idleace._state.ready():
-                STATE = self.idleace._state.get_nowait()
+                STATE = self.idleace._state.get()
                 if STATE[0] == '0' and (time.time() - STATE[1]) >= self.idleSince: self.destroyIdle()

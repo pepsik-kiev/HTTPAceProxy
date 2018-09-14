@@ -63,8 +63,6 @@ class AceClient(object):
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
-        # AceEngine Streamreader state flag
-        self._streamReaderState = Event()
         # AceEngine Streamreader ring buffer with max number of chunks in queue
         self._streamReaderQueue = gevent.queue.Queue(maxsize=1000)
 
@@ -73,13 +71,13 @@ class AceClient(object):
         # Try to connect AceStream engine
         try:
            self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
-           # Spawning recvData greenlet
-           if self._socket: gevent.spawn(self._recvData)
+           # Spawning telnet data reader greenlet
+           gevent.spawn(self._recvData)
            logger.debug('Successfully connected to AceStream on %s:%s' % (ace['aceHostIP'], ace['aceAPIport']))
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-           return
+        finally: return
 
     def destroy(self):
         '''
@@ -98,8 +96,8 @@ class AceClient(object):
 
     def reset(self):
         self._started_again.clear()
-        self._streamReaderState.clear()
         self._result.set()
+        self._urlresult.set()
 
     def _write(self, message):
         try:
@@ -122,7 +120,7 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try: params = self._result.get(timeout=self._resulttimeout)
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived.' % self._resulttimeout
+            errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived!' % self._resulttimeout
             raise AceException(errmsg)
             return
 
@@ -134,7 +132,7 @@ class AceClient(object):
                raise AceException(errmsg)
                return
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. AUTH not resived.' % self._resulttimeout
+            errmsg = 'Engine response time %ssec exceeded. AUTH not resived!' % self._resulttimeout
             raise AceException(errmsg)
 
         if int(params.get('version_code', 0)) >= 3003600: # Display download_stopped massage
@@ -151,7 +149,7 @@ class AceClient(object):
         self._write(AceMessage.request.START(command.upper(), paramsdict))
         try: return self._urlresult.get(timeout=self._videotimeout) # Get url for play from AceEngine
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. START URL not resived.' % self._videotimeout
+            errmsg = 'Engine response time %ssec exceeded. START URL not resived!' % self._videotimeout
             raise AceException(errmsg)
 
     def STOP(self):
@@ -160,17 +158,17 @@ class AceClient(object):
         '''
         self._state = AsyncResult()
         self._write(AceMessage.request.STOP)
-        try: self._state.get(timeout=self._resulttimeout)
+        try: self._state.get(timeout=self._resulttimeout); self._started_again.clear()
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. STATE 0 (IDLE) not resived.' % self._resulttimeout
+            errmsg = 'Engine response time %ssec exceeded. STATE 0 (IDLE) not resived!' % self._resulttimeout
             raise AceException(errmsg)
 
     def LOADASYNC(self, command, params):
         self._result = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1, 100000), params))
-        try: return self._result.get(timeout=self._resulttimeout) # Get _contentinfo json from AceEngine
+        try: return self._result.get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout:
-            errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived.' % self._resulttimeout
+            errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived!' % self._resulttimeout
             raise AceException(errmsg)
 
     def GETCONTENTINFO(self, command, value):
@@ -187,7 +185,7 @@ class AceClient(object):
                 cid = self._cidresult.get(timeout=self._resulttimeout)
                 return '' if cid is None or cid == '' else cid[2:]
             except gevent.Timeout:
-                 errmsg = 'Engine response time %ssec exceeded. CID not resived.' % self._resulttimeout
+                 errmsg = 'Engine response time %ssec exceeded. CID not resived!' % self._resulttimeout
                  raise AceException(errmsg)
         else:
             cid = None
@@ -210,7 +208,6 @@ class AceClient(object):
         logger.debug('Start StreamReader for url: %s' % url)
 
         self._write(AceMessage.request.EVENT('play'))
-        self._streamReaderState.set()
 
         with requests.Session() as session:
            if req_headers:
@@ -220,14 +217,15 @@ class AceClient(object):
               # AceEngine return link for HLS stream
               if url.endswith('.m3u8'):
                   _used_chunks = []
-                  while self._streamReaderState.ready():
+                  while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
                      for chunk in session.get(url, stream=True, timeout = (5,None)).iter_lines():
-                       if chunk and chunk.startswith(b'http://'):
-                           if chunk not in _used_chunks:
-                               if len(_used_chunks) <= 15: _used_chunks.append(chunk)
-                               else: _used_chunks.pop(0); _used_chunks.append(chunk)
-                               with requests.get(chunk, stream=True, timeout=(5,None)) as stream:
+                        if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
+                        if chunk.startswith(b'http://') and chunk not in _used_chunks:
+                            with requests.get(chunk, stream=True, timeout=(5,None)) as stream:
                                   self.RAWDataReader(stream.raw, cid, counter)
+                            _used_chunks.append(chunk)
+                            if len(_used_chunks) > 15: _used_chunks.pop(0)
+                     gevent.sleep(4)
               # AceStream return link for HTTP stream
               else: self.RAWDataReader(session.get(url, stream=True, timeout = (5,None)).raw, cid, counter)
 
@@ -245,29 +243,25 @@ class AceClient(object):
     def RAWDataReader(self, stream, cid, counter):
         logger = logging.getLogger('RAWDataReader')
 
-        while self._streamReaderState.ready():
+        while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
            gevent.sleep()
-           clients = counter.getClients(cid)
-           if clients:
-               STATE = self._state.get_nowait()
-               if STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
-                  data = stream.read(requests.models.CONTENT_CHUNK_SIZE)
-                  if data:
-                       try: self._streamReaderQueue.put_nowait(data)
-                       except gevent.queue.Full:
-                           self._streamReaderQueue.get_nowait()
-                           self._streamReaderQueue.put_nowait(data)
-                       for c in clients:
-                          try: c.queue.put(data, timeout=5)
-                          except gevent.queue.Full:
-                              if len(clients) > 1:
-                                  logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
-                                  c.destroy()
-                          except gevent.GreenletExit: pass
-                  else: break
-               elif STATE[0] == '3' and (time.time() - STATE[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
-                   logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); break
-           else: logger.debug('All clients disconnected - broadcast stoped'); break
+           if self._state.get(timeout=self._resulttimeout)[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
+              data = stream.read(requests.models.CONTENT_CHUNK_SIZE)
+              if not data: return
+              try: self._streamReaderQueue.put_nowait(data)
+              except gevent.queue.Full:
+                   self._streamReaderQueue.get_nowait()
+                   self._streamReaderQueue.put_nowait(data)
+              clients = counter.getClients(cid)
+              if not clients: return
+              for c in clients:
+                 try: c.queue.put(data, timeout=5)
+                 except gevent.queue.Full:
+                     if len(clients) > 1:
+                         logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
+                         c.destroy()
+           elif (time.time() - self._state.get(timeout=self._resulttimeout)[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
+                   logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); return
 
     def _recvData(self):
         '''
@@ -280,6 +274,7 @@ class AceClient(object):
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
                 logger.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+            except gevent.GreenletExit: break
             except:
                 # If something happened during read, abandon reader.
                 logger.error('Exception at socket read. AceClient destroyed')
@@ -319,12 +314,12 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:starting'): pass
                     elif self._tempstatus.startswith('main:check'): pass
                     elif self._tempstatus.startswith('main:wait'): pass
-                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): # progress;time
-                       values = list(map(int, self._tempstatus.split(';')[3:]))
-                       self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
-                    elif self._tempstatus.startswith('main:dl'):
-                       values = list(map(int, self._tempstatus.split(';')[1:]))
-                       self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): pass #progress;time
+                       #values = list(map(int, self._tempstatus.split(';')[3:]))
+                       #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith('main:dl'): pass
+                       #values = list(map(int, self._tempstatus.split(';')[1:]))
+                       #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
                     elif self._tempstatus.startswith('main:err'): # err;error_id;error_message
                        self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[3])))
                 # CID
@@ -334,8 +329,7 @@ class AceClient(object):
                 # EVENT
                 elif self._recvbuffer.startswith('EVENT'):
                     self._tempevent = self._recvbuffer.split()
-                    if 'livepos' in self._tempevent:
-                       if self._seekback and not self._started_again.ready(): # if seekback
+                    if self._seekback and not self._started_again.ready() and 'livepos' in self._tempevent:
                            params = { k:v for k,v in (x.split('=') for x in self._tempevent if '=' in x) }
                            self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
                            self._started_again.set()
@@ -353,4 +347,4 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('SHUTDOWN'):
                     self._socket.close()
                     logger.debug('AceClient destroyed')
-                    return
+                    break
