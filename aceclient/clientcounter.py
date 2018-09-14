@@ -89,5 +89,5 @@ class ClientCounter(object):
         while 1:
             gevent.sleep(self.idleSince)
             if self.idleace and self.idleace._state.ready():
-                STATE = self.idleace._state.get()
+                STATE = self.idleace._state.get_nowait()
                 if STATE[0] == '0' and (time.time() - STATE[1]) >= self.idleSince: self.destroyIdle()

@@ -218,12 +218,11 @@ class AceClient(object):
               if url.endswith('.m3u8'):
                   _used_chunks = []
                   while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
-                     for chunk in session.get(url, stream=True, timeout = (5,None)).iter_lines():
+                     for line in session.get(url, stream=True, timeout = (5,None)).iter_lines():
                         if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
-                        if chunk.startswith(b'http://') and chunk not in _used_chunks:
-                            with requests.get(chunk, stream=True, timeout=(5,None)) as stream:
-                                  self.RAWDataReader(stream.raw, cid, counter)
-                            _used_chunks.append(chunk)
+                        if line.startswith(b'http://') and line not in _used_chunks:
+                            self.RAWDataReader(session.get(line, stream=True, timeout=(5,None)).raw, cid, counter)
+                            _used_chunks.append(line)
                             if len(_used_chunks) > 15: _used_chunks.pop(0)
                      gevent.sleep(4)
               # AceStream return link for HTTP stream
@@ -249,9 +248,7 @@ class AceClient(object):
               data = stream.read(requests.models.CONTENT_CHUNK_SIZE)
               if not data: return
               try: self._streamReaderQueue.put_nowait(data)
-              except gevent.queue.Full:
-                   self._streamReaderQueue.get_nowait()
-                   self._streamReaderQueue.put_nowait(data)
+              except gevent.queue.Full: self._streamReaderQueue.get_nowait(); self._streamReaderQueue.put_nowait(data)
               clients = counter.getClients(cid)
               if not clients: return
               for c in clients:
@@ -304,7 +301,7 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('LOADRESP'):
                     self._result.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
                 # STATE
-                elif self._recvbuffer.startswith('STATE'): # (state_id, time of appearance)
+                elif self._recvbuffer.startswith('STATE'): # tuple of (state_id, time of appearance)
                     self._state.set((self._recvbuffer.split()[1], time.time()))
                 # STATUS
                 elif self._recvbuffer.startswith('STATUS'):
