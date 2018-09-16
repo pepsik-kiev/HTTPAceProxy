@@ -234,7 +234,6 @@ class AceClient(object):
                    logger.error('There was an ambiguous exception that occurred while handling request')
            except Exception as err:
                    logger.error('Unexpected error in streamreader %s' % repr(err))
-                   logger.error(traceback.format_exc())
            finally:
                    _used_chunks = None
                    self._streamReaderQueue.queue.clear()
@@ -319,7 +318,7 @@ class AceClient(object):
                        #values = list(map(int, self._tempstatus.split(';')[1:]))
                        #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
                     elif self._tempstatus.startswith('main:err'): # err;error_id;error_message
-                       self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[3])))
+                       self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
                 # CID
                 elif self._recvbuffer.startswith('##'): self._cidresult.set(self._recvbuffer)
                 # INFO
