@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 '''
 Torrent-tv.ru Playlist Downloader Plugin
 http://ip:port/ttvplaylist
@@ -27,7 +27,6 @@ class Torrenttv(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceStuff):
         self.logger = logging.getLogger('torrenttv_plugin')
-        self.lock = gevent.lock.Semaphore()
         self.channels = self.playlist = self.playlisttime = self.etag = self.tvgid = None
         self.logomap = config.logomap
         self.epg_id = { k:'' for k in self.logomap }
@@ -37,7 +36,7 @@ class Torrenttv(AceProxyPlugin):
 
     def playlistTimedDownloader(self):
         while 1:
-            with self.lock: self.downloadPlaylist()
+            self.downloadPlaylist()
             gevent.sleep(config.updateevery * 60)
 
     def downloadPlaylist(self):
@@ -92,54 +91,53 @@ class Torrenttv(AceProxyPlugin):
 
     def handle(self, connection, headers_only=False):
         play = False
-        with self.lock:
-            # 30 minutes cache
-            if not self.playlist or (int(time.time()) - self.playlisttime > 30 * 60):
-                self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
-                if not self.downloadPlaylist(): connection.dieWithError(); return
+        # 30 minutes cache
+        if not self.playlist or (int(time.time()) - self.playlisttime > 30 * 60):
+            self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
+            if not self.downloadPlaylist(): connection.dieWithError(); return
 
-            url = requests.compat.urlparse(connection.path)
-            path = url.path[0:-1] if url.path.endswith('/') else url.path
-            params = parse_qs(connection.query)
+        url = requests.compat.urlparse(connection.path)
+        path = url.path[0:-1] if url.path.endswith('/') else url.path
+        params = parse_qs(connection.query)
 
-            if path.startswith('/torrenttv/channel/'):
-                if not path.endswith('.ts'):
-                    connection.dieWithError(404, 'Invalid path: %s' % requests.compat.unquote(path), logging.ERROR)
-                    return
-                try: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3]).decode('utf-8')
-                except AttributeError: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3])
-                url = self.channels.get(name, None)
-                if url is None:
-                    connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
-                elif url.startswith('acestream://'):
-                    connection.path = '/content_id/%s/stream.ts' % url.split('/')[2]
-                elif url.startswith('infohash://'):
-                    connection.path = '/infohash/%s/stream.ts' % url.split('/')[2]
-                elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                    connection.path = '/url/%s/stream.ts' % requests.compat.quote(url,'')
-                connection.splittedpath = connection.path.split('/')
-                connection.reqtype = connection.splittedpath[1].lower()
-                play = True
-            elif self.etag == connection.headers.get('If-None-Match'):
-                self.logger.debug('ETag matches - returning 304')
-                connection.send_response(304)
-                connection.send_header('Connection', 'close')
-                connection.end_headers()
+        if path.startswith('/torrenttv/channel/'):
+            if not path.endswith('.ts'):
+                connection.dieWithError(404, 'Invalid path: %s' % requests.compat.unquote(path), logging.ERROR)
                 return
-            else:
-                self.logger.debug('Exporting m3u playlist')
-                hostport = connection.headers['Host']
-                path = '' if len(self.channels) == 0 else '/torrenttv/channel'
-                add_ts = True if path.endswith('/ts') else False
-                exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
+            try: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3]).decode('utf-8')
+            except AttributeError: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3])
+            url = self.channels.get(name, None)
+            if url is None:
+                connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
+            elif url.startswith('acestream://'):
+                connection.path = '/content_id/%s/stream.ts' % url.split('/')[2]
+            elif url.startswith('infohash://'):
+                connection.path = '/infohash/%s/stream.ts' % url.split('/')[2]
+            elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
+                connection.path = '/url/%s/stream.ts' % requests.compat.quote(url,'')
+            connection.splittedpath = connection.path.split('/')
+            connection.reqtype = connection.splittedpath[1].lower()
+            play = True
+        elif self.etag == connection.headers.get('If-None-Match'):
+            self.logger.debug('ETag matches - returning 304')
+            connection.send_response(304)
+            connection.send_header('Connection', 'close')
+            connection.end_headers()
+            return
+        else:
+            self.logger.debug('Exporting m3u playlist')
+            hostport = connection.headers['Host']
+            path = '' if len(self.channels) == 0 else '/torrenttv/channel'
+            add_ts = True if path.endswith('/ts') else False
+            exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
 
-                connection.send_response(200)
-                connection.send_header('Content-Type', 'application/x-mpegurl')
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('ETag', self.etag)
-                connection.send_header('Content-Length', str(len(exported)))
-                connection.send_header('Connection', 'close')
-                connection.end_headers()
+            connection.send_response(200)
+            connection.send_header('Content-Type', 'application/x-mpegurl')
+            connection.send_header('Access-Control-Allow-Origin', '*')
+            connection.send_header('ETag', self.etag)
+            connection.send_header('Content-Length', str(len(exported)))
+            connection.send_header('Connection', 'close')
+            connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=params.get('fmt', [''])[0])
+        if play and connection: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only: connection.wfile.write(exported)

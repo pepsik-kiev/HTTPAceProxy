@@ -234,6 +234,7 @@ class AceClient(object):
                    logger.error('There was an ambiguous exception that occurred while handling request')
            except Exception as err:
                    logger.error('Unexpected error in streamreader %s' % repr(err))
+                   logger.error(traceback.format_exc())
            finally:
                    _used_chunks = None
                    self._streamReaderQueue.queue.clear()

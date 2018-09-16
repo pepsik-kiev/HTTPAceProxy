@@ -10,7 +10,6 @@ import requests
 import xml.dom.minidom as dom
 import logging
 import time
-import gevent.lock
 try: from ConfigParser import RawConfigParser
 except: from configparser import RawConfigParser
 
@@ -44,7 +43,6 @@ class TorrentTvApi(object):
         self.email = email
         self.password = password
         self.allTranslations = self.session = self.guid = None
-        self.lock = gevent.lock.RLock()
         self.log = logging.getLogger("TTV API")
         self.conf = RawConfigParser()
         self.headers = {'User-Agent': 'Magic Browser'} # headers for connection to the TTV API
@@ -69,23 +67,22 @@ class TorrentTvApi(object):
             self.session = None
             self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6)))) # get device mac address
 
-        with self.lock:
-            if self.session is None or self.session == '':
-               self.log.debug('Creating new session')
-               url = TorrentTvApi.API_URL + 'auth.php'
-               params = {'typeresult': 'json', 'username':self.email, 'password': self.password, 'application': 'tsproxy', 'guid': self.guid}
-               result = self._jsoncheck(requests.get(url, params=params, headers=self.headers, timeout=5).json())
-               self.session = result['session']
-               self.log.debug("New session created: %s" % self.session)
-               # Store session detales to config file
-               if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
-               self.conf.set('torrenttv_api', 'email', self.email)
-               self.conf.set('torrenttv_api', 'session', self.session)
-               self.conf.set('torrenttv_api', 'guid', self.guid)
-               with open('.aceconfig', 'w+') as config: self.conf.write(config)
-            else: self.log.debug('Reusing saved session: %s' % self.session)
+        if self.session is None or self.session == '':
+            self.log.debug('Creating new session')
+            url = TorrentTvApi.API_URL + 'auth.php'
+            params = {'typeresult': 'json', 'username':self.email, 'password': self.password, 'application': 'tsproxy', 'guid': self.guid}
+            result = self._jsoncheck(requests.get(url, params=params, headers=self.headers, timeout=5).json())
+            self.session = result['session']
+            self.log.debug("New session created: %s" % self.session)
+            # Store session detales to config file
+            if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
+            self.conf.set('torrenttv_api', 'email', self.email)
+            self.conf.set('torrenttv_api', 'session', self.session)
+            self.conf.set('torrenttv_api', 'guid', self.guid)
+            with open('.aceconfig', 'w+') as config: self.conf.write(config)
+        else: self.log.debug('Reusing saved session: %s' % self.session)
 
-            return self.session
+        return self.session
 
     def translations(self, translation_type, raw=False):
         """
@@ -266,11 +263,10 @@ class TorrentTvApi(object):
             raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
 
     def _resetSession(self):
-        with self.lock:
-            self.allTranslations = self.session = None
-            try: self.conf.read('.aceconfig')
-            except: pass
-            if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
-            self.conf.set('torrenttv_api', 'session', '')
-            with open('.aceconfig', 'w+') as config: self.conf.write(config)
-            self.auth()
+        self.allTranslations = self.session = None
+        try: self.conf.read('.aceconfig')
+        except: pass
+        if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
+        self.conf.set('torrenttv_api', 'session', '')
+        with open('.aceconfig', 'w+') as config: self.conf.write(config)
+        self.auth()

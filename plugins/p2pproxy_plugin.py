@@ -19,7 +19,6 @@ __author__ = 'miltador, Dorik1972'
 
 import logging
 from requests.compat import quote, unquote
-from aceconfig import AceConfig
 from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
 

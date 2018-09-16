@@ -117,7 +117,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except Exception as e: self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+            except Exception as e:
+                self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+                logger.error(traceback.format_exc())
             finally: return
         self.handleRequest(headers_only)
 
@@ -186,7 +188,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
+        except Exception as e:
+                self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
+                logger.error(traceback.format_exc())
         else:
             # streaming to client
             self.client.handle(self.reqparams.get('fmt', [''])[0])
@@ -198,8 +202,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def getINFOHASH(self, reqtype, url, idx):
         if reqtype not in ('direct_url', 'efile_url'):
-          with AceStuff.clientcounter.lock:
-             if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = createAce()
+          if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = createAce()
           return AceStuff.clientcounter.idleace.GETINFOHASH(reqtype, url, idx)
 
 class Client:

@@ -5,7 +5,6 @@ Simple statistics plugin
 To use it, go to http://acehttp_proxy_ip:port/stat
 '''
 from PluginInterface import AceProxyPlugin
-from aceconfig import AceConfig
 from gevent.subprocess import Popen, PIPE
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
@@ -38,13 +37,13 @@ class Stat(AceProxyPlugin):
     def mac_lookup(self,ip_address):
 
         mac_address = None
-        if ip_address == AceConfig.httphost:
+        if ip_address == self.config.httphost:
            from uuid import getnode
            try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6))))
            except: pass
         else:
            try:
-              if AceConfig.osplatform != 'Windows':
+              if self.config.osplatform != 'Windows':
                  p1 = Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
                  p2 = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
               else:
@@ -94,15 +93,15 @@ class Stat(AceProxyPlugin):
             response = {}
             response['status'] = 'success'
             response['sys_info'] = {
-                 'os_platform': AceConfig.osplatform,
+                 'os_platform': self.config.osplatform,
                  'cpu_nums': psutil.cpu_count(),
                  'cpu_percent': psutil.cpu_percent(interval=1),
-                 'total_ram': AceConfig.bytes2human(max_mem.total),
-                 'used_ram': AceConfig.bytes2human(max_mem.used),
-                 'free_ram': AceConfig.bytes2human(max_mem.available),
-                 'total_disk': AceConfig.bytes2human(disk.total),
-                 'used_disk': AceConfig.bytes2human(disk.used),
-                 'free_disk': AceConfig.bytes2human(disk.free),
+                 'total_ram': self.config.bytes2human(max_mem.total),
+                 'used_ram': self.config.bytes2human(max_mem.used),
+                 'free_ram': self.config.bytes2human(max_mem.available),
+                 'total_disk': self.config.bytes2human(disk.total),
+                 'used_disk': self.config.bytes2human(disk.used),
+                 'free_disk': self.config.bytes2human(disk.free),
                   }
 
             response['connection_info'] = {
@@ -111,35 +110,31 @@ class Stat(AceProxyPlugin):
                 }
 
             response['clients_data'] = []
-            with self.stuff.clientcounter.lock:
-              for i in self.stuff.clientcounter.streams:
-                 for c in self.stuff.clientcounter.streams[i]:
-                    if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
-                       clientInfo = self.mac_lookup(c.handler.clientip)
-                    else:
-                       clientInfo =u'<i class="flag {country_code}"></i>&nbsp;&nbsp;{country}, {city}'.format(**self.geo_ip_lookup(c.handler.clientip))
+            # Dict {'CID': [client1, client2,....]} to list of values
+            clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
+            for c in clients:
+               if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
+                  clientInfo = self.mac_lookup(c.handler.clientip)
+               else:
+                  clientInfo =u'<i class="flag {country_code}"></i>&nbsp;&nbsp;{country}, {city}'.format(**self.geo_ip_lookup(c.handler.clientip))
 
-                    client_data = {
-                        'channelIcon': c.channelIcon,
-                        'channelName': c.channelName,
-                        'clientIP': c.handler.clientip,
-                        'clientLocation': clientInfo,
-                        'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
-                        'durationTime': time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime))
-                         }
+               client_data = {
+                    'channelIcon': c.channelIcon,
+                    'channelName': c.channelName,
+                    'clientIP': c.handler.clientip,
+                    'clientLocation': clientInfo,
+                    'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
+                    'durationTime': time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime))
+                     }
 
-                    response['clients_data'].append(client_data)
-
+               response['clients_data'].append(client_data)
             connection.wfile.write(requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8'))
-
         else:
-
-          connection.send_response(200)
-          connection.send_header('Content-type', 'text/html; charset=utf-8')
-          connection.send_header('Connection', 'close')
-          connection.end_headers()
-
-          connection.wfile.write(html_template)
+            connection.send_response(200)
+            connection.send_header('Content-type', 'text/html; charset=utf-8')
+            connection.send_header('Connection', 'close')
+            connection.end_headers()
+            connection.wfile.write(html_template)
 
 
 html_template = b"""
