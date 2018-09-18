@@ -23,6 +23,7 @@ class Torrentfilms(AceProxyPlugin):
     handlers = ('films', 'proxyfilms')
 
     def __init__(self, AceConfig, AceStuff):
+        self.config = AceConfig
         self.logger = logging.getLogger('plugin_TorrentFilms')
         self.playlist = []
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
@@ -89,9 +90,8 @@ class Torrentfilms(AceProxyPlugin):
                  if fmt: ln += '/stream.mp4/?fmt=' + fmt +'\n'
                  else: ln += '/stream.mp4\n'
              else:
-                  ln += 'http://%s:%s/ace/%s?infohash=%s&transcode_audio=%s&transcode_mp3=%s&transcode_ac3=%s&preferred_audio_language=%s&_idx=%s\n' % \
-                        (AceConfig.httphost, AceConfig.ace['aceHTTPport'], config.streamtype, infohash, AceConfig.transcode_audio,
-                         AceConfig.transcode_mp3, AceConfig.transcode_ac3, AceConfig.preferred_audio_language, key)
+                  ln += 'http://%s:%s/ace/%s?infohash=%s&_idx=%s\n' % \
+                        (self.config.httphost, self.config.ace['aceHTTPport'], config.streamtype, infohash, key)
 
         self.logger.info('Torrent  playlist created')
         return ln
