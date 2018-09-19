@@ -188,9 +188,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 logger.warning('Broadcast "%s" created' % self.client.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-        except Exception as e:
-                self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
-                logger.error(traceback.format_exc())
+        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
             # streaming to client
             self.client.handle(self.reqparams.get('fmt', [''])[0])
@@ -494,7 +492,13 @@ if AceStuff.ace:
     # Refreshes the acestream.port file for OS Windows.....
     if AceConfig.osplatform == 'Windows': detectPort()
     else: gevent.sleep(AceConfig.acestartuptimeout)
-else: logger.info('Remote AceStream engine will be used on %s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
+else:
+    try:
+       url = 'http://%s:%s/webui/api/service' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
+       params = {'method': 'get_version', 'format': 'json', 'callback': 'mycallback'}
+       version = requests.get(url, params=params, timeout=5).json()['result']['version']
+       logger.info('Remote AceStream engine ver.%s will be used on %s:%s' % (version, AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
+    except: logger.error('AceStream not found!')
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
