@@ -71,13 +71,13 @@ class AceClient(object):
         # Try to connect AceStream engine
         try:
            self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
-           # Spawning telnet data reader greenlet
-           gevent.spawn(self._recvData)
            logger.debug('Successfully connected to AceStream on %s:%s' % (ace['aceHostIP'], ace['aceAPIport']))
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        finally: return
+        else:
+           # Spawning telnet data reader greenlet
+           gevent.spawn(self._recvData)
 
     def destroy(self):
         '''
