@@ -38,7 +38,6 @@ class AceDefConfig(object):
     #transcodecmd['default'] = 'ffmpeg -i - -c:a copy -c:v copy -f mpegts -'.split()
     videoseekback = 0
     videotimeout = 30
-    videostartbuffertime = 0
     fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
     loglevel = logging.DEBUG
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s]  %(message)s'

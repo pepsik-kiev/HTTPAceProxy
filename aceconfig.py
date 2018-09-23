@@ -52,9 +52,6 @@ class AceConfig(acedefconfig.AceDefConfig):
     videoseekback = 0
     # Waiting time response from AceEngine server for playable url or data In seconds.
     videotimeout = 60
-    # Time in seconds allocated to fill the start buffer of the broadcast
-    # 0 - disable
-    videostartbuffertime = 3
     # ----------------------------------------------------
     # HTTP AceProxy configuration
     # ----------------------------------------------------

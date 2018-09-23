@@ -8,7 +8,7 @@ import telnetlib
 import logging
 import requests
 import time
-import random
+import random, sys
 from .acemessages import *
 
 class AceException(Exception):
@@ -64,8 +64,7 @@ class AceClient(object):
         # Did we get START command again? For seekback.
         self._started_again = Event()
         # AceEngine Streamreader ring buffer with max number of chunks in queue
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=1000)
-
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=15)
         # Logger
         logger = logging.getLogger('AceClient')
         # Try to connect AceStream engine
@@ -207,31 +206,29 @@ class AceClient(object):
         logger = logging.getLogger('StreamReader')
         logger.debug('Start StreamReader for url: %s' % url)
 
-        self._write(AceMessage.request.EVENT('play'))
-
         with requests.Session() as session:
            if req_headers:
-               logger.debug('Sending headers from client to AceEngine: %s' % req_headers)
                session.headers.update(req_headers)
+               logger.debug('Sending headers from client to AceEngine: %s' % session.headers)
            try:
+              self._write(AceMessage.request.EVENT('play'))
               # AceEngine return link for HLS stream
               if url.endswith('.m3u8'):
                   _used_chunks = []
-                  while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
-                     for line in session.get(url, stream=True, timeout = (5,None)).iter_lines():
-                        if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
-                        if line.startswith(b'http://') and line not in _used_chunks:
-                            self.RAWDataReader(session.get(line, stream=True, timeout=(5,None)).raw, cid, counter)
-                            _used_chunks.append(line)
-                            if len(_used_chunks) > 15: _used_chunks.pop(0)
-                     gevent.sleep(4)
+                  while 1:
+                    for line in session.get(url, stream=False, timeout = (5,None)).iter_lines():
+                       if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
+                       if line.startswith(b'http://') and line not in _used_chunks:
+                          self.RAWDataReader(session.get(line, stream=True, timeout=(5,None)), cid, counter)
+                          _used_chunks.append(line)
+                          if len(_used_chunks) > 15: _used_chunks.pop(0)
               # AceStream return link for HTTP stream
-              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5,None)).raw, cid, counter)
+              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5,None)), cid, counter)
 
            except requests.exceptions.HTTPError as err:
                    logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
-           except requests.exceptions.RequestException:
-                   logger.error('There was an ambiguous exception that occurred while handling request')
+           except requests.exceptions.RequestException as err:
+                   logger.error('There was an ambiguous exception that occurred while handling request: %s' % repr(err))
            except Exception as err:
                    logger.error('Unexpected error in streamreader %s' % repr(err))
            finally:
@@ -241,12 +238,11 @@ class AceClient(object):
 
     def RAWDataReader(self, stream, cid, counter):
         logger = logging.getLogger('RAWDataReader')
-
-        while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
-           gevent.sleep()
-           if self._state.get(timeout=self._resulttimeout)[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
-              data = stream.read(requests.models.CONTENT_CHUNK_SIZE)
-              if not data: return
+        stream.raise_for_status()
+        for data in stream.iter_content(chunk_size=self.RAWDataReaderChunksize(stream.headers)):
+           STATE = self._state.get(timeout=self._resulttimeout)
+           if STATE[0] not in ('2', '3'): return
+           elif STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
               try: self._streamReaderQueue.put_nowait(data)
               except gevent.queue.Full: self._streamReaderQueue.get_nowait(); self._streamReaderQueue.put_nowait(data)
               clients = counter.getClients(cid)
@@ -257,8 +253,17 @@ class AceClient(object):
                      if len(clients) > 1:
                          logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
                          c.destroy()
-           elif (time.time() - self._state.get(timeout=self._resulttimeout)[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
-                   logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); return
+           elif (time.time() - STATE[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
+                 logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); return
+
+    def RAWDataReaderChunksize(self, headers):
+        ContentLength = XContentDuration = None
+        if 'Content-Length' in headers: ContentLength = float(headers['Content-Length'])
+        if 'X-Content-Duration' in headers: XContentDuration = float(headers['X-Content-Duration'])
+        if ContentLength and XContentDuration: chunk_size = int(ContentLength/XContentDuration) # For vod HTTP
+        elif ContentLength and not XContentDuration: chunk_size = int(ContentLength) # For vod/live HLS
+        else: chunk_size = None # For live HTTP
+        return chunk_size
 
     def _recvData(self):
         '''
@@ -267,7 +272,6 @@ class AceClient(object):
         logger = logging.getLogger('AceClient_recvdata')
 
         while 1:
-            gevent.sleep()
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
                 logger.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))

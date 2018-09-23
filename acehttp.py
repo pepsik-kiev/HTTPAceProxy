@@ -219,17 +219,11 @@ class Client:
         if not self.ace._state.wait(timeout=5.0): # STATE 1 (PREBUFFERING)
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
-
         self.connectionTime = time.time()
-
-        remaining = self.connectionTime + AceConfig.videostartbuffertime
-        while  remaining >= time.time():
-           gevent.sleep()
-           if self.queue.qsize() >= self.ace._streamReaderQueue.maxsize: break
-
         # Sending videostream headers to client
         if self.handler.connection:
-            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Content-Type': 'application/octet-stream', 'Access-Control-Allow-Origin': '*'}
+            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100',
+                                'Content-Type': 'application/octet-stream', 'Access-Control-Allow-Origin': '*'}
             self.handler.send_response(200)
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
             for k,v in list(response_headers.items()): self.handler.send_header(k,v)
@@ -241,7 +235,7 @@ class Client:
         if fmt and AceConfig.osplatform != 'Windows':
             if fmt in AceConfig.transcodecmd:
                 stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                popen_params = { 'bufsize': requests.models.CONTENT_CHUNK_SIZE,
+                popen_params = { 'bufsize': 1048513,
                                  'stdin'  : gevent.subprocess.PIPE,
                                  'stdout' : self.handler.wfile,
                                  'stderr' : stderr,
@@ -253,11 +247,9 @@ class Client:
             else:
                 logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
 
-        logger.info('Streaming "%s" to %s started. Start buffer size: %s' % \
-                 (self.channelName, self.handler.clientip, AceConfig.bytes2human(self.queue.qsize()*requests.models.CONTENT_CHUNK_SIZE)))
+        logger.info('Streaming "%s" to %s started' % (self.channelName, self.handler.clientip))
 
         while self.handler.connection:
-            gevent.sleep()
             try: out.write(self.queue.get(timeout=AceConfig.videotimeout))
             except gevent.queue.Empty:
                 logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
