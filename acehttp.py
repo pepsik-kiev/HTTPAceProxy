@@ -30,7 +30,6 @@ import time
 import requests
 try: from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 except: from http.server import HTTPServer, BaseHTTPRequestHandler
-from gevent.baseserver import BaseServer
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
@@ -45,22 +44,20 @@ import aceconfig
 from aceconfig import AceConfig
 
 class GeventHTTPServer(HTTPServer):
+
     def process_request(self, request, client_address):
+        gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+        gevent.sleep()
+
+    def __new_request(self, handlerClass, request, address, server):
         checkAce() # Check is AceStream engine alive
-        gevent.spawn(self.process_request_thread, request, client_address)
-
-    def process_request_thread(self, request, client_address):
-        try: self.finish_request(request, client_address)
-        except SocketException: pass
-        except Exception: self.handle_error(request, client_address)
-        finally: self.close_request(request)
-
-    def handle_error(self, request, client_address):
-        logging.error(traceback.format_exc())
-        pass
+        handlerClass(request, address, server)
+        self.shutdown_request(request)
 
 class HTTPHandler(BaseHTTPRequestHandler):
+
     server_version = 'HTTPAceProxy'
+    protocol_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -84,13 +81,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        if self.request_version == 'HTTP/1.1': self.protocol_version = 'HTTP/1.1'
         logger = logging.getLogger('do_GET')
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
         logger.debug('Headers: %s' % dict(self.headers))
-
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
 
@@ -220,45 +215,48 @@ class Client:
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
             return
         self.connectionTime = time.time()
-        # Sending videostream headers to client
+
+        transcoder = None
+        out = self.handler.wfile
         if self.handler.connection:
-            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100',
-                                'Content-Type': 'application/octet-stream', 'Access-Control-Allow-Origin': '*'}
+            if fmt and AceConfig.osplatform != 'Windows':
+                if fmt in AceConfig.transcodecmd:
+                    stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
+                    popen_params = { 'bufsize': 1048513,
+                                     'stdin'  : gevent.subprocess.PIPE,
+                                     'stdout' : self.handler.wfile,
+                                     'stderr' : stderr,
+                                     'shell'  : False }
+
+                    transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                    out = transcoder.stdin
+                    logger.warning('Ffmpeg transcoding started')
+                else:
+                    logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
+
+            logger.info('Streaming "%s" to %s started' % (self.channelName, self.handler.clientip))
+            # Sending videostream headers to client
+            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                                'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+            if transcoder: del response_headers['Transfer-Encoding']
             self.handler.send_response(200)
             logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
             for k,v in list(response_headers.items()): self.handler.send_header(k,v)
             self.handler.end_headers()
 
-        transcoder = None
-        out = self.handler.wfile
-
-        if fmt and AceConfig.osplatform != 'Windows':
-            if fmt in AceConfig.transcodecmd:
-                stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                popen_params = { 'bufsize': 1048513,
-                                 'stdin'  : gevent.subprocess.PIPE,
-                                 'stdout' : self.handler.wfile,
-                                 'stderr' : stderr,
-                                 'shell'  : False }
-
-                transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
-                out = transcoder.stdin
-                logger.warning('Ffmpeg transcoding started')
-            else:
-                logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
-
-        logger.info('Streaming "%s" to %s started' % (self.channelName, self.handler.clientip))
-
-        while self.handler.connection:
-            try: out.write(self.queue.get(timeout=AceConfig.videotimeout))
-            except gevent.queue.Empty:
-                logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
-                break
-            except: break
+            while 1: # Stream data to client
+                try:
+                    chunk = self.queue.get(timeout=AceConfig.videotimeout)
+                    out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n'%(len(chunk), chunk))
+                except gevent.queue.Empty:
+                    logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
+                    break
+                except SocketException: break # Client disconected
+                except: logger.error(traceback.format_exc()); break
 
         if transcoder is not None:
-           try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-           except: pass
+            try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+            except: pass
         self.destroy()
         return
 
@@ -518,6 +516,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
 
 # Start complite. Wating for requests
 server = GeventHTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
+server.timeout = 30
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()

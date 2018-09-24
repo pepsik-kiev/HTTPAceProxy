@@ -11,7 +11,6 @@ import time
 class ClientCounter(object):
 
     def __init__(self):
-        self.lock = gevent.lock.RLock()
         self.streams = {}   # {'CID': [client1, client2,....]} dict of current broadcasts and clients
         self.idleace = None
         self.idleSince = 30 # Send SHUTDOWN to AceEngine if it in IDLE more than
@@ -19,71 +18,66 @@ class ClientCounter(object):
         gevent.spawn(self.checkIdle)
 
     def count(self, cid):
-        with self.lock:
-            clients = self.streams.get(cid)
-            return len(clients) if clients else 0
+        return len(self.streams.get(cid, []))
 
     def getClients(self, cid):
-        with self.lock: return self.streams.get(cid)
+        return self.streams.get(cid)
 
     def add(self, cid, client):
-        with self.lock:
-            clients = self.streams.get(cid)
-            if clients: client.ace = clients[0].ace
-            else: client.ace = self.idleace
-            self.idleace = None
+        clients = self.streams.get(cid)
+        if clients: client.ace = clients[0].ace
+        else: client.ace = self.idleace
+        self.idleace = None
 
-            client.queue = client.ace._streamReaderQueue.copy()
-            self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
+        client.queue = client.ace._streamReaderQueue.copy()
+        self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
 
-            self.total += 1
-            return len(self.streams[cid])
+        self.total += 1
+        return len(self.streams[cid])
 
     def delete(self, cid, client):
-        with self.lock:
-            if not cid in self.streams: return 0
-            clients = self.streams[cid]
-            if client not in clients: return len(clients)
-            try:
-                if len(clients) > 1:
-                    clients.remove(client)
-                    return len(clients)
+        if not cid in self.streams: return 0
+        clients = self.streams[cid]
+        if client not in clients: return len(clients)
+        try:
+            if len(clients) > 1:
+                clients.remove(client)
+                return len(clients)
+            else:
+                del self.streams[cid]
+                if self.idleace: client.ace.destroy()
                 else:
-                    del self.streams[cid]
-                    if self.idleace: client.ace.destroy()
-                    else:
-                         try:
-                            client.ace.STOP()
-                            self.idleace = client.ace
-                            self.idleace.reset()
-                         except: client.ace.destroy()
-                    return 0
-            finally: self.total -= 1
+                     try:
+                        client.ace.STOP()
+                        self.idleace = client.ace
+                        self.idleace.reset()
+                        client.ace = None
+                     except: client.ace.destroy()
+                return 0
+        finally: self.total -= 1
 
     def deleteAll(self, cid):
         clients = None
         try:
-            with self.lock:
-                if not cid in self.streams: return
-                clients = self.streams[cid]
-                del self.streams[cid]
-                self.total -= len(clients)
-                if self.idleace: clients[0].ace.destroy()
-                else:
-                    try:
-                        clients[0].ace.STOP()
-                        self.idleace = clients[0].ace
-                        self.idleace.reset()
-                    except: clients[0].ace.destroy()
+            if not cid in self.streams: return
+            clients = self.streams[cid]
+            del self.streams[cid]
+            self.total -= len(clients)
+            if self.idleace: clients[0].ace.destroy()
+            else:
+                try:
+                   clients[0].ace.STOP()
+                   self.idleace = clients[0].ace
+                   self.idleace.reset()
+                except: clients[0].ace.destroy()
         finally:
                 if clients:
                    for c in clients: c.destroy()
 
     def destroyIdle(self):
-        with self.lock:
-            try:
-                if self.idleace: self.idleace.destroy()
-            finally: self.idleace = None
+        try:
+            if self.idleace: self.idleace.destroy()
+        finally: self.idleace = None
 
     def checkIdle(self):
         while 1:

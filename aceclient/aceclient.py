@@ -64,7 +64,7 @@ class AceClient(object):
         # Did we get START command again? For seekback.
         self._started_again = Event()
         # AceEngine Streamreader ring buffer with max number of chunks in queue
-        self._streamReaderQueue = gevent.queue.Queue(maxsize=15)
+        self._streamReaderQueue = gevent.queue.Queue() #maxsize=15)
         # Logger
         logger = logging.getLogger('AceClient')
         # Try to connect AceStream engine
@@ -239,7 +239,7 @@ class AceClient(object):
     def RAWDataReader(self, stream, cid, counter):
         logger = logging.getLogger('RAWDataReader')
         stream.raise_for_status()
-        for data in stream.iter_content(chunk_size=self.RAWDataReaderChunksize(stream.headers)):
+        for data in stream.iter_content(chunk_size=1048513 if 'Content-Length' in stream.headers else None):
            STATE = self._state.get(timeout=self._resulttimeout)
            if STATE[0] not in ('2', '3'): return
            elif STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
@@ -255,15 +255,6 @@ class AceClient(object):
                          c.destroy()
            elif (time.time() - STATE[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
                  logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); return
-
-    def RAWDataReaderChunksize(self, headers):
-        ContentLength = XContentDuration = None
-        if 'Content-Length' in headers: ContentLength = float(headers['Content-Length'])
-        if 'X-Content-Duration' in headers: XContentDuration = float(headers['X-Content-Duration'])
-        if ContentLength and XContentDuration: chunk_size = int(ContentLength/XContentDuration) # For vod HTTP
-        elif ContentLength and not XContentDuration: chunk_size = int(ContentLength) # For vod/live HLS
-        else: chunk_size = None # For live HTTP
-        return chunk_size
 
     def _recvData(self):
         '''
