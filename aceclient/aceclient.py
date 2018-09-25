@@ -64,7 +64,7 @@ class AceClient(object):
         # Did we get START command again? For seekback.
         self._started_again = Event()
         # AceEngine Streamreader ring buffer with max number of chunks in queue
-        self._streamReaderQueue = gevent.queue.Queue() #maxsize=15)
+        self._streamReaderQueue = gevent.queue.Queue(maxsize=15)
         # Logger
         logger = logging.getLogger('AceClient')
         # Try to connect AceStream engine
