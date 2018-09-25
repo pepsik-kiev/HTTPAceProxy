@@ -35,7 +35,6 @@ except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
 from socket import error as SocketException
 from socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR
-from base64 import b64encode
 from modules.PluginInterface import AceProxyPlugin
 
 import aceclient
@@ -47,11 +46,12 @@ class GeventHTTPServer(HTTPServer):
 
     def process_request(self, request, client_address):
         gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
-        gevent.sleep()
 
     def __new_request(self, handlerClass, request, address, server):
         checkAce() # Check is AceStream engine alive
-        handlerClass(request, address, server)
+        try: handlerClass(request, address, server)
+        except SocketException: pass # fix the broken pipe errors
+        except Exception as e: logger.error(traceback.format_exc())
         self.shutdown_request(request)
 
 class HTTPHandler(BaseHTTPRequestHandler):
@@ -112,6 +112,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
+            except SocketException: pass
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                 logger.error(traceback.format_exc())
@@ -195,8 +196,17 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def getINFOHASH(self, reqtype, url, idx):
         if reqtype not in ('direct_url', 'efile_url'):
-            if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = createAce()
+            if not AceStuff.clientcounter.idleace: AceStuff.clientcounter.idleace = self.createAce()
             return AceStuff.clientcounter.idleace.GETINFOHASH(reqtype, url, idx)
+
+    def createAce(self): # Create telnet connection to the AceEngine API port
+        logger.debug('Create connection to AceEngine.....')
+        try: ace = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+        except:
+             logger.error('Ace Stream telnet connection failed'); raise
+        else:
+             ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+             return ace
 
 class Client:
 
@@ -219,7 +229,7 @@ class Client:
 
         transcoder = None
         out = self.handler.wfile
-        if self.handler.connection:
+        if self.handler:
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -316,15 +326,6 @@ def spawnAce(cmd, delay=0.1):
         AceStuff.ace = AceStuff.ace.get(timeout=delay)
         return isRunning(AceStuff.ace)
     except: return False
-
-def createAce(): # Create telnet connection to the AceEngine API port
-    logger.debug('Create connection to AceEngine.....')
-    try: ace = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-    except:
-         logger.error('Ace Stream telnet connection failed'); raise
-    else:
-         ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-         return ace
 
 def checkAce():
     if AceConfig.acespawn and not isRunning(AceStuff.ace):

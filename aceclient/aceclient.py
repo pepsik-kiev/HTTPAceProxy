@@ -8,7 +8,7 @@ import telnetlib
 import logging
 import requests
 import time
-import random, sys
+import random
 from .acemessages import *
 
 class AceException(Exception):

@@ -60,24 +60,25 @@ class Torrenttv(AceProxyPlugin):
                 except: self.updatelogos = False # p2pproxy plugin seems not configured
 
             headers = {'User-Agent': 'Magic Browser'}
-            with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as origin:
+            with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as r:
+                if r.encoding is None: r.encoding = 'utf-8'
                 self.logger.info('TTV playlist %s downloaded' % config.url)
                 pattern = re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
-                for match in pattern.finditer(origin.text, re.MULTILINE):
-                    itemdict = match.groupdict()
-                    name = itemdict.get('name')
+                for match in pattern.finditer(r.text, re.MULTILINE):
+                   itemdict = match.groupdict()
+                   name = itemdict.get('name')
 
-                    itemdict['logo'] = self.logomap.get(name, 'http://static.acestream.net/sites/acestream/img/ACE-logo.png')
-                    itemdict['tvgid'] = self.epg_id.get(name, '')
+                   itemdict['logo'] = self.logomap.get(name, 'http://static.acestream.net/sites/acestream/img/ACE-logo.png')
+                   itemdict['tvgid'] = self.epg_id.get(name, '')
 
-                    url = itemdict['url']
-                    if url.startswith(('acestream://', 'infohash://')) \
-                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
-                        self.channels[name] = url
-                        itemdict['url'] = requests.compat.quote(name.encode('utf-8'),'') + '.ts'
+                   url = itemdict['url']
+                   if url.startswith(('acestream://', 'infohash://')) \
+                         or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
+                       self.channels[name] = url
+                       itemdict['url'] = requests.compat.quote(name.encode('utf-8'),'') + '.ts'
 
-                    self.playlist.addItem(itemdict)
-                    m.update(name.encode('utf-8'))
+                   self.playlist.addItem(itemdict)
+                   m.update(name.encode('utf-8'))
 
                 self.etag = '"' + m.hexdigest() + '"'
                 self.logger.debug('Requested m3u playlist generated')
@@ -135,5 +136,5 @@ class Torrenttv(AceProxyPlugin):
             for k,v in list(response_headers.items()): connection.send_header(k,v)
             connection.end_headers()
 
-        if play and connection: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=params.get('fmt', [''])[0])
+        if play: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only: connection.wfile.write(exported)
