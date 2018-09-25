@@ -240,23 +240,19 @@ class AceClient(object):
         logger = logging.getLogger('RAWDataReader')
         stream.raise_for_status()
         for data in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           STATE = self._state.get(timeout=self._resulttimeout)
-           if STATE[0] not in ('2', '3'): return
-           elif STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
-              # Fill ring buffer for the next connected client to the same broadcast
-              try: self._streamReaderQueue.put_nowait(data)
-              except gevent.queue.Full: self._streamReaderQueue.get_nowait(); self._streamReaderQueue.put_nowait(data)
-              # Put chunk to clients queue
-              clients = counter.getClients(cid)
-              if not clients: return
-              for c in clients:
-                 try: c.queue.put(data, timeout=5)
-                 except gevent.queue.Full:
-                     if len(clients) > 1:
-                         logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
-                         c.destroy()
-           elif (time.time() - STATE[1]) >= self._videotimeout: # STATE 3 (BUFFERING)
-                 logger.warning('No data received from AceEngine for %ssec - broadcast stoped' % self._videotimeout); return
+           if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
+           # Fill ring buffer for the next connected client to the same broadcast
+           try: self._streamReaderQueue.put_nowait(data)
+           except gevent.queue.Full: self._streamReaderQueue.get_nowait(); self._streamReaderQueue.put_nowait(data)
+           # Put chunk to clients queue
+           clients = counter.getClients(cid)
+           if not clients: return
+           for c in clients:
+              try: c.queue.put(data, timeout=5)
+              except gevent.queue.Full:
+                  if len(clients) > 1:
+                      logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
+                      c.destroy()
 
     def _recvData(self):
         '''
