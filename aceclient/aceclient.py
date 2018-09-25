@@ -239,12 +239,14 @@ class AceClient(object):
     def RAWDataReader(self, stream, cid, counter):
         logger = logging.getLogger('RAWDataReader')
         stream.raise_for_status()
-        for data in stream.iter_content(chunk_size=1048513 if 'Content-Length' in stream.headers else None):
+        for data in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
            STATE = self._state.get(timeout=self._resulttimeout)
            if STATE[0] not in ('2', '3'): return
            elif STATE[0] == '2': # Read data from AceEngine only if STATE 2 (DOWNLOADING)
+              # Fill ring buffer for the next connected client to the same broadcast
               try: self._streamReaderQueue.put_nowait(data)
               except gevent.queue.Full: self._streamReaderQueue.get_nowait(); self._streamReaderQueue.put_nowait(data)
+              # Put chunk to clients queue
               clients = counter.getClients(cid)
               if not clients: return
               for c in clients:

@@ -213,6 +213,7 @@ class Client:
 
         if not self.ace._state.wait(timeout=5.0): # STATE 1 (PREBUFFERING)
             self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
+            self.destroy()
             return
         self.connectionTime = time.time()
 
@@ -222,7 +223,7 @@ class Client:
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                    popen_params = { 'bufsize': 1048513,
+                    popen_params = { 'bufsize': 1048576,
                                      'stdin'  : gevent.subprocess.PIPE,
                                      'stdout' : self.handler.wfile,
                                      'stderr' : stderr,
@@ -247,9 +248,10 @@ class Client:
             while 1: # Stream data to client
                 try:
                     chunk = self.queue.get(timeout=AceConfig.videotimeout)
-                    out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n'%(len(chunk), chunk))
+                    out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
                 except gevent.queue.Empty:
                     logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
+                    if not transcoder: out.write(b'0\r\n\r\n') # send the chunked trailer
                     break
                 except SocketException: break # Client disconected
                 except: logger.error(traceback.format_exc()); break
