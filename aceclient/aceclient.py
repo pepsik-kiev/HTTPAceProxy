@@ -253,7 +253,7 @@ class AceClient(object):
               try: c.queue.put(data, timeout=5)
               except gevent.queue.Full:
                   if len(clients) > 1:
-                      logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.handler.clientip)
+                      logger.warning('Client %s does not read data from buffer until 5sec - disconnect it' % c.clientip)
                       c.destroy()
 
     def _recvData(self):
@@ -267,10 +267,10 @@ class AceClient(object):
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
                 logger.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
             except gevent.GreenletExit: break
-            except:
+            except Exception as e:
                 # If something happened during read, abandon reader.
-                logger.error('Exception at socket read. AceClient destroyed')
                 if not self._shuttingDown.ready(): self._shuttingDown.set()
+                raise AceException('Exception at socket read. AceClient destroyed %s' % repr(e))
                 return
             else: # Parsing everything only if the string is not empty
                 # HELLOTS

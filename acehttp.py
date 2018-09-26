@@ -164,35 +164,81 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        self.client = None
+        self.connectionTime = time.time()
+        CID = None
         try:
             CID, NAME = self.getINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-            if not channelName: channelName = NAME
-            if not channelIcon: channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
-            # Create client
-            self.client = Client(self, CID, channelName, channelIcon)
+            self.channelName = NAME if not channelName else channelName
+            self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
             # If there is no existing broadcast we create it
-            if AceStuff.clientcounter.add(CID, self.client) == 1:
-                logger.warning('Create a broadcast "%s"' % self.client.channelName)
+            if AceStuff.clientcounter.add(CID, self) == 1:
+                logger.warning('Create a broadcast "%s"' % self.channelName)
                 # Send START commands to AceEngine and Getting URL from engine
-                url = self.client.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
+                url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
                 # Rewriting host:port for remote Ace Stream Engine
                 if not AceStuff.ace:
                   url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
                 # Start streamreader for broadcast
-                gevent.spawn(self.client.ace.StreamReader, url, CID, AceStuff.clientcounter)
-                logger.warning('Broadcast "%s" created' % self.client.channelName)
+                gevent.spawn(self.ace.StreamReader, url, CID, AceStuff.clientcounter)
+                logger.warning('Broadcast "%s" created' % self.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
             # streaming to client
-            self.client.handle(self.reqparams.get('fmt', [''])[0])
-            logger.info('Streaming "%s" to %s finished' % (self.client.channelName, self.clientip))
+            transcoder = None
+            out = self.wfile
+            if fmt and AceConfig.osplatform != 'Windows':
+                if fmt in AceConfig.transcodecmd:
+                    stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
+                    popen_params = { 'bufsize': 1048576,
+                                     'stdin'  : gevent.subprocess.PIPE,
+                                     'stdout' : self.wfile,
+                                     'stderr' : stderr,
+                                     'shell'  : False }
+
+                    transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                    out = transcoder.stdin
+                    logger.warning('Ffmpeg transcoding started')
+                else:
+                    logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
+
+            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
+            # Sending videostream headers to client
+            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                                'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+            if transcoder: del response_headers['Transfer-Encoding']
+            self.send_response(200)
+            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
+            for k,v in list(response_headers.items()): self.send_header(k,v)
+            self.end_headers()
+
+            while 1: # Stream data to client
+                try:
+                    chunk = self.queue.get(timeout=AceConfig.videotimeout)
+                    out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
+                except gevent.queue.Empty:
+                    logger.warning('Client %s does not get data from streamreader until %sec. Disconnecting "%s"' % \
+                                    (self.clientip, AceConfig.videotimeout, self.channelName))
+                    if not transcoder: out.write(b'0\r\n\r\n') # send the chunked trailer
+                    break
+                except SocketException: break # Client disconected
+                except: logger.error(traceback.format_exc()); break
+
+            if transcoder is not None:
+                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+                except: pass
+            self.destroy()
+            logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+
         finally:
-            if self.client and AceStuff.clientcounter.delete(CID, self.client) == 0:
-                logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.client.channelName)
+            if CID and AceStuff.clientcounter.delete(CID, self) == 0:
+                logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
         return
+
+    def destroy(self):
+            if self.queue: self.queue.queue.clear()
+            if self.connection: self.connection.close()
 
     def getINFOHASH(self, reqtype, url, idx):
         if reqtype not in ('direct_url', 'efile_url'):
@@ -207,68 +253,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         else:
              ace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
              return ace
-
-class Client:
-
-    def __init__(self, handler, cid, channelName, channelIcon):
-        self.handler = handler
-        self.cid = cid
-        self.channelName = channelName
-        self.channelIcon = channelIcon
-        self.ace = self.queue = None
-        self.connectionTime = time.time()
-
-    def handle(self, fmt=None):
-        logger = logging.getLogger("ClientHandler")
-        self.connectionTime = time.time()
-        transcoder = None
-        out = self.handler.wfile
-        if fmt and AceConfig.osplatform != 'Windows':
-            if fmt in AceConfig.transcodecmd:
-                stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                popen_params = { 'bufsize': 1048576,
-                                 'stdin'  : gevent.subprocess.PIPE,
-                                 'stdout' : self.handler.wfile,
-                                 'stderr' : stderr,
-                                 'shell'  : False }
-
-                transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
-                out = transcoder.stdin
-                logger.warning('Ffmpeg transcoding started')
-            else:
-                logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
-
-        logger.info('Streaming "%s" to %s started' % (self.channelName, self.handler.clientip))
-        # Sending videostream headers to client
-        response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                            'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
-        if transcoder: del response_headers['Transfer-Encoding']
-        self.handler.send_response(200)
-        logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
-        for k,v in list(response_headers.items()): self.handler.send_header(k,v)
-        self.handler.end_headers()
-
-        while 1: # Stream data to client
-            try:
-                chunk = self.queue.get(timeout=AceConfig.videotimeout)
-                out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
-            except gevent.queue.Empty:
-                logger.warning('Client %s does not get data from streamreader until %sec. Disconnecting "%s"' % \
-                                (self.handler.clientip, AceConfig.videotimeout, self.channelName))
-                if not transcoder: out.write(b'0\r\n\r\n') # send the chunked trailer
-                break
-            except SocketException: break # Client disconected
-            except: logger.error(traceback.format_exc()); break
-
-        if transcoder is not None:
-            try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-            except: pass
-        self.destroy()
-        return
-
-    def destroy(self):
-            if self.queue: self.queue.queue.clear()
-            if self.handler.connection: self.handler.connection.close()
 
 class AceStuff(object):
     '''

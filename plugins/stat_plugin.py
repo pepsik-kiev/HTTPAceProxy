@@ -113,15 +113,15 @@ class Stat(AceProxyPlugin):
             # Dict {'CID': [client1, client2,....]} to list of values
             clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
             for c in clients:
-               if any([requests.utils.address_in_network(c.handler.clientip,i) for i in localnetranges]):
-                  clientInfo = self.mac_lookup(c.handler.clientip)
+               if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
+                  clientInfo = self.mac_lookup(c.clientip)
                else:
-                  clientInfo =u'<i class="flag {country_code}"></i>&nbsp;&nbsp;{country}, {city}'.format(**self.geo_ip_lookup(c.handler.clientip))
+                  clientInfo =u'<i class="flag {country_code}"></i>&nbsp;&nbsp;{country}, {city}'.format(**self.geo_ip_lookup(c.clientip))
 
                client_data = {
                     'channelIcon': c.channelIcon,
                     'channelName': c.channelName,
-                    'clientIP': c.handler.clientip,
+                    'clientIP': c.clientip,
                     'clientLocation': clientInfo,
                     'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
                     'durationTime': time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime))
