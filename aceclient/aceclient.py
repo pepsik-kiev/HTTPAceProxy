@@ -226,11 +226,14 @@ class AceClient(object):
               else: self.RAWDataReader(session.get(url, stream=True, timeout = (5,None)), cid, counter)
 
            except requests.exceptions.HTTPError as err:
-                   logger.error('An http error occurred while connecting to aceengine: %s' % repr(err))
+                  errmsg = 'An http error occurred while connecting to aceengine: %s' % repr(err)
+                  raise AceException(errmsg)
            except requests.exceptions.RequestException as err:
-                   logger.error('There was an ambiguous exception that occurred while handling request: %s' % repr(err))
+                  errmsg = 'There was an ambiguous exception that occurred while handling request: %s' % repr(err)
+                  raise AceException(errmsg)
            except Exception as err:
-                   logger.error('Unexpected error in streamreader %s' % repr(err))
+                  errmsg = 'Unexpected error in streamreader %s' % repr(err)
+                  raise AceException(errmsg)
            finally:
                    _used_chunks = None
                    self._streamReaderQueue.queue.clear()
@@ -240,13 +243,12 @@ class AceClient(object):
         logger = logging.getLogger('RAWDataReader')
         stream.raise_for_status()
         for data in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
+           clients = counter.getClients(cid)
+           if not clients: return
            # Fill ring buffer for the next connected client to the same broadcast
            try: self._streamReaderQueue.put_nowait(data)
            except gevent.queue.Full: self._streamReaderQueue.get_nowait(); self._streamReaderQueue.put_nowait(data)
-           # Put chunk to clients queue
-           clients = counter.getClients(cid)
-           if not clients: return
+           # Put chunk to connected clients queue
            for c in clients:
               try: c.queue.put(data, timeout=5)
               except gevent.queue.Full:

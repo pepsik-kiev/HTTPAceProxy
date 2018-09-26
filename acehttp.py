@@ -220,51 +220,45 @@ class Client:
 
     def handle(self, fmt=None):
         logger = logging.getLogger("ClientHandler")
-
-        if not self.ace._state.wait(timeout=5.0): # STATE 1 (PREBUFFERING)
-            self.handler.dieWithError(500, 'Video stream not opened in 5sec - disconnecting')
-            self.destroy()
-            return
         self.connectionTime = time.time()
-
         transcoder = None
         out = self.handler.wfile
-        if self.handler:
-            if fmt and AceConfig.osplatform != 'Windows':
-                if fmt in AceConfig.transcodecmd:
-                    stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                    popen_params = { 'bufsize': 1048576,
-                                     'stdin'  : gevent.subprocess.PIPE,
-                                     'stdout' : self.handler.wfile,
-                                     'stderr' : stderr,
-                                     'shell'  : False }
+        if fmt and AceConfig.osplatform != 'Windows':
+            if fmt in AceConfig.transcodecmd:
+                stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
+                popen_params = { 'bufsize': 1048576,
+                                 'stdin'  : gevent.subprocess.PIPE,
+                                 'stdout' : self.handler.wfile,
+                                 'stderr' : stderr,
+                                 'shell'  : False }
 
-                    transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
-                    out = transcoder.stdin
-                    logger.warning('Ffmpeg transcoding started')
-                else:
-                    logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
+                transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                out = transcoder.stdin
+                logger.warning('Ffmpeg transcoding started')
+            else:
+                logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
 
-            logger.info('Streaming "%s" to %s started' % (self.channelName, self.handler.clientip))
-            # Sending videostream headers to client
-            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                                'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
-            if transcoder: del response_headers['Transfer-Encoding']
-            self.handler.send_response(200)
-            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
-            for k,v in list(response_headers.items()): self.handler.send_header(k,v)
-            self.handler.end_headers()
+        logger.info('Streaming "%s" to %s started' % (self.channelName, self.handler.clientip))
+        # Sending videostream headers to client
+        response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                            'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+        if transcoder: del response_headers['Transfer-Encoding']
+        self.handler.send_response(200)
+        logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
+        for k,v in list(response_headers.items()): self.handler.send_header(k,v)
+        self.handler.end_headers()
 
-            while 1: # Stream data to client
-                try:
-                    chunk = self.queue.get(timeout=AceConfig.videotimeout)
-                    out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
-                except gevent.queue.Empty:
-                    logger.warning('No data received from StreamReader for %ssec - disconnecting "%s"' % (AceConfig.videotimeout,self.channelName))
-                    if not transcoder: out.write(b'0\r\n\r\n') # send the chunked trailer
-                    break
-                except SocketException: break # Client disconected
-                except: logger.error(traceback.format_exc()); break
+        while 1: # Stream data to client
+            try:
+                chunk = self.queue.get(timeout=AceConfig.videotimeout)
+                out.write(chunk) if transcoder else out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
+            except gevent.queue.Empty:
+                logger.warning('Client %s does not get data from streamreader until %sec. Disconnecting "%s"' % \
+                                (self.handler.clientip, AceConfig.videotimeout, self.channelName))
+                if not transcoder: out.write(b'0\r\n\r\n') # send the chunked trailer
+                break
+            except SocketException: break # Client disconected
+            except: logger.error(traceback.format_exc()); break
 
         if transcoder is not None:
             try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
