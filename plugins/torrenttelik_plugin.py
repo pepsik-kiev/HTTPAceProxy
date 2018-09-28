@@ -50,7 +50,7 @@ class Torrenttelik(AceProxyPlugin):
 
         if headers_only:
             connection.send_response(200)
-            connection.send_header('Content-Type', 'application/x-mpegurl')
+            connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
             connection.send_header('Connection', 'close')
             connection.end_headers()
             return
@@ -77,7 +77,7 @@ class Torrenttelik(AceProxyPlugin):
         exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=params.get('fmt', [''])[0]).encode('utf-8')
 
         connection.send_response(200)
-        connection.send_header('Content-Type', 'application/x-mpegurl')
+        connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
         connection.send_header('Content-Length', str(len(exported)))
         connection.send_header('Connection', 'close')

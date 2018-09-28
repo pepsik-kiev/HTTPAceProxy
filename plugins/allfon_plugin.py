@@ -29,7 +29,7 @@ class Allfon(AceProxyPlugin):
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser'}
         try:
-            Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, timeout=30).text
+            Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30).text
             Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
         except requests.exceptions.ConnectionError:
@@ -42,7 +42,7 @@ class Allfon(AceProxyPlugin):
         hostport = connection.headers['Host']
         if headers_only:
             connection.send_response(200)
-            connection.send_header('Content-Type', 'application/x-mpegurl')
+            connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
             connection.send_header('Connection', 'close')
             connection.end_headers()
             return
@@ -65,7 +65,7 @@ class Allfon(AceProxyPlugin):
         exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=params.get('fmt', [''])[0]).encode('utf-8')
 
         connection.send_response(200)
-        connection.send_header('Content-Type', 'application/x-mpegurl')
+        connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
         connection.send_header('Content-Length', str(len(exported)))
         connection.send_header('Connection', 'close')

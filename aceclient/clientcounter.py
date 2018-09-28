@@ -21,17 +21,13 @@ class ClientCounter(object):
         return len(self.streams.get(cid, []))
 
     def getClients(self, cid):
-        return self.streams.get(cid)
+        return self.streams.get(cid, 0)
 
     def add(self, cid, client):
         clients = self.streams.get(cid)
-        if clients: client.ace = clients[0].ace
-        else: client.ace = self.idleace
+        client.ace = clients[0].ace if clients else self.idleace
         self.idleace = None
-
-        client.queue = client.ace._streamReaderQueue.copy()
         self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
-
         self.total += 1
         return len(self.streams[cid])
 
@@ -51,7 +47,6 @@ class ClientCounter(object):
                         client.ace.STOP()
                         self.idleace = client.ace
                         self.idleace.reset()
-                        client.ace = None
                      except: client.ace.destroy()
                 return 0
         finally: self.total -= 1

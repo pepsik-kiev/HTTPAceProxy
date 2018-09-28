@@ -52,11 +52,10 @@ class P2pproxy(AceProxyPlugin):
                     # P2pProxy simply closes connection on this request sending Server header, so do we
                     if self.params.get('_', [''])[0]:
                         P2pproxy.logger.debug('Status check')
+                        response_headers = {'Content-Type': 'text/plain;charset=utf-8', 'Server': 'P2pProxy/1.0.4.4 HTTPAceProxy',
+                                            'Access-Control-Allow-Origin': '*', 'Connection': 'close'}
                         connection.send_response(200)
-                        connection.send_header('Access-Control-Allow-Origin', '*')
-                        connection.send_header('Connection', 'close')
-                        connection.send_header('Content-Type', 'text/plain;charset=utf-8')
-                        connection.send_header('Server', 'P2pProxy/1.0.4.4 HTTPAceProxy')
+                        for k,v in list(response_headers.items()): connection.send_header(k,v)
                         connection.wfile.write('\r\n')
                         return
                     else:
@@ -92,7 +91,7 @@ class P2pproxy(AceProxyPlugin):
             elif connection.reqtype == 'channels.m3u' or self.params.get('type', [''])[0] == 'm3u':
                 if headers_only:
                     connection.send_response(200)
-                    connection.send_header('Content-Type', 'application/x-mpegurl')
+                    connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                     connection.end_headers()
                     return
 
@@ -120,7 +119,7 @@ class P2pproxy(AceProxyPlugin):
                 P2pproxy.logger.debug('Exporting m3u playlist')
                 exported = playlistgen.exportm3u(hostport=hostport, header=config.m3uheadertemplate, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
                 connection.send_response(200)
-                connection.send_header('Content-Type', 'application/x-mpegurl')
+                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -138,11 +137,10 @@ class P2pproxy(AceProxyPlugin):
                 translations_list = TorrentTvApi(config.email, config.password).translations(self.params.get('filter', ['all'])[0], True)
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
+                response_headers = {'Access-Control-Allow-Origin': '*', 'Connection': 'close',
+                                    'Content-Type': 'text/xml;charset=utf-8', 'Content-Length': str(len(translations_list)) }
                 connection.send_response(200)
-                connection.send_header('Access-Control-Allow-Origin', '*')
-                connection.send_header('Connection', 'close')
-                connection.send_header('Content-Type', 'text/xml;charset=utf-8')
-                connection.send_header('Content-Length', str(len(translations_list)))
+                for k,v in list(response_headers.items()): connection.send_header(k,v)
                 connection.end_headers()
                 connection.wfile.write(translations_list)
 
@@ -179,7 +177,7 @@ class P2pproxy(AceProxyPlugin):
                     d -= delta
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
                 connection.send_response(200)
-                connection.send_header('Content-Type', 'application/x-mpegurl')
+                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -200,7 +198,7 @@ class P2pproxy(AceProxyPlugin):
                         d -= delta
 
                 connection.send_response(200)
-                connection.send_header('Content-Type', 'application/x-mpegurl')
+                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
 
                 if headers_only:
                     connection.end_headers()
@@ -270,7 +268,7 @@ class P2pproxy(AceProxyPlugin):
 
                 if headers_only:
                     connection.send_response(200)
-                    connection.send_header('Content-Type', 'application/x-mpegurl')
+                    connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                     connection.end_headers()
                     return
 
@@ -322,7 +320,7 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
 
                 connection.send_response(200)
-                connection.send_header('Content-Type', 'application/x-mpegurl')
+                connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)

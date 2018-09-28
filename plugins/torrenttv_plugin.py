@@ -130,7 +130,7 @@ class Torrenttv(AceProxyPlugin):
             add_ts = True if path.endswith('/ts') else False
             exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
 
-            response_headers = {'Content-Type': 'application/x-mpegurl', 'Access-Control-Allow-Origin': '*',
+            response_headers = {'Content-Type': 'audio/mpegurl; charset=utf-8', 'Access-Control-Allow-Origin': '*',
                                 'ETag': self.etag, 'Content-Length': str(len(exported)), 'Connection': 'close'}
             connection.send_response(200)
             for k,v in list(response_headers.items()): connection.send_header(k,v)
