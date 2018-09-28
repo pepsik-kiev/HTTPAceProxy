@@ -79,6 +79,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.connection:
             try:
                 self.send_error(errorcode)
+                self.send_header("Content-type", 'text/xml')
                 self.end_headers()
             except: pass
 
@@ -191,8 +192,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 if not AceStuff.ace:
                   url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
                 # Start streamreader for broadcast
-                try: gevent.spawn(self.ace.AceStreamReader, url, CID, AceStuff.clientcounter, AceConfig.videotimeout)
-                except: pass
+                gevent.spawn(self.ace.AceStreamReader, url, CID, AceStuff.clientcounter, AceConfig.videotimeout)
+                #except: pass
                 logger.warning('Broadcast "%s" created' % self.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))

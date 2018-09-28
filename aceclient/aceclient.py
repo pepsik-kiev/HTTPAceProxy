@@ -223,21 +223,22 @@ class AceClient(object):
 
     def RAWDataReader(self, stream, cid, counter, videotimeout):
         try:
-           for data in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
+           for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
               clients = counter.getClients(cid)
               if not clients: return
-              gevent.wait([gevent.spawn(self.write_data, c, data) for c in clients])
+              # filter out keep-alive new chunks
+              if chunk: gevent.wait([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
         except:
            logging.error('AceEngine did not send data within %ssec. Broadcast "%s" destroyed' % (videotimeout, clients[0].channelName))
            gevent.wait([gevent.spawn(self.closeAll,c) for c in clients])
 
-    def closeAll(self, c):
-        c.out.write(b'0\r\n\r\n') # send the chunked trailer
-        c.destroy()
+    def closeAll(self, client):
+        client.out.write(b'0\r\n\r\n') # send the chunked trailer
+        client.destroy()
 
-    def write_data(self, c, data):
-        try: c.out.write(b'%X\r\n%s\r\n' % (len(data), data))
-        except SocketException: c.destroy() # Client disconected
+    def write_chunk(self, client, chunk):
+        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
+        except SocketException: client.destroy() # Client disconected
 
     def _recvData(self):
         '''
