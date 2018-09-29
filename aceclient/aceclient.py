@@ -233,7 +233,7 @@ class AceClient(object):
 
     def write_chunk(self, client, chunk, chunk_trailer=None):
         try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
-        except: pass  # Client disconected
+        except: client.destroy()  # Client disconected
         if chunk_trailer: client.destroy()
 
     def _recvData(self):
