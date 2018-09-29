@@ -8,7 +8,6 @@ import logging
 import requests
 import time
 import random
-from socket import error as SocketException
 from .acemessages import *
 
 class AceException(Exception):
@@ -17,7 +16,7 @@ class AceException(Exception):
     '''
     pass
 
-class Telnet(telnetlib.Telnet, object):
+class Telnet(telnetlib.Telnet):
 
     if requests.compat.is_py3:
         def read_until(self, expected, timeout=None):
@@ -218,13 +217,13 @@ class AceClient(object):
               else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), cid, counter, videotimeout)
            except Exception as err:
               logging.error('Unexpected error in streamreader %s' % repr(err))
-              gevent.wait([gevent.spawn(self.closeAll,c) for c in counter.getClients(cid)])
+              gevent.wait([gevent.spawn(self.write_chunk,c, b'', True) for c in counter.getClientsList(cid)]) # b'0\r\n\r\n' - send the chunked trailer
            finally: _used_chunks = None
 
     def RAWDataReader(self, stream, cid, counter, videotimeout):
         try:
            for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-              clients = counter.getClients(cid)
+              clients = counter.getClientsList(cid)
               if not clients: return
               # filter out keep-alive new chunks
               if chunk: gevent.wait([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
@@ -232,13 +231,10 @@ class AceClient(object):
            logging.error('AceEngine did not send data within %ssec. Broadcast "%s" destroyed' % (videotimeout, clients[0].channelName))
            gevent.wait([gevent.spawn(self.closeAll,c) for c in clients])
 
-    def closeAll(self, client):
-        client.out.write(b'0\r\n\r\n') # send the chunked trailer
-        client.destroy()
-
-    def write_chunk(self, client, chunk):
+    def write_chunk(self, client, chunk, chunk_trailer=None):
         try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
-        except SocketException: client.destroy() # Client disconected
+        except: pass  # Client disconected
+        if chunk_trailer: client.destroy()
 
     def _recvData(self):
         '''

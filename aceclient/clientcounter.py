@@ -17,24 +17,36 @@ class ClientCounter(object):
         self.total = 0      # Client counter total
         gevent.spawn(self.checkIdle)
 
-    def count(self, cid):
-        return len(self.streams.get(cid, []))
+    def getClientsQuantity(self, cid):
+        '''
+        Quantity of clients in list by CID
+        '''
+        return len(self.getClientsList(cid))
 
-    def getClients(self, cid):
-        return self.streams.get(cid, 0)
+    def getClientsList(self, cid):
+        '''
+        List of Clients by CID
+        '''
+        return self.streams.get(cid,[])
 
-    def add(self, cid, client):
-        clients = self.streams.get(cid)
+    def addClient(self, cid, client):
+        '''
+        Adds client to the dictionary list by CID key and return their number
+        '''
+        clients = self.getClientsList(cid)
         client.ace = clients[0].ace if clients else self.idleace
         self.idleace = None
         self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
         self.total += 1
-        return len(self.streams[cid])
+        return self.getClientsQuantity(cid)
 
-    def delete(self, cid, client):
+    def deleteClient(self, cid, client):
+        '''
+        Remove client from the dictionary list by CID key and return their number
+        '''
         if not cid in self.streams: return 0
-        clients = self.streams[cid]
-        if client not in clients: return len(clients)
+        clients = self.getClientsList(cid)
+        if client not in clients: return self.getClientsQuantity(cid)
         try:
             if len(clients) > 1:
                 clients.remove(client)
@@ -52,12 +64,15 @@ class ClientCounter(object):
         finally: self.total -= 1
 
     def deleteAll(self, cid):
+        '''
+        Remove all Clients from dict by CID
+        '''
         clients = None
         try:
             if not cid in self.streams: return
-            clients = self.streams[cid]
+            clients = self.getClientsList(cid)
             del self.streams[cid]
-            self.total -= len(clients)
+            self.total -= self.getClientsQuantity(cid)
             if self.idleace: clients[0].ace.destroy()
             else:
                 try:

@@ -79,7 +79,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.connection:
             try:
                 self.send_error(errorcode)
-                self.send_header("Content-type", 'text/xml')
                 self.end_headers()
             except: pass
 
@@ -184,7 +183,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.channelName = NAME if not channelName else channelName
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
             # If there is no existing broadcast we create it
-            if AceStuff.clientcounter.add(CID, self) == 1:
+            if AceStuff.clientcounter.addClient(CID, self) == 1:
                 logger.warning('Create a broadcast "%s"' % self.channelName)
                 # Send START commands to AceEngine and Getting URL from engine
                 url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
@@ -237,7 +236,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
 
         finally:
-            if CID and AceStuff.clientcounter.delete(CID, self) == 0:
+            if CID and AceStuff.clientcounter.deleteClient(CID, self) == 0:
                 logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
         return
 
