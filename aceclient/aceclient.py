@@ -217,7 +217,7 @@ class AceClient(object):
               else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), cid, counter, videotimeout)
            except Exception as err:
               logging.error('Unexpected error in streamreader %s' % repr(err))
-              gevent.wait([gevent.spawn(self.write_chunk,c, b'', True) for c in counter.getClientsList(cid)]) # b'0\r\n\r\n' - send the chunked trailer
+              gevent.wait([gevent.spawn(self.write_chunk, c, b'', True) for c in counter.getClientsList(cid)]) # b'0\r\n\r\n' - send the chunked trailer
            finally: _used_chunks = None
 
     def RAWDataReader(self, stream, cid, counter, videotimeout):
@@ -229,7 +229,7 @@ class AceClient(object):
               if chunk: gevent.wait([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
         except:
            logging.error('AceEngine did not send data within %ssec. Broadcast "%s" destroyed' % (videotimeout, clients[0].channelName))
-           gevent.wait([gevent.spawn(self.closeAll,c) for c in clients])
+           gevent.wait([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) # b'0\r\n\r\n' - send the chunked trailer
 
     def write_chunk(self, client, chunk, chunk_trailer=None):
         try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
