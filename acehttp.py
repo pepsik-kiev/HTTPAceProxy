@@ -220,12 +220,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             # Sending videostream headers to client
-            response_headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                                'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
-            if transcoder: del response_headers['Transfer-Encoding']
+            headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                       'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+            drop_headers = []
+
+            if transcoder: drop_headers.extend['Transfer-Encoding']
+
+            response_headers = [ (k,v) for (k,v) in headers.items() if k not in drop_headers ]
             self.send_response(200)
-            logger.debug('Sending HTTPAceProxy headers to client: %s' % response_headers)
-            for k,v in list(response_headers.items()): self.send_header(k,v)
+            logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
+            for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
             while self.connection: gevent.sleep(1.0) # Stream data to client
