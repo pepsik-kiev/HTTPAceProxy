@@ -210,28 +210,26 @@ class AceClient(object):
                     for line in session.get(url, stream=True, timeout=(5,videotimeout)).iter_lines():
                        if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
                        if line.startswith(b'http://') and line not in _used_chunks:
-                          self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), cid, counter, videotimeout)
+                          self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), counter.getClientsList(cid), videotimeout)
                           _used_chunks.append(line)
                           if len(_used_chunks) > 15: _used_chunks.pop(0)
               # AceStream return link for HTTP stream
-              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), cid, counter, videotimeout)
+              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), counter.getClientsList(cid), videotimeout)
            except Exception as err:
-              logging.error('Unexpected error in streamreader %s' % repr(err))
               clients = counter.getClientsList(cid)
-              if clients: self.write_chunk(clients, b'', True) #b'0\r\n\r\n' - send the chunked trailer
+              if clients:
+                 logging.error('"%s" StreamReader error %s' % (clients[0].channelName, repr(err)))
+                 gevent.joinall([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
            finally: _used_chunks = None
 
-    def RAWDataReader(self, stream, cid, counter, videotimeout):
+    def RAWDataReader(self, stream, clients, videotimeout):
         for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           clients = counter.getClientsList(cid)
-           if not clients: return
-           if chunk: self.write_chunk(clients, chunk)
+           if clients and chunk: gevent.joinall([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
 
-    def write_chunk(self, clients, chunk, chunk_trailer=None):
-        for c in clients:
-           try: c.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not c.transcoder else c.out.write(chunk)
-           except: c.destroy() # Client disconected
-           if chunk_trailer: c.destroy()
+    def write_chunk(self, c, chunk, chunk_trailer=None):
+        try: c.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not c.transcoder else c.out.write(chunk)
+        except: c.destroy() # Client disconected
+        if chunk_trailer: c.destroy()
 
     def _recvData(self):
         '''
@@ -314,4 +312,4 @@ class AceClient(object):
                     self._socket.close()
                     logging.debug('AceClient destroyed')
                     break
-#            finally: gevent.sleep()
+            finally: gevent.sleep()
