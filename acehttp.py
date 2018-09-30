@@ -201,7 +201,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                logger.error(traceback.format_exc())
         else:
             # streaming to client
-            transcoder = None
+            self.transcoder = None
             self.out = self.wfile
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
@@ -212,8 +212,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                                      'stderr' : stderr,
                                      'shell'  : False }
 
-                    transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
-                    self.out = transcoder.stdin
+                    self.transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+                    self.out = self.transcoder.stdin
                     logger.warning('Ffmpeg transcoding started')
                 else:
                     logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
@@ -224,7 +224,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                        'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
             drop_headers = []
 
-            if transcoder: drop_headers.extend['Transfer-Encoding']
+            if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
             response_headers = [ (k,v) for (k,v) in headers.items() if k not in drop_headers ]
             self.send_response(200)
@@ -234,8 +234,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             while self.connection: gevent.sleep(1.0) # Stream data to client
 
-            if transcoder is not None:
-                try: transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+            if self.transcoder is not None:
+                try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                 except: pass
             logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
 

@@ -208,7 +208,6 @@ class AceClient(object):
                   _used_chunks = []
                   while 1:
                     for line in session.get(url, stream=True, timeout=(5,videotimeout)).iter_lines():
-                       print(line)
                        if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
                        if line.startswith(b'http://') and line not in _used_chunks:
                           self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), cid, counter, videotimeout)
@@ -230,7 +229,7 @@ class AceClient(object):
 
     def write_chunk(self, clients, chunk, chunk_trailer=None):
         for c in clients:
-           try: c.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk))
+           try: c.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not c.transcoder else c.out.write(chunk)
            except: c.destroy() # Client disconected
            if chunk_trailer: c.destroy()
 
