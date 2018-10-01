@@ -80,7 +80,6 @@ class AceClient(object):
         AceClient Destructor
         '''
         if self._shuttingDown.ready(): return   # Already in the middle of destroying
-        self._result.set()
         # Trying to disconnect
         try:
             logging.debug('Destroying AceStream client.....')
@@ -90,10 +89,15 @@ class AceClient(object):
         finally: self._shuttingDown.set()
 
     def reset(self):
+        # Reset initial values
         self._started_again.clear()
         self._result.set()
         self._urlresult.set()
         self._loadasyncresult.set()
+        self._cidresult.set()
+        self._status.set()
+        self._event.set()
+        self._state.set()
 
     def _write(self, message):
         try:
