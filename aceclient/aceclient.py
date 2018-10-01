@@ -93,6 +93,7 @@ class AceClient(object):
         self._started_again.clear()
         self._result.set()
         self._urlresult.set()
+        self._loadasyncresult.set()
 
     def _write(self, message):
         try:
