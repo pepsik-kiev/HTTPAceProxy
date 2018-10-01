@@ -42,15 +42,15 @@ class AceClient(object):
         # AceEngine product key
         self._product_key = None
         # Result (Created with AsyncResult() on call)
-        self._result = AsyncResult()
+        self._auth = AsyncResult()
         # Result for START URL
-        self._urlresult = AsyncResult()
+        self._url = AsyncResult()
         # URL response time from AceEngine
         self._videotimeout = None
         # Result for CID
-        self._cidresult = AsyncResult()
+        self._cid = AsyncResult()
         # Result fo LOADASYNC
-        self._loadasyncresult = AsyncResult()
+        self._loadasync = AsyncResult()
         # Current STATUS
         self._status = AsyncResult()
         # Current EVENT
@@ -91,13 +91,9 @@ class AceClient(object):
     def reset(self):
         # Reset initial values
         self._started_again.clear()
-        self._result.set()
-        self._urlresult.set()
-        self._loadasyncresult.set()
-        self._cidresult.set()
-        self._status.set()
-        self._event.set()
-        self._state.set()
+        self._url.set()
+        self._loadasync.set()
+        self._cid.set()
 
     def _write(self, message):
         try:
@@ -113,18 +109,18 @@ class AceClient(object):
         self._videotimeout = float(videotimeout)
         self._started_again.clear()
 
-        self._result = AsyncResult()
+        self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
-        try: params = self._result.get(timeout=self._resulttimeout)
+        try: params = self._auth.get(timeout=self._resulttimeout)
         except gevent.Timeout:
             errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived!' % self._resulttimeout
             raise AceException(errmsg)
             return
 
-        self._result = AsyncResult()
+        self._auth = AsyncResult()
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
         try:
-            if self._result.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
+            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
                errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
                raise AceException(errmsg)
                return
@@ -142,9 +138,9 @@ class AceClient(object):
         Returns the url provided by AceEngine
         '''
         paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
-        self._urlresult = AsyncResult()
+        self._url = AsyncResult()
         self._write(AceMessage.request.START(command.upper(), paramsdict))
-        try: return self._urlresult.get(timeout=self._videotimeout) # Get url for play from AceEngine
+        try: return self._url.get(timeout=self._videotimeout) # Get url for play from AceEngine
         except gevent.Timeout:
             errmsg = 'Engine response time %ssec exceeded. START URL not resived!' % self._videotimeout
             raise AceException(errmsg)
@@ -161,9 +157,9 @@ class AceClient(object):
             raise AceException(errmsg)
 
     def LOADASYNC(self, command, params):
-        self._loadasyncresult = AsyncResult()
+        self._loadasync = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1, 100000), params))
-        try: return self._loadasyncresult.get(timeout=self._resulttimeout) # Get _contentinfo json
+        try: return self._loadasync.get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout:
             errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived!' % self._resulttimeout
             raise AceException(errmsg)
@@ -176,10 +172,10 @@ class AceClient(object):
         contentinfo = self.GETCONTENTINFO(command, value)
         if contentinfo['status'] in (1, 2):
             paramsdict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
-            self._cidresult = AsyncResult()
+            self._cid = AsyncResult()
             self._write(AceMessage.request.GETCID(paramsdict))
             try:
-                cid = self._cidresult.get(timeout=self._resulttimeout)
+                cid = self._cid.get(timeout=self._resulttimeout)
                 return '' if cid is None or cid == '' else cid[2:]
             except gevent.Timeout:
                  errmsg = 'Engine response time %ssec exceeded. CID not resived!' % self._resulttimeout
@@ -253,11 +249,11 @@ class AceClient(object):
                 # HELLOTS
                 if self._recvbuffer.startswith('HELLOTS'):
                     # version=engine_version version_code=version_code key=request_key http_port=http_port
-                    self._result.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
+                    self._auth.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
                 # NOTREADY
-                elif self._recvbuffer.startswith('NOTREADY'): self._result.set('NOTREADY')
+                elif self._recvbuffer.startswith('NOTREADY'): self._auth.set('NOTREADY')
                 # AUTH
-                elif self._recvbuffer.startswith('AUTH'): self._result.set(self._recvbuffer.split()[1]) # user_auth_level
+                elif self._recvbuffer.startswith('AUTH'): self._auth.set(self._recvbuffer.split()[1]) # user_auth_level
                 # START
                 elif self._recvbuffer.startswith('START'):
                     # url [ad=1 [interruptable=1]] [stream=1] [pos=position]
@@ -268,10 +264,10 @@ class AceClient(object):
                         # ignore it, then do seekback in first EVENT position command
                         # AceStream sends us STOP and START again with new link.
                         # We use only second link then.
-                        self._urlresult.set(self._recvbuffer.split()[1]) # url for play
+                        self._url.set(self._recvbuffer.split()[1]) # url for play
                 # LOADRESP
                 elif self._recvbuffer.startswith('LOADRESP'):
-                    self._loadasyncresult.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
+                    self._loadasync.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
                 # STATE
                 elif self._recvbuffer.startswith('STATE'): # tuple of (state_id, time of appearance)
                     self._state.set((self._recvbuffer.split()[1], time.time()))
@@ -292,7 +288,7 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:err'): # err;error_id;error_message
                        self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
                 # CID
-                elif self._recvbuffer.startswith('##'): self._cidresult.set(self._recvbuffer)
+                elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
                 # INFO
                 elif self._recvbuffer.startswith('INFO'): pass
                 # EVENT
