@@ -45,7 +45,7 @@ class AceClient(object):
         self._auth = AsyncResult()
         # Result for START URL
         self._url = AsyncResult()
-        # URL response time from AceEngine
+        # get URL response time from AceEngine
         self._videotimeout = None
         # Result for CID
         self._cid = AsyncResult()
@@ -211,19 +211,19 @@ class AceClient(object):
                     for line in session.get(url, stream=True, timeout=(5,videotimeout)).iter_lines():
                        if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
                        if line.startswith(b'http://') and line not in _used_chunks:
-                          self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), counter.getClientsList(cid), videotimeout)
+                          self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), counter.getClientsList(cid))
                           _used_chunks.append(line)
                           if len(_used_chunks) > 15: _used_chunks.pop(0)
               # AceStream return link for HTTP stream
-              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), counter.getClientsList(cid), videotimeout)
+              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), counter.getClientsList(cid))
            except Exception as err:
               clients = counter.getClientsList(cid)
               if clients:
-                 logging.error('"%s" StreamReader error %s' % (clients[0].channelName, repr(err)))
+                 logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
                  gevent.joinall([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
            finally: _used_chunks = None
 
-    def RAWDataReader(self, stream, clients, videotimeout):
+    def RAWDataReader(self, stream, clients):
         for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
            if clients and chunk: gevent.joinall([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
 

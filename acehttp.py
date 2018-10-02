@@ -196,9 +196,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 logger.warning('Broadcast "%s" created' % self.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-        except Exception as e:
-               self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
-               logger.error(traceback.format_exc())
+        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
         else:
             # streaming to client
             self.transcoder = None
@@ -220,8 +218,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             # Sending videostream headers to client
-            headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                       'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+            headers = { 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                        'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked' }
             drop_headers = []
 
             if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
@@ -232,7 +230,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
-            while self.connection: gevent.sleep(1.0) # Stream data to client
+            while self.connection: gevent.sleep(0.5) # Stream data to client
 
             if self.transcoder is not None:
                 try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
@@ -245,7 +243,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         return
 
     def destroy(self):
-            if self.connection: self.connection.close(); self.connection = None
+            if self.connection: self.connection.close()
+            self.connection = None
 
 class AceStuff(object):
     '''

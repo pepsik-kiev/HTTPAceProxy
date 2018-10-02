@@ -48,9 +48,9 @@ class ClientCounter(object):
         clients = self.getClientsList(cid)
         if client not in clients: return self.getClientsQuantity(cid)
         try:
-            if len(clients) > 1:
+            if self.getClientsQuantity(cid) > 1:
                 clients.remove(client)
-                return len(clients)
+                return self.getClientsQuantity(cid)
             else:
                 del self.streams[cid]
                 if self.idleace: client.ace.destroy()
