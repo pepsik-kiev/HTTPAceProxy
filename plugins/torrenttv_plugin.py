@@ -9,7 +9,6 @@ __author__ = 'AndreyPavlenko, Dorik1972'
 import traceback
 import gevent
 import logging, re
-import time
 import hashlib
 import requests
 try: from urlparse import parse_qs
@@ -40,7 +39,7 @@ class Torrenttv(AceProxyPlugin):
             gevent.sleep(config.updateevery * 60)
 
     def downloadPlaylist(self):
-        self.playlisttime = int(time.time())
+        self.playlisttime = int(gevent.time.time())
         self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
         self.channels = {}
         m = hashlib.md5()
@@ -91,7 +90,7 @@ class Torrenttv(AceProxyPlugin):
     def handle(self, connection, headers_only=False):
         play = False
         # 30 minutes cache
-        if not self.playlist or (int(time.time()) - self.playlisttime > 30 * 60):
+        if not self.playlist or (int(gevent.time.time()) - self.playlisttime > 30 * 60):
             self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
             if not self.downloadPlaylist(): connection.dieWithError(); return
 

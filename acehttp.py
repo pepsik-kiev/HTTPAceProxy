@@ -26,7 +26,6 @@ for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys
 
 import logging, traceback
 import psutil
-import time
 import requests
 try: from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 except: from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -172,15 +171,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        self.connectionTime = time.time()
+        self.connectionTime = gevent.time.time()
         CID = NAME = None
         try:
-            if not AceStuff.clientcounter.idleace:
+            if not AceStuff.clientcounter.idleAce:
                logger.debug('Create connection to AceEngine.....')
-               AceStuff.clientcounter.idleace = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-               AceStuff.clientcounter.idleace.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+               AceStuff.clientcounter.idleAce = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+               AceStuff.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
             if self.reqtype not in ('direct_url', 'efile_url'):
-               CID, NAME = AceStuff.clientcounter.idleace.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
+               CID, NAME = AceStuff.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
             self.channelName = NAME if not channelName else channelName
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
             # If there is no existing broadcast we create it

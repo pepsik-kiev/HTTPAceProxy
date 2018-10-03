@@ -10,7 +10,6 @@ __author__ = 'Dorik1972'
 import os
 import logging
 import bencode, hashlib
-import time
 import gevent
 from requests.compat import unquote
 from PluginInterface import AceProxyPlugin

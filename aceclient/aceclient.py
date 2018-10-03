@@ -6,7 +6,6 @@ from gevent.event import AsyncResult, Event
 import telnetlib
 import logging
 import requests
-import time
 import random
 from .acemessages import *
 
@@ -274,7 +273,7 @@ class AceClient(object):
                     self._loadasync.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
                 # STATE
                 elif self._recvbuffer.startswith('STATE'): # tuple of (state_id, time of appearance)
-                    self._state.set((self._recvbuffer.split()[1], time.time()))
+                    self._state.set((self._recvbuffer.split()[1], gevent.time.time()))
                 # STATUS
                 elif self._recvbuffer.startswith('STATUS'):
                     self._tempstatus = self._recvbuffer.split()[1]

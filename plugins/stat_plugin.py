@@ -6,10 +6,10 @@ To use it, go to http://acehttp_proxy_ip:port/stat
 '''
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
+from gevent import time
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 import psutil
-import time
 import logging, re
 import requests
 
