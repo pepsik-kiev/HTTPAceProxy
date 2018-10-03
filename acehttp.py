@@ -33,8 +33,7 @@ except: from http.server import HTTPServer, BaseHTTPRequestHandler
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
-from socket import error as SocketException
-from socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR
+from socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR, error as SocketException
 from modules.PluginInterface import AceProxyPlugin
 
 import aceclient
@@ -101,6 +100,24 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
            return
 
+        # Limit concurrent connections
+        if 0 < AceConfig.maxconns <= AceStuff.clientcounter.total:
+            self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
+            return
+
+        # Pretend to work fine with Fake or HEAD request.
+        if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
+            # Return 200 and exit
+            if headers_only: logger.debug('Sending headers and closing connection')
+            else: logger.debug('Fake request - closing connection')
+            self.send_response(200)
+            self.send_header('Content-Type', 'video/mpeg')
+            self.senf_header('Transfer-Encoding', 'chunked')
+            self.send_header('Connection', 'Close')
+            self.end_headers()
+            self.wfile.write(b'0\r\n\r\n')
+            return
+
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
@@ -148,22 +165,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 return
         except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
 
-        # Limit concurrent connections
-        if 0 < AceConfig.maxconns <= AceStuff.clientcounter.total:
-            self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
-            return
-
-        # Pretend to work fine with Fake or HEAD request.
-        if headers_only or AceConfig.isFakeRequest(self.path, self.reqparams, self.headers):
-            # Return 200 and exit
-            if headers_only: logger.debug('Sending headers and closing connection')
-            else: logger.debug('Fake request - closing connection')
-            self.send_response(200)
-            self.send_header('Content-Type', 'video/mpeg')
-            self.send_header('Connection', 'Close')
-            self.end_headers()
-            return
-
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict = {}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')
@@ -191,7 +192,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 if not AceStuff.ace:
                   url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
                 # Start streamreader for broadcast
-                gevent.spawn(self.ace.AceStreamReader, url, CID, AceStuff.clientcounter, AceConfig.videotimeout)
+                gevent.spawn(self.ace.AceStreamReader, url, CID, AceStuff.clientcounter)
                 #except: pass
                 logger.warning('Broadcast "%s" created' % self.channelName)
 

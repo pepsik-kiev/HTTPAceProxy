@@ -16,7 +16,7 @@ class AceException(Exception):
     '''
     pass
 
-class Telnet(telnetlib.Telnet):
+class Telnet(telnetlib.Telnet, object):
 
     if requests.compat.is_py3:
         def read_until(self, expected, timeout=None):
@@ -45,7 +45,7 @@ class AceClient(object):
         self._auth = AsyncResult()
         # Result for START URL
         self._url = AsyncResult()
-        # get URL response time from AceEngine
+        # Response time from AceEngine to get URL or DATA
         self._videotimeout = None
         # Result for CID
         self._cid = AsyncResult()
@@ -99,9 +99,9 @@ class AceClient(object):
         try:
             logging.debug('>>> %s' % message)
             self._socket.write('%s\r\n' % message)
-        except EOFError as e: raise AceException('Write error! %s' % repr(e))
+        except EOFError as e: raise AceException('Telnet socket Write error! %s' % repr(e))
 
-    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=0):
+    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
         self._age = age
         self._product_key = product_key
@@ -196,7 +196,10 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def AceStreamReader(self, url, cid, counter, videotimeout, req_headers=None):
+    def AceStreamReader(self, url, cid, counter, req_headers=None):
+        '''
+        Get stream from AceEngine url and write it to client(s)
+        '''
         logging.debug('Start StreamReader for url: %s' % url)
         with requests.Session() as session:
            if req_headers:
@@ -208,14 +211,15 @@ class AceClient(object):
               if url.endswith('.m3u8'):
                   _used_chunks = []
                   while 1:
-                    for line in session.get(url, stream=True, timeout=(5,videotimeout)).iter_lines():
+                    for line in session.get(url, stream=True, timeout=(5,self._videotimeout)).iter_lines():
                        if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
                        if line.startswith(b'http://') and line not in _used_chunks:
                           self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), counter.getClientsList(cid))
                           _used_chunks.append(line)
                           if len(_used_chunks) > 15: _used_chunks.pop(0)
               # AceStream return link for HTTP stream
-              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, videotimeout)), counter.getClientsList(cid))
+              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, self._videotimeout)), counter.getClientsList(cid))
+
            except Exception as err:
               clients = counter.getClientsList(cid)
               if clients:
@@ -225,12 +229,12 @@ class AceClient(object):
 
     def RAWDataReader(self, stream, clients):
         for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           if clients and chunk: gevent.joinall([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
+           if chunk: gevent.joinall([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
 
-    def write_chunk(self, c, chunk, chunk_trailer=None):
-        try: c.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not c.transcoder else c.out.write(chunk)
-        except: c.destroy() # Client disconected
-        if chunk_trailer: c.destroy()
+    def write_chunk(self, client, chunk, chunk_trailer=None):
+        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not client.transcoder else client.out.write(chunk)
+        except: client.destroy() # Client disconected
+        if chunk_trailer: client.destroy()
 
     def _recvData(self):
         '''
