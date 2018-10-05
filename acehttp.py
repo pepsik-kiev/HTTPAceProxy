@@ -43,6 +43,10 @@ from aceconfig import AceConfig
 class HTTPServer(HTTPServer):
 
     def process_request(self, request, client_address):
+        # If firewall enabled
+        if AceConfig.firewall and not checkFirewall(client_address[0]):
+           logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
+           return
         gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
 
     def __new_request(self, handlerClass, request, address, server):
@@ -94,16 +98,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
 
-        # If firewall enabled
-        if AceConfig.firewall and not checkFirewall(self.clientip):
-           self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
-           return
-
-        # Limit concurrent connections
-        if 0 < AceConfig.maxconns <= AceStuff.clientcounter.total:
-            self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
-            return
-
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
             # Return 200 and exit
@@ -146,15 +140,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger = logging.getLogger('HandleRequest')
         self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
 
+        # Limit concurrent connections
+        if 0 < AceConfig.maxconns <= AceStuff.clientcounter.totalClients():
+            self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
+            return
+
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
                                  '.ogx', '.qt', '.rm', '.swf', '.ts', '.vob', '.wmv', '.wav', '.webm')
-
-        # If firewall enabled
-        if AceConfig.firewall and not checkFirewall(self.clientip):
-           self.dieWithError(403, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)  # 403 Forbidden
-           return
-
         # Check if third parameter exists…/self.reqtype/blablablablabla/video.mpg
         #                                                     |_________|
         # And if it ends with regular video extension
@@ -230,7 +223,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
-            while self.connection: gevent.sleep(0.5) # Stream data to client
+            while self.connection: gevent.sleep(0.5) # Stream data to client from AceStreamReader
 
             if self.transcoder is not None:
                 try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')

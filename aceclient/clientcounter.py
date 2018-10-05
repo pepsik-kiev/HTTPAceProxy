@@ -13,7 +13,6 @@ class ClientCounter(object):
         self.streams = {}   # {'CID': [client1, client2,....]} dict of current broadcasts and clients
         self.idleAce = None
         self.idleSince = 30 # Send SHUTDOWN to AceEngine if it in IDLE more than
-        self.total = 0      # Client counter total
         gevent.spawn(self.checkIdle)
 
     def getClientsQuantity(self, cid):
@@ -28,6 +27,12 @@ class ClientCounter(object):
         '''
         return self.streams.get(cid,[])
 
+    def totalClients(self):
+        '''
+        Return total of clients for all CIDs
+        '''
+        return sum(self.getClientsQuantity(cid) for cid in self.streams)
+
     def addClient(self, cid, client):
         '''
         Adds client to the dictionary list by CID key and return their number
@@ -36,7 +41,6 @@ class ClientCounter(object):
         client.ace = clients[0].ace if clients else self.idleAce
         self.idleAce = None
         self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
-        self.total += 1
         return self.getClientsQuantity(cid)
 
     def deleteClient(self, cid, client):
@@ -46,21 +50,19 @@ class ClientCounter(object):
         if not cid in self.streams: return 0
         clients = self.getClientsList(cid)
         if client not in clients: return self.getClientsQuantity(cid)
-        try:
-            if self.getClientsQuantity(cid) > 1:
-                clients.remove(client)
-                return self.getClientsQuantity(cid)
+        if self.getClientsQuantity(cid) > 1:
+            clients.remove(client)
+            return self.getClientsQuantity(cid)
+        else:
+            del self.streams[cid]
+            if self.idleAce: client.ace.destroy()
             else:
-                del self.streams[cid]
-                if self.idleAce: client.ace.destroy()
-                else:
-                     try:
-                        client.ace.STOP()
-                        self.idleAce = client.ace
-                        self.idleAce.reset()
-                     except: client.ace.destroy()
-                return 0
-        finally: self.total -= 1
+                 try:
+                    client.ace.STOP()
+                    self.idleAce = client.ace
+                    self.idleAce.reset()
+                 except: client.ace.destroy()
+            return 0
 
     def deleteAll(self, cid):
         '''
@@ -71,7 +73,6 @@ class ClientCounter(object):
             if not cid in self.streams: return
             clients = self.getClientsList(cid)
             del self.streams[cid]
-            self.total -= self.getClientsQuantity(cid)
             if self.idleAce: clients[0].ace.destroy()
             else:
                 try:

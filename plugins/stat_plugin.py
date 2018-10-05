@@ -106,7 +106,7 @@ class Stat(AceProxyPlugin):
 
             response['connection_info'] = {
                  'max_clients': self.config.maxconns,
-                 'total_clients': self.stuff.clientcounter.total,
+                 'total_clients': self.stuff.clientcounter.totalClients(),
                 }
 
             response['clients_data'] = []
