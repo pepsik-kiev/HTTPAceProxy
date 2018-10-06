@@ -209,11 +209,11 @@ class AceClient(object):
               # AceEngine return link for HLS stream
               if url.endswith('.m3u8'):
                   _used_chunks = []
-                  while 1:
-                    for line in session.get(url, stream=True, timeout=(5,self._videotimeout)).iter_lines():
-                       if self._state.get(timeout=self._resulttimeout)[0] not in ('2', '3'): return
+                  while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
+                    for line in session.get(url, stream=True, timeout=(5, self._videotimeout)).iter_lines():
+                       if line.startswith(b'download not found'): return
                        if line.startswith(b'http://') and line not in _used_chunks:
-                          self.RAWDataReader(session.get(line, stream=True, timeout=(5,10)), counter.getClientsList(cid))
+                          self.RAWDataReader(session.get(line, stream=True, timeout=(5, self._videotimeout)), counter.getClientsList(cid))
                           _used_chunks.append(line)
                           if len(_used_chunks) > 15: _used_chunks.pop(0)
               # AceStream return link for HTTP stream
@@ -223,12 +223,12 @@ class AceClient(object):
               clients = counter.getClientsList(cid)
               if clients:
                  logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
-                 gevent.joinall([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
+                 gevent.wait([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
            finally: _used_chunks = None
 
     def RAWDataReader(self, stream, clients):
         for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           if chunk: gevent.joinall([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
+           if chunk: gevent.wait([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
 
     def write_chunk(self, client, chunk, chunk_trailer=None):
         try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not client.transcoder else client.out.write(chunk)

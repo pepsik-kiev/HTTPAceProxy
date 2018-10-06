@@ -47,7 +47,9 @@ class HTTPServer(HTTPServer):
         if AceConfig.firewall and not checkFirewall(client_address[0]):
            logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
            return
-        gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+        if not AceStuff.requestPool.full():
+              AceStuff.requestPool.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+        else: logger.error('Maximum number of connections reached. Denial of service!')
 
     def __new_request(self, handlerClass, request, address, server):
         checkAce() # Check is AceStream engine alive
@@ -140,7 +142,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger = logging.getLogger('HandleRequest')
         self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
 
-        # Limit concurrent connections
+        # Limit on the number of clients connected to broadcasts
         if 0 < AceConfig.maxconns <= AceStuff.clientcounter.totalClients():
             self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
             return
@@ -149,7 +151,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
                                  '.ogx', '.qt', '.rm', '.swf', '.ts', '.vob', '.wmv', '.wav', '.webm')
         # Check if third parameter exists…/self.reqtype/blablablablabla/video.mpg
-        #                                                     |_________|
         # And if it ends with regular video extension
         try:
             if not self.path.endswith(self.videoextdefaults):
@@ -480,6 +481,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
+AceStuff.requestPool = gevent.pool.Pool(AceConfig.maxconns*2)
 server = HTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
