@@ -63,6 +63,8 @@ class AceClient(object):
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
+        # AceEngine STATUS 0 (idle) timeout
+        self._recvreadtimeout = 30
 
         try:
            self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
@@ -241,14 +243,18 @@ class AceClient(object):
         '''
         while 1:
             try:
-                self._recvbuffer = self._socket.read_until('\r\n').strip()
-                logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+                with gevent.timeout.Timeout(self._recvreadtimeout):
+                  self._recvbuffer = self._socket.read_until('\r\n').strip()
+                  logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
             except EOFError as e:
                 # If something happened during read, abandon reader.
                 if not self._shuttingDown.ready(): self._shuttingDown.set()
                 raise AceException('Exception at socket read. AceClient destroyed %s' % repr(e))
                 return
-            except gevent.socket.timeout: pass # If an error occurs while reading blank lines from socket in STATE 0 (IDLE)
+            # If an error occurs while reading blank lines from socket in STATE 0 (IDLE)
+            except gevent.socket.timeout: pass
+            # SHUTDOWN socket connection if AceEngine STATUS 0 (idle) more than Nsec
+            except gevent.timeout.Timeout: self.destroy()
 
             else: # Parsing everything only if the string is not empty
                 # HELLOTS

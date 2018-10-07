@@ -287,7 +287,7 @@ def spawnAce(cmd, delay=0.1):
 
 def checkAce():
     if AceConfig.acespawn and not isRunning(AceStuff.ace):
-        AceStuff.clientcounter.destroyIdle()
+        if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
         if hasattr(AceStuff, 'ace'): del AceStuff.ace
         if spawnAce(AceStuff.acecmd, AceConfig.acestartuptimeout):
             logger.error('Ace Stream died, respawned it with pid %s' % AceStuff.ace.pid)
@@ -339,7 +339,7 @@ def findProcess(name):
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        AceStuff.clientcounter.destroyIdle()
+        if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try: os.remove(AceStuff.acedir + '\\acestream.port')
             except: pass

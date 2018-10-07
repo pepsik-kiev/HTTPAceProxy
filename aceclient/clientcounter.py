@@ -4,16 +4,11 @@ Simple Client Counter for VLC VLM
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent
-import logging
-
 class ClientCounter(object):
 
     def __init__(self):
         self.streams = {}   # {'CID': [client1, client2,....]} dict of current broadcasts and clients
         self.idleAce = None
-        self.idleSince = 30 # Send SHUTDOWN to AceEngine if it in IDLE more than
-        gevent.spawn(self.checkIdle)
 
     def getClientsQuantity(self, cid):
         '''
@@ -83,15 +78,3 @@ class ClientCounter(object):
         finally:
                 if clients:
                    for c in clients: c.destroy()
-
-    def destroyIdle(self):
-        try:
-            if self.idleAce: self.idleAce.destroy()
-        finally: self.idleAce = None
-
-    def checkIdle(self):
-        while 1:
-            gevent.sleep(self.idleSince)
-            if self.idleAce and self.idleAce._state.ready():
-                STATE = self.idleAce._state.get_nowait()
-                if STATE[0] == '0' and (gevent.time.time() - STATE[1]) >= self.idleSince: self.destroyIdle()
