@@ -50,13 +50,11 @@ class ClientCounter(object):
             return self.getClientsQuantity(cid)
         else:
             del self.streams[cid]
-            if self.idleAce: client.ace.destroy()
-            else:
-                 try:
-                    client.ace.STOP()
-                    self.idleAce = client.ace
-                    self.idleAce.reset()
-                 except: client.ace.destroy()
+            try:
+               client.ace.STOP()
+               self.idleAce = client.ace
+               self.idleAce.reset()
+            except: client.ace.destroy(); self.idleAce = None
             return 0
 
     def deleteAll(self, cid):
@@ -78,3 +76,4 @@ class ClientCounter(object):
         finally:
                 if clients:
                    for c in clients: c.destroy()
+

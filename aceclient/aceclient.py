@@ -29,11 +29,15 @@ class Telnet(telnetlib.Telnet, object):
 
 class AceClient(object):
 
-    def __init__(self, ace, connect_timeout=5, result_timeout=10):
+    def __init__(self, clientcounter, ace, connect_timeout=5, result_timeout=10):
         # Telnet response buffer
         self._recvbuffer = None
+        # Telnet response read timeout
+        self._recvbuffertimeout = 30
         # AceEngine socket
         self._socket = None
+        # ClientCounter
+        self._clientcounter = clientcounter
         # AceEngine read result timeout
         self._resulttimeout = float(result_timeout)
         # Shutting down flag
@@ -197,7 +201,7 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def AceStreamReader(self, url, cid, counter, req_headers=None):
+    def AceStreamReader(self, url, cid, req_headers=None):
         '''
         Get stream from AceEngine url and write it to client(s)
         '''
@@ -215,14 +219,14 @@ class AceClient(object):
                     for line in session.get(url, stream=True, timeout=(5, self._videotimeout)).iter_lines():
                        if line.startswith(b'download not found'): return
                        if line.startswith(b'http://') and line not in _used_chunks:
-                          self.RAWDataReader(session.get(line, stream=True, timeout=(5, self._videotimeout)), counter.getClientsList(cid))
+                          self.RAWDataReader(session.get(line, stream=True, timeout=(5, self._videotimeout)), self._clientcounter.getClientsList(cid))
                           _used_chunks.append(line)
                           if len(_used_chunks) > 15: _used_chunks.pop(0)
               # AceStream return link for HTTP stream
-              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, self._videotimeout)), counter.getClientsList(cid))
+              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, self._videotimeout)), self._clientcounter.getClientsList(cid))
 
            except Exception as err:
-              clients = counter.getClientsList(cid)
+              clients = self._clientcounter.getClientsList(cid)
               if clients:
                  logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
                  gevent.wait([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
@@ -243,9 +247,9 @@ class AceClient(object):
         '''
         while 1:
             try:
-                with gevent.timeout.Timeout(self._recvreadtimeout):
-                  self._recvbuffer = self._socket.read_until('\r\n').strip()
-                  logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+                with gevent.timeout.Timeout(self._recvbuffertimeout):
+                   self._recvbuffer = self._socket.read_until('\r\n').strip()
+                   logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
             except EOFError as e:
                 # If something happened during read, abandon reader.
                 if not self._shuttingDown.ready(): self._shuttingDown.set()
@@ -253,8 +257,8 @@ class AceClient(object):
                 return
             # If an error occurs while reading blank lines from socket in STATE 0 (IDLE)
             except gevent.socket.timeout: pass
-            # SHUTDOWN socket connection if AceEngine STATUS 0 (idle) more than Nsec
-            except gevent.timeout.Timeout: self.destroy()
+            # AceEngine STATE 0 (IDLE) and we didn't read anything for Nsec
+            except gevent.timeout.Timeout: self.destroy(); self._clientcounter.idleAce = None
 
             else: # Parsing everything only if the string is not empty
                 # HELLOTS
@@ -323,6 +327,6 @@ class AceClient(object):
                 elif self._recvbuffer.startswith('SHUTDOWN'):
                     self._socket.close()
                     logging.debug('AceClient destroyed')
-                    break
+                    return
 
             finally: gevent.sleep()

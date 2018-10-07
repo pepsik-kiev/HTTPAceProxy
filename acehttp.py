@@ -168,7 +168,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
             if not AceStuff.clientcounter.idleAce:
                logger.debug('Create connection to AceEngine.....')
-               AceStuff.clientcounter.idleAce = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+               AceStuff.clientcounter.idleAce = aceclient.AceClient(AceStuff.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
                AceStuff.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
             if self.reqtype not in ('direct_url', 'efile_url'):
                CID, NAME = AceStuff.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
@@ -183,7 +183,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 if not AceStuff.ace:
                   url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
                 # Start streamreader for broadcast
-                gevent.spawn(self.ace.AceStreamReader, url, CID, AceStuff.clientcounter)
+                gevent.spawn(self.ace.AceStreamReader, url, CID)
                 #except: pass
                 logger.warning('Broadcast "%s" created' % self.channelName)
 
