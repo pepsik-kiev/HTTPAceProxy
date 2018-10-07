@@ -243,7 +243,7 @@ class AceClient(object):
             try:
                 self._recvbuffer = self._socket.read_until('\r\n').strip()
                 logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
-            except Exception as e:
+            except EOFError as e:
                 # If something happened during read, abandon reader.
                 if not self._shuttingDown.ready(): self._shuttingDown.set()
                 raise AceException('Exception at socket read. AceClient destroyed %s' % repr(e))
