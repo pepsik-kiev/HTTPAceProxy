@@ -47,9 +47,7 @@ class HTTPServer(HTTPServer):
         if AceConfig.firewall and not checkFirewall(client_address[0]):
            logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
            return
-        if not AceStuff.requestPool.full():
-              AceStuff.requestPool.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
-        else: logger.error('Maximum number of connections reached. Denial of service!')
+        gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
 
     def __new_request(self, handlerClass, request, address, server):
         checkAce() # Check is AceStream engine alive
@@ -198,12 +196,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                    popen_params = { 'bufsize': 1048576,
-                                     'stdin'  : gevent.subprocess.PIPE,
-                                     'stdout' : self.wfile,
-                                     'stderr' : stderr,
-                                     'shell'  : False }
-
+                    popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
+                                     'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                     self.transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
                     self.out = self.transcoder.stdin
                     logger.warning('Ffmpeg transcoding started')
@@ -481,7 +475,6 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-AceStuff.requestPool = gevent.pool.Pool(AceConfig.maxconns*2)
 server = HTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
