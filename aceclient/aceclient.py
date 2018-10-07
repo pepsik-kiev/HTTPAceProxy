@@ -248,6 +248,8 @@ class AceClient(object):
                 if not self._shuttingDown.ready(): self._shuttingDown.set()
                 raise AceException('Exception at socket read. AceClient destroyed %s' % repr(e))
                 return
+            except gevent.socket.timeout: pass # If an error occurs while reading blank lines from socket in STATE 0 (IDLE)
+
             else: # Parsing everything only if the string is not empty
                 # HELLOTS
                 if self._recvbuffer.startswith('HELLOTS'):
@@ -316,4 +318,5 @@ class AceClient(object):
                     self._socket.close()
                     logging.debug('AceClient destroyed')
                     break
+
             finally: gevent.sleep()
