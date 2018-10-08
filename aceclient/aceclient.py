@@ -30,9 +30,9 @@ class Telnet(telnetlib.Telnet, object):
 class AceClient(object):
 
     def __init__(self, clientcounter, ace, connect_timeout=5, result_timeout=10):
-        # Telnet response buffer
+        # Telnet socket response buffer
         self._recvbuffer = None
-        # Telnet response read timeout
+        # Telnet socket response read timeout
         self._recvbuffertimeout = 30
         # AceEngine socket
         self._socket = None
@@ -248,19 +248,18 @@ class AceClient(object):
         while 1:
             try:
                 with gevent.timeout.Timeout(self._recvbuffertimeout):
-                   self._recvbuffer = self._socket.read_until('\r\n').strip()
-                   logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+                    self._recvbuffer = self._socket.read_until('\r\n').strip()
             except EOFError as e:
                 # If something happened during read, abandon reader.
                 if not self._shuttingDown.ready(): self._shuttingDown.set()
                 raise AceException('Exception at socket read. AceClient destroyed %s' % repr(e))
-                return
             # If an error occurs while reading blank lines from socket in STATE 0 (IDLE)
             except gevent.socket.timeout: pass
-            # AceEngine STATE 0 (IDLE) and we didn't read anything for Nsec
+            # AceEngine STATE 0 (IDLE). We didn't read anything from socket until Nsec
             except gevent.timeout.Timeout: self.destroy(); self._clientcounter.idleAce = None
 
             else: # Parsing everything only if the string is not empty
+                logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
                 # HELLOTS
                 if self._recvbuffer.startswith('HELLOTS'):
                     # version=engine_version version_code=version_code key=request_key http_port=http_port

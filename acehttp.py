@@ -142,7 +142,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         # Limit on the number of clients connected to broadcasts
         if 0 < AceConfig.maxconns <= AceStuff.clientcounter.totalClients():
-            self.dieWithError(503, "Maximum client connections reached, can't serve request from %" % self.clientip, logging.ERROR)  # 503 Service Unavailable
+            self.dieWithError(503, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)  # 503 Service Unavailable
             return
 
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
