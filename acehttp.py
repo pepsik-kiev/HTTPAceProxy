@@ -105,7 +105,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             else: logger.debug('Fake request - closing connection')
             self.send_response(200)
             self.send_header('Content-Type', 'video/mpeg')
-            self.senf_header('Transfer-Encoding', 'chunked')
+            self.send_header('Transfer-Encoding', 'chunked')
             self.send_header('Connection', 'Close')
             self.end_headers()
             self.wfile.write(b'0\r\n\r\n')
