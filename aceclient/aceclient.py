@@ -19,20 +19,17 @@ class Telnet(telnetlib.Telnet, object):
 
     if requests.compat.is_py3:
         def read_until(self, expected, timeout=None):
-            expected = bytes(expected, encoding='utf-8')
-            received = super(Telnet, self).read_until(expected, timeout)
-            return str(received, encoding='utf-8')
+            return super(Telnet, self).read_until(expected.encode(), timeout).decode()
 
         def write(self, buffer):
-            buffer = bytes(buffer, encoding='utf-8')
-            super(Telnet, self).write(buffer)
+            super(Telnet, self).write(buffer.encode())
 
 class AceClient(object):
 
     def __init__(self, clientcounter, ace, connect_timeout=5, result_timeout=10):
         # Telnet socket response buffer
         self._recvbuffer = None
-        # Telnet socket response read timeout
+        # Telnet socket response buffer read timeout
         self._recvbuffertimeout = 30
         # AceEngine socket
         self._socket = None
@@ -40,8 +37,6 @@ class AceClient(object):
         self._clientcounter = clientcounter
         # AceEngine read result timeout
         self._resulttimeout = float(result_timeout)
-        # Shutting down flag
-        self._shuttingDown = Event()
         # AceEngine product key
         self._product_key = None
         # Result (Created with AsyncResult() on call)
@@ -67,8 +62,6 @@ class AceClient(object):
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
-        # AceEngine STATUS 0 (idle) timeout
-        self._recvreadtimeout = 30
 
         try:
            self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
@@ -76,25 +69,21 @@ class AceClient(object):
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        else:
-           # Spawning telnet data reader greenlet
-           gevent.spawn(self._recvData)
+        else: gevent.spawn(self._recvData)  # Spawning telnet data reader
 
     def destroy(self):
         '''
         AceClient Destructor
         '''
-        if self._shuttingDown.ready(): return   # Already in the middle of destroying
         # Trying to disconnect
-        try:
-            logging.debug('Destroying AceStream client.....')
-            self._shuttingDown.set()
-            self._write(AceMessage.request.SHUTDOWN)
+        logging.debug('Destroying AceStream client.....')
+        try: self._write(AceMessage.request.SHUTDOWN)
         except: pass # Ignore exceptions on destroy
-        finally: self._shuttingDown.set()
 
     def reset(self):
-        # Reset initial values
+        '''
+        Reset initial values
+        '''
         self._started_again.clear()
         self._url.set()
         self._loadasync.set()
@@ -104,7 +93,7 @@ class AceClient(object):
         try:
             logging.debug('>>> %s' % message)
             self._socket.write('%s\r\n' % message)
-        except EOFError as e: raise AceException('Telnet socket Write error! %s' % repr(e))
+        except gevent.socket.error as e: raise AceException('Telnet exception at socket write %s' % repr(e))
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
@@ -140,7 +129,7 @@ class AceClient(object):
     def START(self, command, paramsdict, acestreamtype):
         '''
         Start video method
-        Returns the url provided by AceEngine
+        Return the url provided by AceEngine
         '''
         paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
         self._url = AsyncResult()
@@ -179,14 +168,11 @@ class AceClient(object):
             paramsdict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
             self._cid = AsyncResult()
             self._write(AceMessage.request.GETCID(paramsdict))
-            try:
-                cid = self._cid.get(timeout=self._resulttimeout)
-                return '' if cid is None or cid == '' else cid[2:]
+            try: return self._cid.get(timeout=self._resulttimeout)[2:] # ##CID
             except gevent.Timeout:
                  errmsg = 'Engine response time %ssec exceeded. CID not resived!' % self._resulttimeout
                  raise AceException(errmsg)
         else:
-            cid = None
             errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
             raise AceException(errmsg)
 
@@ -248,14 +234,14 @@ class AceClient(object):
         while 1:
             try:
                 with gevent.timeout.Timeout(self._recvbuffertimeout):
-                    self._recvbuffer = self._socket.read_until('\r\n').strip()
+                    self._recvbuffer = self._socket.read_until('\r\n', timeout=None).strip()
             except EOFError as e:
-                # If something happened during read, abandon reader.
-                if not self._shuttingDown.ready(): self._shuttingDown.set()
-                raise AceException('Exception at socket read. AceClient destroyed %s' % repr(e))
-            # If an error occurs while reading blank lines from socket in STATE 0 (IDLE)
+                # if the connection is closed and no cooked data is available.
+                raise AceException('Telnet exception at socket read. AceClient destroyed %s' % repr(e))
+                return
+            # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
             except gevent.socket.timeout: pass
-            # AceEngine STATE 0 (IDLE). We didn't read anything from socket until Nsec
+            # SHUTDOWN socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
             except gevent.timeout.Timeout: self.destroy(); self._clientcounter.idleAce = None
 
             else: # Parsing everything only if the string is not empty
