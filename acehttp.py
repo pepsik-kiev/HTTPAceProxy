@@ -32,7 +32,7 @@ except: from http.server import HTTPServer, BaseHTTPRequestHandler
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
-from socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR, error as SocketException
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 from modules.PluginInterface import AceProxyPlugin
 
 import aceclient
@@ -458,7 +458,7 @@ except: pass
 # Creating dict of handlers
 AceStuff.pluginshandlers = {}
 # And a list with plugin instances
-AceStuff.pluginlist = list()
+AceStuff.pluginlist = []
 sys.path.insert(0, 'plugins')
 logger.info("Load Ace Stream HTTP Proxy plugins .....")
 for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]:
