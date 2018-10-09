@@ -29,10 +29,7 @@ class Stat(AceProxyPlugin):
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
         headers = {'User-Agent':'API Browser'}
-        response = requests.get('https://geoip-db.com/json/%s' % ip_address, headers=headers, timeout=5).json()
-        return {'country_code' : '' if not response['country_code'] else response['country_code'].lower(),
-                'country'      : '' if not response['country_name'] else response['country_name'],
-                'city'         : '' if not response['city'] else response['city']}
+        return requests.get('http://api.db-ip.com/v2/free/%s' % ip_address, headers=headers, stream=False, timeout=10).json()
 
     def mac_lookup(self,ip_address):
 
@@ -116,7 +113,9 @@ class Stat(AceProxyPlugin):
                if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
                   clientInfo = self.mac_lookup(c.clientip)
                else:
-                  clientInfo =u'<i class="flag {country_code}"></i>&nbsp;&nbsp;{country}, {city}'.format(**self.geo_ip_lookup(c.clientip))
+                  try: r = self.geo_ip_lookup(c.clientip)
+                  except: r = {}
+                  clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('countryCode','n/a').lower(), r.get('countryName','n/a'), r.get('city', 'n/a'))
 
                client_data = {
                     'channelIcon': c.channelIcon,
