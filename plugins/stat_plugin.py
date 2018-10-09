@@ -29,9 +29,9 @@ class Stat(AceProxyPlugin):
     def geo_ip_lookup(self, ip_address):
         Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
         headers = {'User-Agent':'API Browser'}
-        response = requests.get('http://geoip.nekudo.com/api/%s/en' % ip_address, headers=headers, timeout=5).json()
-        return {'country_code' : '' if not response['country']['code'] else response['country']['code'].lower(),
-                'country'      : '' if not response['country']['name'] else response['country']['name'],
+        response = requests.get('https://geoip-db.com/json/%s' % ip_address, headers=headers, timeout=5).json()
+        return {'country_code' : '' if not response['country_code'] else response['country_code'].lower(),
+                'country'      : '' if not response['country_name'] else response['country_name'],
                 'city'         : '' if not response['city'] else response['city']}
 
     def mac_lookup(self,ip_address):
