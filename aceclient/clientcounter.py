@@ -72,7 +72,7 @@ class ClientCounter(object):
                    clients[0].ace.STOP()
                    self.idleAce = clients[0].ace
                    self.idleAce.reset()
-                except: clients[0].ace.destroy()
+                except: clients[0].ace.destroy(); self.idleAce = None
         finally:
                 if clients:
                    for c in clients: c.destroy()

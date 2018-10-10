@@ -56,13 +56,6 @@ class HTTPServer(HTTPServer):
         except Exception as e: logger.error(traceback.format_exc())
         self.shutdown_request(request)
 
-class BaseHTTPRequestHandler(BaseHTTPRequestHandler):
-
-    def finish(self):
-        if not self.wfile.closed: self.wfile.flush()
-        self.wfile.close()
-        self.rfile.close()
-
 class HTTPHandler(BaseHTTPRequestHandler):
 
     server_version = 'HTTPAceProxy'
@@ -97,17 +90,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger.debug('Headers: %s' % dict(self.headers))
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
-
-        # Pretend to work fine with Fake or HEAD request.
-        if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
-            # Return 200 and exit
-            if headers_only: logger.debug('Sending headers and closing connection')
-            else: logger.debug('Fake request - closing connection')
-            self.send_response(200)
-            self.send_header('Content-Type', 'video/mpeg')
-            self.send_header('Connection', 'Close')
-            self.end_headers()
-            return
 
         try:
             self.splittedpath = self.path.split('/')
@@ -153,6 +135,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
                 return
         except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
+        # Pretend to work fine with Fake or HEAD request.
+        if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
+            # Return 200 and exit
+            if headers_only: logger.debug('Sending headers and closing connection')
+            else: logger.debug('Fake request - closing connection')
+            self.send_response(200)
+            self.send_header('Content-Type', 'video/mpeg')
+            self.send_header('Connection', 'Close')
+            self.end_headers()
+            return
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
