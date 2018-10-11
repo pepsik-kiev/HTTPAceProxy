@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 '''
-Simple Client Counter for VLC VLM
+Client Counter for BroadcastStreamer
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
@@ -34,8 +33,8 @@ class ClientCounter(object):
         '''
         clients = self.getClientsList(cid)
         client.ace = clients[0].ace if clients else self.idleAce
-        self.idleAce = None
         self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
+        self.idleAce = None
         return self.getClientsQuantity(cid)
 
     def deleteClient(self, cid, client):

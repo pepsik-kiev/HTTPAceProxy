@@ -36,7 +36,7 @@ from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 from modules.PluginInterface import AceProxyPlugin
 
 import aceclient
-from aceclient.clientcounter import ClientCounter
+from clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
 
@@ -167,14 +167,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.addClient(CID, self) == 1:
                 logger.warning('Create a broadcast "%s"' % self.channelName)
-                # Send START commands to AceEngine and Getting URL from engine
-                url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
-                # Rewriting host:port for remote Ace Stream Engine
-                if not AceStuff.ace:
-                  url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
-                # Start streamreader for broadcast
-                gevent.spawn(self.ace.AceStreamReader, url, CID)
-                #except: pass
+                gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
                 logger.warning('Broadcast "%s" created' % self.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
@@ -286,6 +280,47 @@ def checkAce():
             else: gevent.sleep(AceConfig.acestartuptimeout)
         else:
             logger.error("Can't spawn Ace Stream!")
+
+def BroadcastStreamer(url, cid, req_headers=None):
+    '''
+    Get stream from AceEngine url and write data to client(s)
+    '''
+    logging.debug('Start BroadcastStreamer for url: %s' % url)
+    # Rewriting host:port for remote Ace Stream Engine
+    if not AceStuff.ace:
+       url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
+    with requests.Session() as session:
+       if req_headers:
+           session.headers.update(req_headers)
+           logging.debug('Sending headers from client to AceEngine: %s' % session.headers)
+       try:
+          # AceEngine return link for HLS stream
+          if url.endswith('.m3u8'):
+              _used_chunks = []
+              while  AceStuff.clientcounter.getClientsList(cid):
+                for line in session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)).iter_lines():
+                   if line.startswith(b'download not found'): return
+                   if line.startswith(b'http://') and line not in _used_chunks:
+                      RAWDataReader(session.get(line, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
+                      _used_chunks.append(line)
+                      if len(_used_chunks) > 15: _used_chunks.pop(0)
+          # AceStream return link for HTTP stream
+          else: RAWDataReader(session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
+       except Exception as err:
+          clients =  AceStuff.clientcounter.getClientsList(cid)
+          logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
+          gevent.wait([gevent.spawn(write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
+       finally: _used_chunks = None
+
+def RAWDataReader(stream, cid):
+    for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
+       if chunk: gevent.wait([gevent.spawn(write_chunk, c, chunk) for c in  AceStuff.clientcounter.getClientsList(cid)])
+
+def write_chunk(client, chunk, chunk_trailer=None):
+    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not client.transcoder else client.out.write(chunk)
+    except gevent.socket.timeout: pass
+    except: client.destroy() # Client disconected
+    if chunk_trailer: client.destroy()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

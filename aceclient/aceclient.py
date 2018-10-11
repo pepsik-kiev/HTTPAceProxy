@@ -29,12 +29,8 @@ class AceClient(object):
     def __init__(self, clientcounter, ace, connect_timeout=5, result_timeout=10):
         # Telnet socket response buffer
         self._recvbuffer = None
-        # Telnet socket response buffer read timeout
-        self._recvbuffertimeout = 30
         # AceEngine socket
         self._socket = None
-        # ClientCounter
-        self._clientcounter = clientcounter
         # AceEngine read result timeout
         self._resulttimeout = float(result_timeout)
         # AceEngine product key
@@ -62,6 +58,8 @@ class AceClient(object):
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
+        # ClientCounter
+        self._clientcounter = clientcounter
 
         try:
            self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
@@ -69,7 +67,7 @@ class AceClient(object):
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        else: gevent.spawn(self._recvData)  # Spawning telnet data reader
+        else: gevent.spawn(self._recvData, 30)  # Spawning telnet data reader with recvbuffer read timeout
 
     def destroy(self):
         '''
@@ -91,9 +89,9 @@ class AceClient(object):
 
     def _write(self, message):
         try:
-            logging.debug('>>> %s' % message)
             self._socket.write('%s\r\n' % message)
-        except gevent.socket.error as e: raise AceException('Telnet exception at socket write %s' % repr(e))
+            logging.debug('>>> %s' % message)
+        except gevent.socket.error as e: raise AceException('AceEngine exception at socket write %s' % repr(e))
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
@@ -187,57 +185,18 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def AceStreamReader(self, url, cid, req_headers=None):
-        '''
-        Get stream from AceEngine url and write it to client(s)
-        '''
-        logging.debug('Start StreamReader for url: %s' % url)
-        with requests.Session() as session:
-           if req_headers:
-               session.headers.update(req_headers)
-               logging.debug('Sending headers from client to AceEngine: %s' % session.headers)
-           try:
-              self._write(AceMessage.request.EVENT('play'))
-              # AceEngine return link for HLS stream
-              if url.endswith('.m3u8'):
-                  _used_chunks = []
-                  while self._state.get(timeout=self._resulttimeout)[0] in ('2', '3'):
-                    for line in session.get(url, stream=True, timeout=(5, self._videotimeout)).iter_lines():
-                       if line.startswith(b'download not found'): return
-                       if line.startswith(b'http://') and line not in _used_chunks:
-                          self.RAWDataReader(session.get(line, stream=True, timeout=(5, self._videotimeout)), self._clientcounter.getClientsList(cid))
-                          _used_chunks.append(line)
-                          if len(_used_chunks) > 15: _used_chunks.pop(0)
-              # AceStream return link for HTTP stream
-              else: self.RAWDataReader(session.get(url, stream=True, timeout = (5, self._videotimeout)), self._clientcounter.getClientsList(cid))
-
-           except Exception as err:
-              clients = self._clientcounter.getClientsList(cid)
-              if clients:
-                 logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
-                 gevent.wait([gevent.spawn(self.write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
-           finally: _used_chunks = None
-
-    def RAWDataReader(self, stream, clients):
-        for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           if chunk: gevent.wait([gevent.spawn(self.write_chunk, c, chunk) for c in clients])
-
-    def write_chunk(self, client, chunk, chunk_trailer=None):
-        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not client.transcoder else client.out.write(chunk)
-        except: client.destroy() # Client disconected
-        if chunk_trailer: client.destroy()
-
-    def _recvData(self):
+    def _recvData(self,timeout=None):
         '''
         Data receiver method for greenlet
         '''
         while 1:
             try:
-                with gevent.timeout.Timeout(self._recvbuffertimeout):
-                    self._recvbuffer = self._socket.read_until('\r\n', timeout=None).strip()
+                with gevent.timeout.Timeout(timeout):
+                    self._recvbuffer = self._socket.read_until('\r\n', None).strip()
             except EOFError as e:
                 # if the connection is closed and no cooked data is available.
-                raise AceException('Telnet exception at socket read. AceClient destroyed %s' % repr(e))
+                self._clientcounter.idleAce = None
+                raise AceException('AceEngine error at socket read. Connection closed by remote host %s' % repr(e))
                 return
             # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
             except gevent.socket.timeout: pass
