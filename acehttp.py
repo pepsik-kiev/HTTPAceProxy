@@ -204,10 +204,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             while self.connection: gevent.sleep(0.5) # Stream data to client from AceStreamReader
 
+            logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+
             if self.transcoder is not None:
                 try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                 except: pass
-            logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+            else: self.out.write(b'0\r\n\r\n') # write final, zero-length chunk.
+            self.out.flush() # Ensure any buffered output has been transmitted and close the stream
 
         finally:
             if CID and AceStuff.clientcounter.deleteClient(CID, self) == 0:
@@ -297,7 +300,7 @@ def BroadcastStreamer(url, cid, req_headers=None):
           # AceEngine return link for HLS stream
           if url.endswith('.m3u8'):
               _used_chunks = []
-              while  AceStuff.clientcounter.getClientsList(cid):
+              while AceStuff.clientcounter.getClientsQuantity(cid) != 0:
                 for line in session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)).iter_lines():
                    if line.startswith(b'download not found'): return
                    if line.startswith(b'http://') and line not in _used_chunks:
@@ -307,20 +310,18 @@ def BroadcastStreamer(url, cid, req_headers=None):
           # AceStream return link for HTTP stream
           else: RAWDataReader(session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
        except Exception as err:
-          clients =  AceStuff.clientcounter.getClientsList(cid)
+          clients = AceStuff.clientcounter.getClientsList(cid)
           logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
-          gevent.wait([gevent.spawn(write_chunk, c, b'', True) for c in clients]) #b'0\r\n\r\n' - send the chunked trailer
+          gevent.joinall([gevent.spawn(c.destroy) for c in clients])
        finally: _used_chunks = None
 
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       if chunk: gevent.wait([gevent.spawn(write_chunk, c, chunk) for c in  AceStuff.clientcounter.getClientsList(cid)])
+       if chunk: gevent.joinall([gevent.spawn(write_chunk, c, chunk) for c in AceStuff.clientcounter.getClientsList(cid)])
 
-def write_chunk(client, chunk, chunk_trailer=None):
+def write_chunk(client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not client.transcoder else client.out.write(chunk)
-    except gevent.socket.timeout: pass
     except: client.destroy() # Client disconected
-    if chunk_trailer: client.destroy()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
