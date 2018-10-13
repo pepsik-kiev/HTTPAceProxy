@@ -77,12 +77,13 @@ class Stat(AceProxyPlugin):
 
             current_time = time.time()
 
-            connection.send_response(200)
-            connection.send_header('Content-type', 'application/json')
-            connection.send_header('Connection', 'close')
-            connection.end_headers()
+            if headers_only:
+               connection.send_response(200)
+               connection.send_header('Content-type', 'application/json')
+               connection.send_header('Connection', 'close')
+               connection.end_headers()
+               return
 
-            if headers_only: return
             # Sys Info
             max_mem = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
@@ -127,14 +128,20 @@ class Stat(AceProxyPlugin):
                      }
 
                response['clients_data'].append(client_data)
-            connection.wfile.write(requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8'))
+            exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
+            connection.send_response(200)
+            connection.send_header('Content-type', 'application/json')
+            connection.send_header('Connection', 'close')
+            connection.send_header('Content-Length', str(len(exported)))
+            connection.end_headers()
+            connection.wfile.write(exported)
         else:
             connection.send_response(200)
             connection.send_header('Content-type', 'text/html; charset=utf-8')
             connection.send_header('Connection', 'close')
+            connection.send_header('Content-Length', str(len(html_template)))
             connection.end_headers()
             connection.wfile.write(html_template)
-
 
 html_template = b"""
 <!doctype html>
@@ -142,19 +149,12 @@ html_template = b"""
   <head>
     <meta charset="UTF-8"/>
     <meta name="description" content="HTTP AceProxy state panel">
-
 <link rel="shortcut icon" href="http://i.piccy.info/i9/699484caf086b9c6b5c6cf2cf48f3624/1530371843/19958/1254756/shesterenka.png" type="image/png">
-
     <title>AceProxy stat info</title>
-
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
-
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
-
     <link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>
-
     <style>
         .header {height: 150px; background-color: #0a0351 !important; background-size: 100%;background-image: url(http://i.piccy.info/i9/32afd3631fc0032bbfc7bed47d8fec11/1530666765/66668/1254756/space_2294795_1280.jpg);}
         .header-block {position: relative; color:aliceblue; width: 100%; height: 100%;}
@@ -170,12 +170,9 @@ html_template = b"""
         .table .thead-light th {color: #495057; background-color: #e9e9e9; border: 3px ridge #4b4b4b;}
         .table-bordered td {border: 3px ridge #4b4b4b;}
         th > small {font-weight: bold}
-
     </style>
-
     <script type="text/javascript">
         getStatus();
-
         function getStatus() {
             $.ajax({
                 url: 'stat/?action=get_status',
@@ -198,44 +195,33 @@ html_template = b"""
                 },
             });
         }
-
         function renderPage(data) {
             var sys_info = data.sys_info;
             var connection_info = data.connection_info;
             var clients_data = data.clients_data;
             var clients_content = "";
-
             $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
                                 " used: " + sys_info.cpu_percent + "%</br>"+
                                 "RAM &nbsp;total: " + sys_info.total_ram +
                                 " &nbsp;used: " + sys_info.used_ram +
                                 "&nbsp;free: " + sys_info.free_ram + "</br>DISK &nbsp;total: " + sys_info.total_disk +
                                 "&nbsp;used: " + sys_info.used_disk + "&nbsp;free: " + sys_info.free_disk);
-
             $('#connection_info').html("Connections limit: " + connection_info.max_clients +
                                        "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
-
             if (clients_data.length) {
-
                 clients_data.forEach(function(item, i, arr) {
-
                     clients_content += '<tr><td><img src="' + item.channelIcon +
                                        '" width="40" height="20"/>&nbsp;&nbsp;' + item.channelName +
                                         '</td><td>' + item.clientIP + '</td><td>' + item.clientLocation + '</td>' +
                                         '<td>' + item.startTime + '</td><td class="text-center">' + item.durationTime + '</td></tr>';
                 });
-
                 $('tbody').html(clients_content);
-
             } else {
                 $('tbody').html('');
             }
         }
-
     </script>
-
   </head>
-
   <body>
     <nav class="header">
         <div class="header-block">
@@ -252,9 +238,7 @@ html_template = b"""
                 <p class="text-center"><a class="home-link" href="http://mytalks.ru/index.php?topic=4506.0" target="_blank">Forum HTTPAceProxy</a></p>
             </div>
         </div>
-
     </nav>
-
     <main role="main" class="container" style="margin-top: 30px">
         <div class="f16 container container-fluid">
             <table class="table table-sm table-bordered">
@@ -274,5 +258,4 @@ html_template = b"""
     </main>
   </body>
 </html>
-
 """

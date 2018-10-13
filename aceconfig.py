@@ -151,3 +151,6 @@ class AceConfig(acedefconfig.AceDefConfig):
          # Dune 301
         elif useragent == 'DuneHD/1.0' and headers.get('Range') != 'bytes=0-':
             return True
+         # MX Player 1.10.13 for Android
+        elif 'MXPlayer/1.10.13' in useragent and 'Accept-Encoding' in headers:
+            return True

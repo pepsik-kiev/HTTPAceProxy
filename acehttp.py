@@ -15,6 +15,8 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
+gevent.config.loop = ['libuv', 'libuv-cffi', 'libev-cffi', 'libev-cext']
+gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
@@ -59,7 +61,6 @@ class HTTPServer(HTTPServer):
 class HTTPHandler(BaseHTTPRequestHandler):
 
     server_version = 'HTTPAceProxy'
-    protocol_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -90,6 +91,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger.debug('Headers: %s' % dict(self.headers))
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
+        self.protocol_version = 'HTTP/1.1' if self.request_version == 'HTTP/1.1' else 'HTTP/1.0'
+        self.use_gzip = 'gzip' in self.headers.get('accept-encoding','')
 
         try:
             self.splittedpath = self.path.split('/')
@@ -190,13 +193,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             # Sending videostream headers to client
-            headers = { 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                        'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked' }
             drop_headers = []
+            if self.protocol_version == 'HTTP/1.1':
+               headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                          'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+               if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
-            if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
+            elif self.protocol_version == 'HTTP/1.0':
+               headers = {'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream'}
 
-            response_headers = [ (k,v) for (k,v) in headers.items() if k not in drop_headers ]
+            response_headers = [(k,v) for (k,v) in headers.items() if k not in drop_headers]
             self.send_response(200)
             logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
             for (k,v) in response_headers: self.send_header(k,v)
@@ -206,10 +212,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
 
+            if self.protocol_version == 'HTTP/1.1' and self.transcoder is None: self.out.write(b'0\r\n\r\n') # write final, zero-length chunk.
             if self.transcoder is not None:
                 try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                 except: pass
-            else: self.out.write(b'0\r\n\r\n') # write final, zero-length chunk.
             self.out.flush() # Ensure any buffered output has been transmitted and close the stream
 
         finally:
@@ -276,6 +282,7 @@ def checkAce():
     if AceConfig.acespawn and not isRunning(AceStuff.ace):
         if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
         if hasattr(AceStuff, 'ace'): del AceStuff.ace
+        AceStuff.acecmd = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
         if spawnAce(AceStuff.acecmd, AceConfig.acestartuptimeout):
             logger.error('Ace Stream died, respawned it with pid %s' % AceStuff.ace.pid)
             # refresh the acestream.port file for Windows only after full loading...
@@ -320,7 +327,7 @@ def RAWDataReader(stream, cid):
        if chunk: gevent.joinall([gevent.spawn(write_chunk, c, chunk) for c in AceStuff.clientcounter.getClientsList(cid)])
 
 def write_chunk(client, chunk):
-    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if not client.transcoder else client.out.write(chunk)
+    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
     except: client.destroy() # Client disconected
 
 def checkFirewall(clientip):

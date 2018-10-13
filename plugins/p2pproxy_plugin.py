@@ -21,6 +21,8 @@ import logging
 from requests.compat import quote, unquote
 from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
+import gzip
+from io import BytesIO
 
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
@@ -120,6 +122,12 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport=hostport, header=config.m3uheadertemplate, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                if connection.use_gzip:
+                    connection.send_header('Content-Encoding', 'gzip')
+                    with BytesIO() as buffer:
+                      with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                         f.write(exported)
+                      exported = buffer.getvalue()
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -139,6 +147,13 @@ class P2pproxy(AceProxyPlugin):
                 P2pproxy.logger.debug('Exporting m3u playlist')
                 response_headers = {'Access-Control-Allow-Origin': '*', 'Connection': 'close',
                                     'Content-Type': 'text/xml;charset=utf-8', 'Content-Length': str(len(translations_list)) }
+                if connection.use_gzip:
+                    connection.send_header('Content-Encoding', 'gzip')
+                    with BytesIO() as buffer:
+                      with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                         f.write(translation_list)
+                      translation_list = buffer.getvalue()
+                      connectin.response_headers['Content-Length'] = str(len(translations_list))
                 connection.send_response(200)
                 for k,v in list(response_headers.items()): connection.send_header(k,v)
                 connection.end_headers()
@@ -156,6 +171,12 @@ class P2pproxy(AceProxyPlugin):
                 return
 
             translations_list = TorrentTvApi(config.email, config.password).translations('all', True)
+            if connection.use_gzip:
+                connection.send_header('Content-Encoding', 'gzip')
+                with BytesIO() as buffer:
+                  with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                     f.write(translation_list)
+                  translation_list = buffer.getvalue()
             connection.send_header('Content-Length', str(len(translations_list)))
             connection.end_headers()
             P2pproxy.logger.debug('Exporting m3u playlist')
@@ -178,6 +199,12 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                if connection.use_gzip:
+                    connection.send_header('Content-Encoding', 'gzip')
+                    with BytesIO() as buffer:
+                      with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                         f.write(exported)
+                      exported = buffer.getvalue()
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -220,6 +247,12 @@ class P2pproxy(AceProxyPlugin):
                             playlistgen.addItem({'group': name, 'tvg': '', 'name': n, 'url': url, 'logo': logo})
 
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
+                if connection.use_gzip:
+                    connection.send_header('Content-Encoding', 'gzip')
+                    with BytesIO() as buffer:
+                      with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                         f.write(exported)
+                      exported = buffer.getvalue()
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -235,6 +268,12 @@ class P2pproxy(AceProxyPlugin):
                 else:
                     archive_channels = TorrentTvApi(config.email, config.password).archive_channels(True)
                     P2pproxy.logger.debug('Exporting m3u playlist')
+                    if connection.use_gzip:
+                        connection.send_header('Content-Encoding', 'gzip')
+                        with BytesIO() as buffer:
+                          with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                             f.write(archive_channels)
+                          archive_channels = buffer.getvalue()
                     connection.send_header('Content-Length', str(len(archive_channels)))
                     connection.end_headers()
                     connection.wfile.write(archive_channels)
@@ -321,6 +360,12 @@ class P2pproxy(AceProxyPlugin):
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
+                if connection.use_gzip:
+                    connection.send_header('Content-Encoding', 'gzip')
+                    with BytesIO() as buffer:
+                      with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                         f.write(exported)
+                      exported = buffer.getvalue()
                 connection.send_header('Content-Length', str(len(exported)))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -346,6 +391,12 @@ class P2pproxy(AceProxyPlugin):
                 else:
                     records_list = TorrentTvApi(config.email, config.password).records(param_channel, d.strftime('%d-%m-%Y'), True)
                     P2pproxy.logger.debug('Exporting m3u playlist')
+                    if connection.use_gzip:
+                        connection.send_header('Content-Encoding', 'gzip')
+                        with BytesIO() as buffer:
+                          with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                             f.write(records_list)
+                          records_list = buffer.getvalue()
                     connection.send_header('Content-Length', str(len(records_list)))
                     connection.end_headers()
                     connection.wfile.write(records_list)

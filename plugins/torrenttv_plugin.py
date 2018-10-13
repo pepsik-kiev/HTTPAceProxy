@@ -13,6 +13,8 @@ import hashlib
 import requests
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
+import gzip
+from io import BytesIO
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -55,8 +57,7 @@ class Torrenttv(AceProxyPlugin):
                            self.logomap[name] = config.logobase + channel.getAttribute('logo')
 
                     self.logger.debug("Logos updated")
-                    self.updatelogos = False
-                except: self.updatelogos = False # p2pproxy plugin seems not configured
+                finally: self.updatelogos = False # p2pproxy plugin not configured
 
             headers = {'User-Agent': 'Magic Browser'}
             with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as r:
@@ -128,12 +129,19 @@ class Torrenttv(AceProxyPlugin):
             path = '' if len(self.channels) == 0 else '/torrenttv/channel'
             add_ts = True if path.endswith('/ts') else False
             exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
-
             response_headers = {'Content-Type': 'audio/mpegurl; charset=utf-8', 'Access-Control-Allow-Origin': '*',
                                 'ETag': self.etag, 'Content-Length': str(len(exported)), 'Connection': 'close'}
+            if connection.use_gzip:
+                response_headers['Content-Encoding'] = 'gzip'
+                with BytesIO() as buffer:
+                  with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                     f.write(exported)
+                  exported = buffer.getvalue()
+                  response_headers['Content-Length'] = str(len(exported))
+
             connection.send_response(200)
             for k,v in list(response_headers.items()): connection.send_header(k,v)
             connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, config.logomap.get(name), fmt=params.get('fmt', [''])[0])
+        if play: connection.handleRequest(headers_only, name, self.logomap.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only: connection.wfile.write(exported)

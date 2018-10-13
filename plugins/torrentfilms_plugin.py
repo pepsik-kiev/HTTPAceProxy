@@ -11,6 +11,8 @@ import os
 import logging
 import bencode, hashlib
 import gevent
+import gzip
+from io import BytesIO
 from requests.compat import unquote
 from PluginInterface import AceProxyPlugin
 try: from urlparse import parse_qs
@@ -110,6 +112,12 @@ class Torrentfilms(AceProxyPlugin):
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
+        if connection.use_gzip:
+            connection.send_header('Content-Encoding', 'gzip')
+            with BytesIO() as buffer:
+              with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                 f.write(exported)
+              exported = buffer.getvalue()
         connection.send_header('Content-Length', str(len(exported)))
         connection.send_header('Connection', 'close')
         connection.end_headers()

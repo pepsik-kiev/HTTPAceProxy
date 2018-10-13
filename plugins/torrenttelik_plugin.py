@@ -21,6 +21,8 @@ import requests
 import time
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
+import gzip
+from io import BytesIO
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 import config.torrenttelik as config
@@ -79,6 +81,12 @@ class Torrenttelik(AceProxyPlugin):
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
+        if connection.use_gzip:
+            connection.send_header('Content-Encoding', 'gzip')
+            with BytesIO() as buffer:
+              with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                 f.write(exported)
+              exported = buffer.getvalue()
         connection.send_header('Content-Length', str(len(exported)))
         connection.send_header('Connection', 'close')
         connection.end_headers()

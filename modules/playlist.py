@@ -73,8 +73,8 @@ class PlaylistConfig():
                 value = replacementsDict.get(value)
                 if value: item[setKey] = value
             elif type(value) == unicode:
-                value = replacementsDict.get(value.encode('utf8'))
-                if value: item[setKey] = value.decode('utf8')
+                value = replacementsDict.get(value.encode('utf-8'))
+                if value: item[setKey] = value.decode('utf-8')
 
     xml_template = """<?xml version="1.0" encoding="utf-8"?>
     <items>

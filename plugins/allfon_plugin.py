@@ -9,6 +9,8 @@ __author__ = 'miltador, Dorik1972'
 import logging, re
 import requests
 import time
+import gzip
+from io import BytesIO
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from PluginInterface import AceProxyPlugin
@@ -29,7 +31,8 @@ class Allfon(AceProxyPlugin):
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser'}
         try:
-            Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30).text
+            Allfon.playlist = requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30)
+            if Allfon.playlist.encoding is None: Allfon.playlist.encoding = 'utf-8'
             Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
         except requests.exceptions.ConnectionError:
@@ -56,7 +59,7 @@ class Allfon(AceProxyPlugin):
         Allfon.logger.debug('Generating requested m3u playlist')
 
         pattern = re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
-        for match in pattern.finditer(Allfon.playlist, re.MULTILINE): playlistgen.addItem(match.groupdict())
+        for match in pattern.finditer(Allfon.playlist.text, re.MULTILINE): playlistgen.addItem(match.groupdict())
 
         Allfon.logger.debug('Exporting m3u playlist')
         params = parse_qs(connection.query)
@@ -67,6 +70,12 @@ class Allfon(AceProxyPlugin):
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
+        if connection.use_gzip:
+            connection.send_header('Content-Encoding', 'gzip')
+            with BytesIO() as buffer:
+              with gzip.GzipFile(fileobj=buffer, mode='w') as f:
+                 f.write(exported)
+              exported = buffer.getvalue()
         connection.send_header('Content-Length', str(len(exported)))
         connection.send_header('Connection', 'close')
         connection.end_headers()
