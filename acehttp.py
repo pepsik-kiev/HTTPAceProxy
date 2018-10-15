@@ -15,8 +15,6 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
-gevent.config.loop = ['libuv', 'libuv-cffi', 'libev-cffi', 'libev-cext']
-gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
@@ -212,7 +210,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
 
-            if self.protocol_version == 'HTTP/1.1' and self.transcoder is None: self.out.write(b'0\r\n\r\n') # write final, zero-length chunk.
             if self.transcoder is not None:
                 try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
                 except: pass
@@ -271,7 +268,7 @@ def spawnAce(cmd, delay=0.1):
             AceStuff.acedir = os.path.dirname(engine[0])
             cmd = engine[0].split()
     try:
-        logger.debug('AceEngine starts .....')
+        logger.debug('AceEngine starts up .....')
         AceStuff.ace = gevent.event.AsyncResult()
         gevent.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceStuff.ace)
         AceStuff.ace = AceStuff.ace.get(timeout=delay)
@@ -324,11 +321,13 @@ def BroadcastStreamer(url, cid, req_headers=None):
 
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       if chunk: gevent.joinall([gevent.spawn(write_chunk, c, chunk) for c in AceStuff.clientcounter.getClientsList(cid)])
+       if chunk: gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid)])
 
-def write_chunk(client, chunk):
+def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
-    except: client.destroy() # Client disconected
+    except SocketException:
+          AceStuff.clientcounter.deleteClient(cid, client)
+          client.destroy() # Client disconected
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
