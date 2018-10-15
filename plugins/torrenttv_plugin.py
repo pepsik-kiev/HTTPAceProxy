@@ -9,12 +9,12 @@ __author__ = 'AndreyPavlenko, Dorik1972'
 import traceback
 import gevent
 import logging, re
+import zlib
 import hashlib
 import requests
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
-import gzip
-from io import BytesIO
+
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -129,15 +129,20 @@ class Torrenttv(AceProxyPlugin):
             path = '' if len(self.channels) == 0 else '/torrenttv/channel'
             add_ts = True if path.endswith('/ts') else False
             exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
-            response_headers = {'Content-Type': 'audio/mpegurl; charset=utf-8', 'Access-Control-Allow-Origin': '*',
-                                'ETag': self.etag, 'Content-Length': str(len(exported)), 'Connection': 'close'}
-            if connection.use_gzip:
-                response_headers['Content-Encoding'] = 'gzip'
-                with BytesIO() as buffer:
-                  with gzip.GzipFile(fileobj=buffer, mode='w') as f:
-                     f.write(exported)
-                  exported = buffer.getvalue()
-                  response_headers['Content-Length'] = str(len(exported))
+            response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
+                                 'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
+            compress_method = connection.headers.get('Accept-Encoding')
+            if compress_method:
+               compress_method = compress_method.split(',')[0]
+               if 'zlib' in compress_method:
+                  f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
+               elif 'deflate' in compress_method:
+                  f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+               elif 'gzip' in compress_method:
+                  f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+               exported = f.compress(exported) + f.flush()
+               response_headers['Content-Encoding'] = compress_method
+               response_headers['Content-Length'] = len(exported)
 
             connection.send_response(200)
             for k,v in list(response_headers.items()): connection.send_header(k,v)

@@ -90,7 +90,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
         self.protocol_version = 'HTTP/1.1' if self.request_version == 'HTTP/1.1' else 'HTTP/1.0'
-        self.use_gzip = 'gzip' in self.headers.get('accept-encoding','')
 
         try:
             self.splittedpath = self.path.split('/')

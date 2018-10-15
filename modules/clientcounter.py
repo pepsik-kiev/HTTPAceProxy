@@ -1,5 +1,5 @@
 '''
-Client Counter for BroadcastStreamer
+Client counter for BroadcastStreamer
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
@@ -54,7 +54,7 @@ class ClientCounter(object):
                self.idleAce = client.ace
                self.idleAce.reset()
             except: client.ace.destroy(); self.idleAce = None
-            return 0
+            finally: return 0
 
     def deleteAll(self, cid):
         '''

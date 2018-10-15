@@ -132,14 +132,14 @@ class Stat(AceProxyPlugin):
             connection.send_response(200)
             connection.send_header('Content-type', 'application/json')
             connection.send_header('Connection', 'close')
-            connection.send_header('Content-Length', str(len(exported)))
+            connection.send_header('Content-Length', len(exported))
             connection.end_headers()
             connection.wfile.write(exported)
         else:
             connection.send_response(200)
             connection.send_header('Content-type', 'text/html; charset=utf-8')
             connection.send_header('Connection', 'close')
-            connection.send_header('Content-Length', str(len(html_template)))
+            connection.send_header('Content-Length', len(html_template))
             connection.end_headers()
             connection.wfile.write(html_template)
 

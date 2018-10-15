@@ -11,8 +11,7 @@ import os
 import logging
 import bencode, hashlib
 import gevent
-import gzip
-from io import BytesIO
+import zlib
 from requests.compat import unquote
 from PluginInterface import AceProxyPlugin
 try: from urlparse import parse_qs
@@ -112,13 +111,19 @@ class Torrentfilms(AceProxyPlugin):
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
-        if connection.use_gzip:
-            connection.send_header('Content-Encoding', 'gzip')
-            with BytesIO() as buffer:
-              with gzip.GzipFile(fileobj=buffer, mode='w') as f:
-                 f.write(exported)
-              exported = buffer.getvalue()
-        connection.send_header('Content-Length', str(len(exported)))
+        compress_method = connection.headers.get('Accept-Encoding')
+        if compress_method:
+           compress_method = compress_method.split(',')[0]
+           if 'zlib' in compress_method:
+              f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
+           elif 'deflate' in compress_method:
+              f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+           elif 'gzip' in compress_method:
+              f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+           exported = f.compress(exported) + f.flush()
+           connection.send_header('Content-Encoding', compress_method)
+
+        connection.send_header('Content-Length', len(exported))
         connection.send_header('Connection', 'close')
         connection.end_headers()
 
