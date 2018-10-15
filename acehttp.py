@@ -193,12 +193,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # Sending videostream headers to client
             drop_headers = []
             if self.protocol_version == 'HTTP/1.1':
-               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'video/mp2t',
+               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream',
                                  'Cache-Control': 'no-cache, max-age=0', 'Transfer-Encoding': 'chunked' }
                if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
             elif self.protocol_version == 'HTTP/1.0':
-               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'video/mp2t',
+               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream',
                                   'Pragma': 'no-cache' }
 
             response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
