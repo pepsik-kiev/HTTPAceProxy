@@ -15,6 +15,7 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
+gevent.config.track_greenlet_tree = False
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
@@ -141,7 +142,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if headers_only: logger.debug('Sending headers and closing connection')
             else: logger.debug('Fake request - closing connection')
             self.send_response(200)
-            self.send_header('Content-Type', 'video/mpeg')
+            self.send_header('Content-Type', 'video/mp2t')
             self.send_header('Connection', 'Close')
             self.end_headers()
             return
@@ -192,14 +193,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # Sending videostream headers to client
             drop_headers = []
             if self.protocol_version == 'HTTP/1.1':
-               headers = {'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                          'Content-Type': 'application/octet-stream', 'Transfer-Encoding': 'chunked'}
+               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'video/mp2t',
+                                 'Cache-Control': 'no-cache, max-age=0', 'Transfer-Encoding': 'chunked' }
                if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
             elif self.protocol_version == 'HTTP/1.0':
-               headers = {'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream'}
+               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'video/mp2t',
+                                  'Pragma': 'no-cache' }
 
-            response_headers = [(k,v) for (k,v) in headers.items() if k not in drop_headers]
+            response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
             self.send_response(200)
             logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
             for (k,v) in response_headers: self.send_header(k,v)
@@ -313,9 +315,8 @@ def BroadcastStreamer(url, cid, req_headers=None):
           # AceStream return link for HTTP stream
           else: RAWDataReader(session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
        except Exception as err:
-          clients = AceStuff.clientcounter.getClientsList(cid)
-          logging.error('"%s" StreamReader error: %s' % (clients[0].channelName, repr(err)))
-          gevent.joinall([gevent.spawn(c.destroy) for c in clients])
+          logging.error('StreamReader error: %s' % repr(err))
+          gevent.joinall([gevent.spawn(c.destroy) for c in AceStuff.clientcounter.getClientsList(cid)])
        finally: _used_chunks = None
 
 def RAWDataReader(stream, cid):
