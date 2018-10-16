@@ -33,7 +33,7 @@ class ClientCounter(object):
         '''
         clients = self.getClientsList(cid)
         client.ace = clients[0].ace if clients else self.idleAce
-        self.streams[cid].append(client) if cid in self.streams else self.streams.update({cid:[client]})
+        self.streams.setdefault(cid,[]).append(client)
         self.idleAce = None
         return self.getClientsQuantity(cid)
 
