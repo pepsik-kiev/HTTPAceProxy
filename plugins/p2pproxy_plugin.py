@@ -105,7 +105,7 @@ class P2pproxy(AceProxyPlugin):
                 P2pproxy.logger.debug('Generating requested m3u playlist')
                 for channel in translations_list:
                     group_id = channel.getAttribute('group')
-                    if param_group and not group_id in param_group: continue # filter channels by &group=1,2,5...
+                    if param_group and not group_id in param_group.split(','): continue # filter channels by &group=1,2,5...
 
                     name = channel.getAttribute('name')
                     group = TorrentTvApi.CATEGORIES[int(group_id)]
