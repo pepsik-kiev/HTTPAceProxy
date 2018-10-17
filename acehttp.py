@@ -15,7 +15,6 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
-gevent.config.track_greenlet_tree = False
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
