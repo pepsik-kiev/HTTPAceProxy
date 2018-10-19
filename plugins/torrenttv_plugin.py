@@ -8,9 +8,8 @@ __author__ = 'AndreyPavlenko, Dorik1972'
 
 import traceback
 import gevent
-import logging, re
+import logging
 import zlib
-import hashlib
 import requests
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
@@ -44,7 +43,7 @@ class Torrenttv(AceProxyPlugin):
         self.playlisttime = int(gevent.time.time())
         self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
         self.channels = {}
-        m = hashlib.md5()
+        m = requests.auth.hashlib.md5()
         try:
             if self.updatelogos:
                 try:
@@ -63,8 +62,8 @@ class Torrenttv(AceProxyPlugin):
             with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as r:
                 if r.encoding is None: r.encoding = 'utf-8'
                 self.logger.info('TTV playlist %s downloaded' % config.url)
-                pattern = re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
-                for match in pattern.finditer(r.text, re.MULTILINE):
+                pattern = requests.auth.re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
+                for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
                    itemdict = match.groupdict()
                    name = itemdict.get('name')
 

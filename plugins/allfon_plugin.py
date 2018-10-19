@@ -6,7 +6,7 @@ http://ip:port/allfon
 
 __author__ = 'miltador, Dorik1972'
 
-import logging, re
+import logging
 import requests
 import time
 import zlib
@@ -57,8 +57,8 @@ class Allfon(AceProxyPlugin):
 
         Allfon.logger.debug('Generating requested m3u playlist')
 
-        pattern = re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
-        for match in pattern.finditer(Allfon.playlist.text, re.MULTILINE): playlistgen.addItem(match.groupdict())
+        pattern = requests.auth.re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
+        for match in pattern.finditer(Allfon.playlist.text, requests.auth.re.MULTILINE): playlistgen.addItem(match.groupdict())
 
         Allfon.logger.debug('Exporting m3u playlist')
         params = parse_qs(connection.query)

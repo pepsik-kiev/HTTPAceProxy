@@ -33,8 +33,8 @@ try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
 from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
-from modules.PluginInterface import AceProxyPlugin
 
+from modules.PluginInterface import AceProxyPlugin
 import aceclient
 from clientcounter import ClientCounter
 import aceconfig
@@ -166,10 +166,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
             # If there is no existing broadcast we create it
             if AceStuff.clientcounter.addClient(CID, self) == 1:
-                logger.warning('Create a broadcast "%s"' % self.channelName)
-                gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
-                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
-                logger.warning('Broadcast "%s" created' % self.channelName)
+               logger.warning('Create a broadcast "%s"' % self.channelName)
+               gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+               self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
+               logger.warning('Broadcast "%s" created' % self.channelName)
 
         except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
@@ -198,7 +198,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             elif self.protocol_version == 'HTTP/1.0':
                proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream',
-                                  'Pragma': 'no-cache' }
+                                 'Pragma': 'no-cache' }
 
             response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
             self.send_response(200)
@@ -315,7 +315,7 @@ def BroadcastStreamer(url, cid, req_headers=None):
           else: RAWDataReader(session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
        except Exception as err:
           logging.error('StreamReader error: %s' % repr(err))
-          gevent.joinall([gevent.spawn(c.destroy) for c in AceStuff.clientcounter.getClientsList(cid)])
+          AceStuff.clientcounter.deleteAll(cid)
        finally: _used_chunks = None
 
 def RAWDataReader(stream, cid):
