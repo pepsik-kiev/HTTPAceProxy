@@ -171,8 +171,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
                logger.warning('Broadcast "%s" created' % self.channelName)
 
-        except aceclient.AceException as e: self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-        except Exception as e: self.dieWithError(500, 'Unkonwn exception: %s' % repr(e))
+        except aceclient.AceException as e:
+            if CID: AceStuff.clientcounter.deleteAll(CID)
+            self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         else:
             # streaming to client
             self.transcoder = None
@@ -213,9 +214,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 except: pass
             self.out.flush() # Ensure any buffered output has been transmitted and close the stream
 
-        finally:
-            if CID and AceStuff.clientcounter.deleteClient(CID, self) == 0:
-                logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
         return
 
 class AceStuff(object):
@@ -318,10 +316,11 @@ def RAWDataReader(stream, cid):
 
 def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
-    except SocketException:
-          AceStuff.clientcounter.deleteClient(cid, client)
-          logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
-#          client.destroy() # Client disconected
+    except SocketException: # Client disconected
+          if AceStuff.clientcounter.deleteClient(cid, client) == 0:
+             logger.warning('Broadcast "%s" stoped. Last client disconnected' % client.channelName)
+          else:
+             logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
