@@ -272,3 +272,5 @@ class AceClient(object):
                     self._socket.close()
                     logging.debug('AceClient destroyed')
                     return
+
+            finally: gevent.sleep()

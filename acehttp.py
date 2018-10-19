@@ -206,9 +206,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
-            while self.connection: gevent.sleep(0.5) # Stream data to client from AceStreamReader
-
-            logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+            while self in AceStuff.clientcounter.getClientsList(CID): gevent.sleep(0.5)
 
             if self.transcoder is not None:
                 try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
@@ -219,10 +217,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if CID and AceStuff.clientcounter.deleteClient(CID, self) == 0:
                 logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
         return
-
-    def destroy(self):
-            if self.connection: self.connection.close()
-            self.connection = None
 
 class AceStuff(object):
     '''
@@ -314,8 +308,8 @@ def BroadcastStreamer(url, cid, req_headers=None):
           # AceStream return link for HTTP stream
           else: RAWDataReader(session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
        except Exception as err:
+          AceStuff.clientcounter.deleteAll(cid) # Finished streaming to all connected clients for existing broadcast
           logging.error('StreamReader error: %s' % repr(err))
-          AceStuff.clientcounter.deleteAll(cid)
        finally: _used_chunks = None
 
 def RAWDataReader(stream, cid):
@@ -326,7 +320,8 @@ def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
     except SocketException:
           AceStuff.clientcounter.deleteClient(cid, client)
-          client.destroy() # Client disconected
+          logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
+#          client.destroy() # Client disconected
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
