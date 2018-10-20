@@ -67,7 +67,7 @@ class AceClient(object):
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        else: gevent.spawn(self._recvData, 30)  # Spawning telnet data reader with recvbuffer read timeout
+        else: gevent.spawn(self._recvData, 30)  # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
 
     def destroy(self):
         '''
@@ -189,6 +189,7 @@ class AceClient(object):
         '''
         Data receiver method for greenlet
         '''
+        if timeout is None: timeout = self._resulttimeout
         while 1:
             try:
                 with gevent.timeout.Timeout(timeout):

@@ -32,7 +32,10 @@ class ClientCounter(object):
         Adds client to the dictionary list by CID key and return their number
         '''
         clients = self.getClientsList(cid)
-        client.ace = clients[0].ace if clients else self.idleAce
+        if clients:
+            client.ace = clients[0].ace; self.idleAce.destroy()
+        else:
+            client.ace = self.idleAce
         self.streams.setdefault(cid,[]).append(client)
         self.idleAce = None
         return self.getClientsQuantity(cid)

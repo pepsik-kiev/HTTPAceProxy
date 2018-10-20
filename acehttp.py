@@ -500,6 +500,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
+HTTPServer.allow_reuse_address = True
 server = HTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
