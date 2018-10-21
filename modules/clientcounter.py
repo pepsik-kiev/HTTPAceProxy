@@ -73,4 +73,8 @@ class ClientCounter(object):
                self.idleAce = clients[0].ace
                self.idleAce.reset()
             except: clients[0].ace.destroy(); self.idleAce = None
+        for c in clients:
+            if c.transcoder is not None:
+               try: c.transcoder.kill()
+               except: pass
 

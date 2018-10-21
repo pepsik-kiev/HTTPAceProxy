@@ -47,14 +47,10 @@ class HTTPServer(HTTPServer):
         if AceConfig.firewall and not checkFirewall(client_address[0]):
            logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
            return
-        gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
-
-    def __new_request(self, handlerClass, request, address, server):
-        checkAce() # Check is AceStream engine alive
-        try: handlerClass(request, address, server)
-        except SocketException: pass # fix the broken pipe errors
-        except Exception as e: logger.error(traceback.format_exc())
-        self.shutdown_request(request)
+        # Check is AceStream engine alive
+        checkAce()
+        # Handle a request
+        gevent.spawn(self.RequestHandlerClass, request, client_address, self)
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -207,14 +203,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
-            while self in AceStuff.clientcounter.getClientsList(CID): gevent.sleep(0.5)
-
-            if self.transcoder is not None:
-                try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-                except: pass
-            self.out.flush() # Ensure any buffered output has been transmitted and close the stream
-
-        return
 
 class AceStuff(object):
     '''
@@ -321,6 +309,9 @@ def write_chunk(cid, client, chunk):
              logger.warning('Broadcast "%s" stoped. Last client disconnected' % client.channelName)
           else:
              logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
+          if client.transcoder is not None:
+                try: client.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+                except: pass
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

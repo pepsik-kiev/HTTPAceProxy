@@ -105,6 +105,7 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try: params = self._auth.get(timeout=self._resulttimeout)
         except gevent.Timeout:
+            self.destroy(); self._clientcounter.idleAce = None
             errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived!' % self._resulttimeout
             raise AceException(errmsg)
             return
@@ -113,10 +114,12 @@ class AceClient(object):
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
         try:
             if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
+               self.destroy(); self._clientcounter.idleAce = None
                errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
                raise AceException(errmsg)
                return
         except gevent.Timeout:
+            self.destroy(); self._clientcounter.idleAce = None
             errmsg = 'Engine response time %ssec exceeded. AUTH not resived!' % self._resulttimeout
             raise AceException(errmsg)
 
