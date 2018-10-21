@@ -150,7 +150,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
         self.connectionTime = gevent.time.time()
-        CID = NAME = None
+        self.transcoder = CID = NAME = None
         try:
             if not AceStuff.clientcounter.idleAce:
                logger.debug('Create connection to AceEngine.....')
@@ -172,7 +172,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.dieWithError(500, 'AceClient exception: %s' % repr(e))
         else:
             # streaming to client
-            self.transcoder = None
             self.out = self.wfile
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
