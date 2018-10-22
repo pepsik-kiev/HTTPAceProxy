@@ -178,12 +178,20 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 else:
                     logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
 
+            if AceStuff.clientcounter.addClient(CID, self) == 1:
+               # If there is no existing broadcast we create it
+               logger.warning('Create a broadcast "%s"' % self.channelName)
+               gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+               self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
+               logger.warning('Broadcast "%s" created' % self.channelName)
+
             # Sending videostream headers to client
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
             if self.protocol_version == 'HTTP/1.1':
                proxy_headers = { 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                                 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-cache, max-age=0', 'Transfer-Encoding': 'chunked' }
+                                 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-cache, max-age=0', 
+                                 'Transfer-Encoding': 'chunked' }
                if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
             elif self.protocol_version == 'HTTP/1.0':
@@ -196,13 +204,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
-            if AceStuff.clientcounter.addClient(CID, self) == 1:
-               # If there is no existing broadcast we create it
-               logger.warning('Create a broadcast "%s"' % self.channelName)
-               gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
-               self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
-               logger.warning('Broadcast "%s" created' % self.channelName)
-
+            # Stream data to Client
             while self.connection: gevent.sleep(0.5)
 
             if AceStuff.clientcounter.deleteClient(CID, self) == 0:
