@@ -206,7 +206,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             while self.connection: gevent.sleep(0.5)
 
             if AceStuff.clientcounter.deleteClient(CID, self) == 0:
-               logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
+               logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
             else:
                logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
 
@@ -310,7 +310,6 @@ def BroadcastStreamer(url, cid, req_headers=None):
        except Exception as err:
           AceStuff.clientcounter.deleteAll(cid) # Finished streaming to all connected clients for existing broadcast
           logging.error('StreamReader error: %s' % repr(err))
-       finally: _used_chunks = None
 
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
@@ -319,7 +318,7 @@ def RAWDataReader(stream, cid):
 
 def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
-    except SocketException: client.connection = None  # Client disconected
+    except SocketException: client.connection.close(); client.connection = None  # Client disconected
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

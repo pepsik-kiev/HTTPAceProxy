@@ -67,7 +67,12 @@ class AceClient(object):
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        else: gevent.spawn(self._recvData, 30)  # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
+        # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
+        else: gevent.spawn(self._recvData, 30).link_exception(self.telnet_EOFError)
+
+    def telnet_EOFError(self):
+        errmsg = 'AceEngine error at socket read. Connection closed by remote host'
+        raise AceException(errmsg)
 
     def destroy(self):
         '''
@@ -194,11 +199,6 @@ class AceClient(object):
             try:
                 with gevent.timeout.Timeout(timeout):
                     self._recvbuffer = self._socket.read_until('\r\n', None).strip()
-            except EOFError as e:
-                # if the connection is closed and no cooked data is available.
-                self._clientcounter.idleAce = None
-                raise AceException('AceEngine error at socket read. Connection closed by remote host %s' % repr(e))
-                return
             # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
             except gevent.socket.timeout: pass
             # SHUTDOWN socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
