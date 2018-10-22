@@ -47,10 +47,14 @@ class HTTPServer(HTTPServer):
         if AceConfig.firewall and not checkFirewall(client_address[0]):
            logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
            return
-        # Check is AceStream engine alive
-        checkAce()
-        # Handle a request
-        gevent.spawn(self.RequestHandlerClass, request, client_address, self)
+        gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+
+    def __new_request(self, handlerClass, request, address, server):
+        checkAce() # Check is AceStream engine alive
+        try: handlerClass(request, address, server)
+        except SocketException: pass # fix the broken pipe errors
+        except Exception as e: logger.error(traceback.format_exc())
+        self.shutdown_request(request)
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -151,6 +155,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #End parameters dict
         self.connectionTime = gevent.time.time()
         self.transcoder = CID = NAME = None
+        self.out = self.wfile
         try:
             if not AceStuff.clientcounter.idleAce:
                logger.debug('Create connection to AceEngine.....')
@@ -160,19 +165,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                CID, NAME = AceStuff.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
             self.channelName = NAME if not channelName else channelName
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
-            # If there is no existing broadcast we create it
-            if AceStuff.clientcounter.addClient(CID, self) == 1:
-               logger.warning('Create a broadcast "%s"' % self.channelName)
-               gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
-               self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
-               logger.warning('Broadcast "%s" created' % self.channelName)
 
-        except aceclient.AceException as e:
-            if CID: AceStuff.clientcounter.deleteAll(CID)
-            self.dieWithError(500, 'AceClient exception: %s' % repr(e))
-        else:
-            # streaming to client
-            self.out = self.wfile
+            # If &fmt transcode key present in request
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -184,12 +178,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 else:
                     logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
 
-            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             # Sending videostream headers to client
+            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
             if self.protocol_version == 'HTTP/1.1':
-               proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream',
-                                 'Cache-Control': 'no-cache, max-age=0', 'Transfer-Encoding': 'chunked' }
+               proxy_headers = { 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                                 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-cache, max-age=0', 'Transfer-Encoding': 'chunked' }
                if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
             elif self.protocol_version == 'HTTP/1.0':
@@ -202,6 +196,27 @@ class HTTPHandler(BaseHTTPRequestHandler):
             for (k,v) in response_headers: self.send_header(k,v)
             self.end_headers()
 
+            if AceStuff.clientcounter.addClient(CID, self) == 1:
+               # If there is no existing broadcast we create it
+               logger.warning('Create a broadcast "%s"' % self.channelName)
+               gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+               self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
+               logger.warning('Broadcast "%s" created' % self.channelName)
+
+            while self.connection: gevent.sleep(0.5)
+
+            if AceStuff.clientcounter.deleteClient(CID, self) == 0:
+               logger.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
+            else:
+               logger.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+
+            if self.transcoder is not None:
+               try: self.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
+               except: pass
+
+        except aceclient.AceException as e:
+            if CID: AceStuff.clientcounter.deleteAll(CID)
+            self.dieWithError(500, 'AceClient exception: %s' % repr(e))
 
 class AceStuff(object):
     '''
@@ -300,17 +315,11 @@ def BroadcastStreamer(url, cid, req_headers=None):
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
        if chunk: gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid)])
+       gevent.sleep(0.5)
 
 def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
-    except SocketException: # Client disconected
-          if AceStuff.clientcounter.deleteClient(cid, client) == 0:
-             logger.warning('Broadcast "%s" stoped. Last client disconnected' % client.channelName)
-          else:
-             logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
-          if client.transcoder is not None:
-                try: client.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-                except: pass
+    except SocketException: client.connection = None  # Client disconected
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
