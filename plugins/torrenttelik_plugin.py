@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 '''
 Downloader for json-based playlists
 Playlist format example:
@@ -83,14 +83,16 @@ class Torrenttelik(AceProxyPlugin):
         compress_method = connection.headers.get('Accept-Encoding')
         if compress_method:
            compress_method = compress_method.split(',')[0]
+           f = None
            if 'zlib' in compress_method:
               f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
            elif 'deflate' in compress_method:
               f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
            elif 'gzip' in compress_method:
               f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-           exported = f.compress(exported) + f.flush()
-           connection.send_header('Content-Encoding', compress_method)
+           if f:
+              exported = f.compress(exported) + f.flush()
+              connection.send_header('Content-Encoding', compress_method)
 
         connection.send_header('Content-Length', len(exported))
         connection.send_header('Connection', 'close')

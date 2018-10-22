@@ -124,14 +124,16 @@ class P2pproxy(AceProxyPlugin):
                 compress_method = connection.headers.get('Accept-Encoding')
                 if compress_method:
                    compress_method = compress_method.split(',')[0]
+                   f = None
                    if 'zlib' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                    elif 'deflate' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                    elif 'gzip' in compress_method:
-                     f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                   exported = f.compress(exported) + f.flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                      f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+                   if f:
+                        exported = f.compress(exported) + f.flush()
+                        connection.send_header('Content-Encoding', compress_method)
 
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
@@ -155,16 +157,18 @@ class P2pproxy(AceProxyPlugin):
                 compress_method = connection.headers.get('Accept-Encoding')
                 if compress_method:
                    compress_method = compress_method.split(',')[0]
+                   f = None
                    if 'zlib' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                    elif 'deflate' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                    elif 'gzip' in compress_method:
-                     f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                   translation_list = f.compress(translation_list) + f.flush()
-                   response_headers['Content-Encoding'] = compress_method
-                   response_headers['Content-Length'] = len(translation_list)
+                      f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+                   if f:
+                        translation_list = f.compress(translation_list) + f.flush()
+                        response_headers['Content-Encoding'] = compress_method
 
+                response_headers['Content-Length'] = len(translation_list)
                 connection.send_response(200)
                 for k,v in list(response_headers.items()): connection.send_header(k,v)
                 connection.end_headers()
@@ -185,14 +189,16 @@ class P2pproxy(AceProxyPlugin):
             compress_method = connection.headers.get('Accept-Encoding')
             if compress_method:
                compress_method = compress_method.split(',')[0]
+               f = None
                if 'zlib' in compress_method:
                   f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                elif 'deflate' in compress_method:
                   f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                elif 'gzip' in compress_method:
                   f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-               translation_list = f.compress(translation_list) + f.flush()
-               connection.send_header('Content-Encoding', compress_method)
+               if f:
+                  translation_list = f.compress(translation_list) + f.flush()
+                  connection.send_header('Content-Encoding', compress_method)
 
             connection.send_header('Content-Length', len(translations_list))
             connection.end_headers()
@@ -217,6 +223,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 compress_method = connection.headers.get('Accept-Encoding')
+                f = None
                 if compress_method:
                    compress_method = compress_method.split(',')[0]
                    if 'zlib' in compress_method:
@@ -225,8 +232,9 @@ class P2pproxy(AceProxyPlugin):
                       f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                    elif 'gzip' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                   exported = f.compress(exported) + f.flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                   if f:
+                      exported = f.compress(exported) + f.flush()
+                      connection.send_header('Content-Encoding', compress_method)
 
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
@@ -273,14 +281,16 @@ class P2pproxy(AceProxyPlugin):
                 compress_method = connection.headers.get('Accept-Encoding')
                 if compress_method:
                    compress_method = compress_method.split(',')[0]
+                   f = None
                    if 'zlib' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                    elif 'deflate' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                    elif 'gzip' in compress_method:
-                     f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                   exported = f.compress(exported) + f.flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                      f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+                   if f:
+                      exported = f.compress(exported) + f.flush()
+                      connection.send_header('Content-Encoding', compress_method)
 
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
@@ -300,14 +310,16 @@ class P2pproxy(AceProxyPlugin):
                     compress_method = connection.headers.get('Accept-Encoding')
                     if compress_method:
                        compress_method = compress_method.split(',')[0]
+                       f = None
                        if 'zlib' in compress_method:
                           f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                        elif 'deflate' in compress_method:
                           f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                        elif 'gzip' in compress_method:
                           f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                       archive_channels = f.compress(archive_channels) + f.flush()
-                       connection.send_header('Content-Encoding', compress_method)
+                       if f:
+                          archive_channels = f.compress(archive_channels) + f.flush()
+                          connection.send_header('Content-Encoding', compress_method)
 
                     connection.send_header('Content-Length', len(archive_channels))
                     connection.end_headers()
@@ -398,14 +410,16 @@ class P2pproxy(AceProxyPlugin):
                 compress_method = connection.headers.get('Accept-Encoding')
                 if compress_method:
                    compress_method = compress_method.split(',')[0]
+                   f = None
                    if 'zlib' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                    elif 'deflate' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                    elif 'gzip' in compress_method:
                       f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                   exported = f.compress(exported) + f.flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                   if f:
+                      exported = f.compress(exported) + f.flush()
+                      connection.send_header('Content-Encoding', compress_method)
 
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
@@ -435,14 +449,16 @@ class P2pproxy(AceProxyPlugin):
                     compress_method = connection.headers.get('Accept-Encoding')
                     if compress_method:
                        compress_method = compress_method.split(',')[0]
+                       f = None
                        if 'zlib' in compress_method:
                           f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS)
                        elif 'deflate' in compress_method:
                           f = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
                        elif 'gzip' in compress_method:
                           f = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                       records_list = f.compress(records_list) + f.flush()
-                       connection.send_header('Content-Encoding', compress_method)
+                       if f:
+                          records_list = f.compress(records_list) + f.flush()
+                          connection.send_header('Content-Encoding', compress_method)
 
                     connection.send_header('Content-Length', len(records_list))
                     connection.end_headers()
