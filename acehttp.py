@@ -316,7 +316,6 @@ def BroadcastStreamer(url, cid, req_headers=None):
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
        if chunk: gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid)])
-       gevent.sleep(0.5)
 
 def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
