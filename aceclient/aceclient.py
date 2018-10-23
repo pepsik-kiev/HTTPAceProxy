@@ -71,7 +71,7 @@ class AceClient(object):
         else: gevent.spawn(self._recvData, 30).link_exception(self.telnet_EOFError)
 
     def telnet_EOFError(self):
-        errmsg = 'AceEngine error at socket read. Connection closed by remote host'
+        errmsg = 'Error reading data from AceEngine API port'
         raise AceException(errmsg)
 
     def destroy(self):
@@ -96,7 +96,7 @@ class AceClient(object):
         try:
             self._socket.write('%s\r\n' % message)
             logging.debug('>>> %s' % message)
-        except gevent.socket.error as e: raise AceException('AceEngine exception at socket write %s' % repr(e))
+        except gevent.socket.error: raise AceException('Error writing data to AceEngine API port')
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
