@@ -319,7 +319,7 @@ def RAWDataReader(stream, cid):
 
 def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if (client.protocol_version == 'HTTP/1.1' and client.transcoder is None) else client.out.write(chunk)
-    except SocketException: client.connection.close(); client.connection = None  # Client disconected
+    except SocketException: client.connection = None  # Client disconected
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
