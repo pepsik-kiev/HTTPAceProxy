@@ -34,6 +34,9 @@ class P2pproxy(AceProxyPlugin):
     TTVU = TTV + 'uploads/'
     handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logos')
     logger = logging.getLogger('plugin_p2pproxy')
+    compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
+                        'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
+                        'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
 
     def __init__(self, AceConfig, AceStuff): pass
 
@@ -121,14 +124,11 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport=hostport, header=config.m3uheadertemplate, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
-                compress_method = connection.headers.get('Accept-Encoding')
-                if compress_method:
-                   compress_method = compress_method.split(',')[0]
-                   d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                         'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                   exported = d[compress_method].compress(exported) + d[compress_method].flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                try:
+                     h = connection.headers.get('Accept-Encoding').split(',')[0]
+                     exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
+                     connection.send_header('Content-Encoding', h)
+                except: pass
 
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
@@ -149,15 +149,11 @@ class P2pproxy(AceProxyPlugin):
                 P2pproxy.logger.debug('Exporting m3u playlist')
                 response_headers = {'Access-Control-Allow-Origin': '*', 'Connection': 'close',
                                     'Content-Type': 'text/xml;charset=utf-8', 'Content-Length': len(translations_list) }
-                compress_method = connection.headers.get('Accept-Encoding')
-                if compress_method:
-                   compress_method = compress_method.split(',')[0]
-                   d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                         'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                   translation_list = d[compress_method].compress(translation_list) + d[compress_method].flush()
-                   connection.send_header('Content-Encoding', compress_method)
-
+                try:
+                     h = connection.headers.get('Accept-Encoding').split(',')[0]
+                     translation_list = P2pproxy.compress_method[h].compress(translation_list) + P2pproxy.compress_method[h].flush()
+                     connection.send_header('Content-Encoding', h)
+                except: pass
                 response_headers['Content-Length'] = len(translation_list)
                 connection.send_response(200)
                 for k,v in list(response_headers.items()): connection.send_header(k,v)
@@ -176,14 +172,11 @@ class P2pproxy(AceProxyPlugin):
                 return
 
             translations_list = TorrentTvApi(config.email, config.password).translations('all', True)
-            compress_method = connection.headers.get('Accept-Encoding')
-            if compress_method:
-               compress_method = compress_method.split(',')[0]
-               d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                     'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                     'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-               translation_list = d[compress_method].compress(translation_list) + d[compress_method].flush()
-               connection.send_header('Content-Encoding', compress_method)
+            try:
+                h = connection.headers.get('Accept-Encoding').split(',')[0]
+                translation_list = P2pproxy.compress_method[h].compress(translation_ist) + P2pproxy.compress_method[h].flush()
+                connection.send_header('Content-Encoding', h)
+            except: pass
             connection.send_header('Content-Length', len(translations_list))
             connection.end_headers()
             P2pproxy.logger.debug('Exporting m3u playlist')
@@ -206,15 +199,11 @@ class P2pproxy(AceProxyPlugin):
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
-                compress_method = connection.headers.get('Accept-Encoding')
-                if compress_method:
-                   compress_method = compress_method.split(',')[0]
-                   d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                         'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                   exported = d[compress_method].compress(exported) + d[compress_method].flush()
-                   connection.send_header('Content-Encoding', compress_method)
-
+                try:
+                     h = connection.headers.get('Accept-Encoding').split(',')[0]
+                     exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
+                     connection.send_header('Content-Encoding', h)
+                except: pass
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -257,14 +246,11 @@ class P2pproxy(AceProxyPlugin):
                             playlistgen.addItem({'group': name, 'tvg': '', 'name': n, 'url': url, 'logo': logo})
 
                 exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
-                compress_method = connection.headers.get('Accept-Encoding')
-                if compress_method:
-                   compress_method = compress_method.split(',')[0]
-                   d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                         'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                   exported = d[compress_method].compress(exported) + d[compress_method].flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                try:
+                     h = connection.headers.get('Accept-Encoding').split(',')[0]
+                     exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
+                     connection.send_header('Content-Encoding', h)
+                except: pass
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -280,14 +266,11 @@ class P2pproxy(AceProxyPlugin):
                 else:
                     archive_channels = TorrentTvApi(config.email, config.password).archive_channels(True)
                     P2pproxy.logger.debug('Exporting m3u playlist')
-                    compress_method = connection.headers.get('Accept-Encoding')
-                    if compress_method:
-                       compress_method = compress_method.split(',')[0]
-                       d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                             'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                             'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                       archive_channels = d[compress_method].compress(archive_channels) + d[compress_method].flush()
-                       connection.send_header('Content-Encoding', compress_method)
+                    try:
+                        h = connection.headers.get('Accept-Encoding').split(',')[0]
+                        archive_channels = P2pproxy.compress_method[h].compress(archive_channels) + P2pproxy.compress_method[h].flush()
+                        connection.send_header('Content-Encoding', h)
+                    except: pass
                     connection.send_header('Content-Length', len(archive_channels))
                     connection.end_headers()
                     connection.wfile.write(archive_channels)
@@ -374,14 +357,11 @@ class P2pproxy(AceProxyPlugin):
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
-                compress_method = connection.headers.get('Accept-Encoding')
-                if compress_method:
-                   compress_method = compress_method.split(',')[0]
-                   d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                         'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                   exported = d[compress_method].compress(exported) + d[compress_method].flush()
-                   connection.send_header('Content-Encoding', compress_method)
+                try:
+                     h = connection.headers.get('Accept-Encoding').split(',')[0]
+                     exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
+                     connection.send_header('Content-Encoding', h)
+                except: pass
                 connection.send_header('Content-Length', len(exported))
                 connection.end_headers()
                 connection.wfile.write(exported)
@@ -407,14 +387,11 @@ class P2pproxy(AceProxyPlugin):
                 else:
                     records_list = TorrentTvApi(config.email, config.password).records(param_channel, d.strftime('%d-%m-%Y'), True)
                     P2pproxy.logger.debug('Exporting m3u playlist')
-                    compress_method = connection.headers.get('Accept-Encoding')
-                    if compress_method:
-                       compress_method = compress_method.split(',')[0]
-                       d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                             'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                             'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-                       records_list = d[compress_method].compress(records_list) + d[compress_method].flush()
-                       connection.send_header('Content-Encoding', compress_method)
+                    try:
+                        h = connection.headers.get('Accept-Encoding').split(',')[0]
+                        records_list = P2pproxy.compress_method[h].compress(records_list) + P2pproxy.compress_method[h].flush()
+                        connection.send_header('Content-Encoding', h)
+                    except: pass
                     connection.send_header('Content-Length', len(records_list))
                     connection.end_headers()
                     connection.wfile.write(records_list)

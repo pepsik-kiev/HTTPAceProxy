@@ -111,15 +111,14 @@ class Torrentfilms(AceProxyPlugin):
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
         connection.send_header('Access-Control-Allow-Origin', '*')
-        compress_method = connection.headers.get('Accept-Encoding')
-        if compress_method:
-           compress_method = compress_method.split(',')[0]
-           d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                 'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                 'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-           exported = d[compress_method].compress(exported) + d[compress_method].flush()
-           connection.send_header('Content-Encoding', compress_method)
-
+        try:
+           h = connection.headers.get('Accept-Encoding').split(',')[0]
+           compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
+                               'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
+                               'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
+           exported = compress_method[h].compress(exported) + compress_method[h].flush()
+           connection.send_header('Content-Encoding', h)
+        except: pass
         connection.send_header('Content-Length', len(exported))
         connection.send_header('Connection', 'close')
         connection.end_headers()

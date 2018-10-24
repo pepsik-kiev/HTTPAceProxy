@@ -130,15 +130,16 @@ class Torrenttv(AceProxyPlugin):
             exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
             response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
                                  'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
-            compress_method = connection.headers.get('Accept-Encoding')
-            if compress_method:
-               compress_method = compress_method.split(',')[0]
-               d = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
-                     'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
-                     'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
-               exported = d[compress_method].compress(exported) + d[compress_method].flush()
-               connection.send_header('Content-Encoding', compress_method)
-            response_headers['Content-Length'] = len(exported)
+            try:
+               h = connection.headers.get('Accept-Encoding').split(',')[0]
+               compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
+                                   'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
+                                   'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
+               exported = compress_method[h].compress(exported) + compress_method[h].flush()
+               response_headers['Content-Length'] = len(exported)
+               response_headers['Content-Encoding'] = h
+            except: pass
+
             connection.send_response(200)
             for k,v in list(response_headers.items()): connection.send_header(k,v)
             connection.end_headers()
