@@ -364,7 +364,10 @@ def clean_proc():
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
-            try: os.remove(AceStuff.acedir + '\\acestream.port')
+            try:
+                os.remove(AceStuff.acedir + '\\acestream.port')
+                for proc in psutil.process_iter():
+                    if proc.name() == 'ace_engine.exe': proc.kill()
             except: pass
     import gc
     gevent.killall([obj for obj in gc.get_objects() if isinstance(obj, gevent.Greenlet)])
