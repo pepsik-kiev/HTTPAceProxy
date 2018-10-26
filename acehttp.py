@@ -47,12 +47,12 @@ class HTTPServer(HTTPServer):
         if AceConfig.firewall and not checkFirewall(client_address[0]):
            logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
            return
-        if checkAce(): # Check is AceStream engine alive
-           gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+        # Check AceStream engine is alive and handle request
+        if checkAce(): gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
 
     def __new_request(self, handlerClass, request, address, server):
         try: handlerClass(request, address, server)
-        except SocketException: pass # fix the broken pipe errors
+        except SocketException: pass # fix the broken pipe errors#
         except Exception as e: logger.error(traceback.format_exc())
         self.shutdown_request(request)
 
@@ -189,7 +189,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
             self.send_response(200)
             logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
-            for (k,v) in response_headers: self.send_header(k,v)
+            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
             self.end_headers()
 
             if AceStuff.clientcounter.addClient(CID, self) == 1:
@@ -201,7 +201,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         except aceclient.AceException as e:
             if CID: AceStuff.clientcounter.deleteAll(CID)
-            self.dieWithError(500, 'AceClient exception: %s' % repr(e))
+            self.dieWithError(500, '%s' % repr(e))
 
 class AceStuff(object):
     '''
@@ -272,7 +272,7 @@ def checkAce():
             return False
     else: return True
 
-def BroadcastStreamer(url, cid, req_headers=None):
+def BroadcastStreamer(url, cid):
     '''
     Get stream from AceEngine url and write data to client(s)
     '''
@@ -280,43 +280,36 @@ def BroadcastStreamer(url, cid, req_headers=None):
     # Rewriting host:port for remote Ace Stream Engine
     if not AceStuff.ace:
        url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
-    with requests.Session() as session:
-       if req_headers:
-           session.headers.update(req_headers)
-           logging.debug('Sending headers from client to AceEngine: %s' % session.headers)
-       try:
-          # AceEngine return link for HLS stream
-          if url.endswith('.m3u8'):
-              _used_chunks = []
-              while AceStuff.clientcounter.getClientsQuantity(cid) != 0:
-                for line in session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)).iter_lines():
-                   if line.startswith(b'download not found'): return
-                   if line.startswith(b'http://') and line not in _used_chunks:
-                      RAWDataReader(session.get(line, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
-                      _used_chunks.append(line)
-                      if len(_used_chunks) > 15: _used_chunks.pop(0)
-          # AceStream return link for HTTP stream
-          else: RAWDataReader(session.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
-       except Exception as err:
-          AceStuff.clientcounter.deleteAll(cid) # Finished streaming to all connected clients for existing broadcast
-          logging.error('StreamReader error: %s' % repr(err))
+    try:
+       if url.endswith('.m3u8'): # AceEngine return link for HLS stream
+          _used_chunks = []
+          while AceStuff.clientcounter.getClientsQuantity(cid) != 0:
+              with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as m3uList:
+                 for line in m3uList.iter_lines():
+                    if line.startswith(b'download not found'): return
+                    if line.startswith(b'http://') and line not in _used_chunks:
+                       with requests.get(line, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
+                           RAWDataReader(stream, cid)
+                       _used_chunks.append(line)
+                       if len(_used_chunks) > 15: _used_chunks.pop(0)
+       else: # AceStream return link for HTTP stream
+            with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
+                RAWDataReader(stream, cid)
+    except Exception as err:
+           AceStuff.clientcounter.deleteAll(cid) # Finished streaming to all connected clients for existing broadcast
+           logging.error('StreamReader error: %s' % repr(err))
 
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       if chunk: gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid)])
+       gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
 def write_chunk(cid, client, chunk):
     try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if client.transcoder is None else client.out.write(chunk)
     except (SocketException, AttributeError): # Client disconected
-         if client.connection: client.connection.close()
-         client.connection = None
-
-         if AceStuff.clientcounter.deleteClient(cid, client) == 0:
+       if AceStuff.clientcounter.deleteClient(cid, client) == 0:
             logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
-         else:
-            logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
-
-         if client.transcoder is not None:
+       else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
+       if client.transcoder is not None:
             try: client.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
             except: pass
 
@@ -339,8 +332,8 @@ def detectPort():
     reg = ConnectRegistry(None, HKEY_CURRENT_USER)
     try: key = OpenKey(reg, 'Software\AceStream')
     except:
-           logger.error("Can't find AceStream!")
-           clean_proc(); sys.exit(1)
+        logger.error("Can't find AceStream!")
+        clean_proc(); sys.exit(1)
     else:
         engine = QueryValueEx(key, 'EnginePath')
         AceStuff.acedir = os.path.dirname(engine[0])
@@ -367,6 +360,7 @@ def clean_proc():
             try:
                 os.remove(AceStuff.acedir + '\\acestream.port')
                 for proc in psutil.process_iter():
+                    # check whether the process name matches
                     if proc.name() == 'ace_engine.exe': proc.kill()
             except: pass
     import gc
@@ -458,12 +452,12 @@ AceStuff.clientcounter = ClientCounter()
 #### AceEngine startup
 AceStuff.ace = findProcess('ace_engine.exe' if AceConfig.osplatform == 'Windows' else os.path.basename(AceConfig.acecmd))
 if not AceStuff.ace and AceConfig.acespawn:
-   AceStuff.acecmd = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
-   if spawnAce(AceStuff.acecmd, AceConfig.acestartuptimeout):
+    AceStuff.acecmd = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
+    if spawnAce(AceStuff.acecmd, AceConfig.acestartuptimeout):
        logger.info('Local AceStream engine spawned with pid %s' % AceStuff.ace.pid)
 elif AceStuff.ace:
-   AceStuff.ace = psutil.Process(AceStuff.ace)
-   logger.info('Local AceStream engine found with pid %s' % AceStuff.ace.pid)
+    AceStuff.ace = psutil.Process(AceStuff.ace)
+    logger.info('Local AceStream engine found with pid %s' % AceStuff.ace.pid)
 
 # If AceEngine started (found) localy
 if AceStuff.ace:
