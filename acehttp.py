@@ -167,6 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
 
             # If &fmt transcode key present in request
+            fmt=self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
