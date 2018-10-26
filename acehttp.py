@@ -199,6 +199,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
                logger.warning('Broadcast "%s" created' % self.channelName)
 
+            if self.transcoder: self.transcoder.wait()
+
         except aceclient.AceException as e:
             if CID: AceStuff.clientcounter.deleteAll(CID)
             self.dieWithError(500, '%s' % repr(e))
