@@ -68,11 +68,7 @@ class AceClient(object):
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        else: gevent.spawn(self._recvData, 30).link_exception(self.telnet_EOFError)
-
-    def telnet_EOFError(self):
-        errmsg = 'Error reading data from AceEngine API port'
-        raise AceException(errmsg)
+        else: gevent.spawn(self._recvData, 30)
 
     def destroy(self):
         '''
@@ -198,7 +194,11 @@ class AceClient(object):
         while 1:
             try:
                 with gevent.timeout.Timeout(timeout):
-                    self._recvbuffer = self._socket.read_until('\r\n', None).strip()
+                    try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
+                    except EOFError:
+                         logging.error('Error reading data from AceEngine API port')
+                         self._socket.close(); self._clientcounter.idleAce = None
+                         return
             # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
             except gevent.socket.timeout: pass
             # SHUTDOWN socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
