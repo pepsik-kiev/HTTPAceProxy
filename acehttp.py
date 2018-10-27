@@ -363,15 +363,11 @@ def clean_proc():
                     # check whether the process name matches
                     if proc.name() == 'ace_engine.exe': proc.kill()
             except: pass
-    import gc
-    gevent.killall([obj for obj in gc.get_objects() if isinstance(obj, gevent.Greenlet)])
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     clean_proc()
-    server.shutdown()
-    server.server_close()
     logger.info('Bye Bye .....')
     sys.exit()
 
