@@ -167,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
 
             # If &fmt transcode key present in request
-            fmt=self.reqparams.get('fmt', [''])[0]
+            fmt = self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
                 if fmt in AceConfig.transcodecmd:
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -175,7 +175,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                                      'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                     self.transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
                     self.out = self.transcoder.stdin
-                    logger.warning('Ffmpeg transcoding started')
+                    logger.info('Ffmpeg transcoding for %s started' % self.clientip)
                 else:
                     logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
 
@@ -200,7 +200,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
                logger.warning('Broadcast "%s" created' % self.channelName)
 
-            if self.transcoder: self.transcoder.wait()
+            if self.transcoder: self.transcoder.wait(); logger.info('Ffmpeg transcoding for %s stoped' % self.clientip)
 
         except aceclient.AceException as e:
             if CID: AceStuff.clientcounter.deleteAll(CID)
@@ -285,16 +285,16 @@ def BroadcastStreamer(url, cid):
        url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
     try:
        if url.endswith('.m3u8'): # AceEngine return link for HLS stream
-          _used_chunks = []
+          used_chunks = []
           while AceStuff.clientcounter.getClientsQuantity(cid) != 0:
               with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as m3uList:
                  for line in m3uList.iter_lines():
                     if line.startswith(b'download not found'): return
-                    if line.startswith(b'http://') and line not in _used_chunks:
+                    if line.startswith(b'http://') and line not in used_chunks:
                        with requests.get(line, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
                            RAWDataReader(stream, cid)
-                       _used_chunks.append(line)
-                       if len(_used_chunks) > 15: _used_chunks.pop(0)
+                       used_chunks.append(line)
+                       if len(used_chunks) > 15: used_chunks.pop(0)
        else: # AceStream return link for HTTP stream
             with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
                 RAWDataReader(stream, cid)
@@ -307,14 +307,11 @@ def RAWDataReader(stream, cid):
        gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
 def write_chunk(cid, client, chunk):
-    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if client.transcoder is None else client.out.write(chunk)
+    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if client.transcoder is None else client.out.write(chunk); gevent.sleep()
     except (SocketException, AttributeError): # Client disconected
        if AceStuff.clientcounter.deleteClient(cid, client) == 0:
             logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
        else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
-       if client.transcoder is not None:
-            try: client.transcoder.kill(); logger.warning('Ffmpeg transcoding stoped')
-            except: pass
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
