@@ -196,7 +196,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if AceStuff.clientcounter.addClient(CID, self) == 1:
                # If there is no existing broadcast we create it
                logger.warning('Create a broadcast "%s"' % self.channelName)
-               gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+               gevent.spawn(BroadcastStreaming, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
                logger.warning('Broadcast "%s" created' % self.channelName)
 
@@ -275,11 +275,11 @@ def checkAce():
             return False
     else: return True
 
-def BroadcastStreamer(url, cid):
+def BroadcastStreaming(url, cid):
     '''
     Get stream from AceEngine url and write data to client(s)
     '''
-    logging.debug('Start BroadcastStreamer for url: %s' % url)
+    logging.debug('Start Broadcasting for url: %s' % url)
     # Rewriting host:port for remote Ace Stream Engine
     if not AceStuff.ace:
        url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
@@ -307,11 +307,17 @@ def RAWDataReader(stream, cid):
        gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
 def write_chunk(cid, client, chunk):
-    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if client.transcoder is None else client.out.write(chunk); gevent.sleep()
-    except (SocketException, AttributeError): # Client disconected
-       if AceStuff.clientcounter.deleteClient(cid, client) == 0:
-            logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
-       else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
+    with gevent.timeout.Timeout(5, False) as timer:
+       try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if client.transcoder is None else client.out.write(chunk)
+       except (SocketException, AttributeError): # The client disconnected himself from broadcast
+          if AceStuff.clientcounter.deleteClient(cid, client) == 0:
+             logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
+          else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
+
+       except gevent.timeout.Timeout: # Client did not read the data for 5 sec disconnect it
+          if AceStuff.clientcounter.deleteClient(cid, client) == 0:
+             logger.warning('Broadcast "%s" stoped. Last client disconnected. Client %s does not read data until %s' % (client.channelName, client.clientip, timer))
+          else: logger.info('Streaming "%s" to %s finished. Client does not read data until %s' % (client.channelName, client.clientip, timer))
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
