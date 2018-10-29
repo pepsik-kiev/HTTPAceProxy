@@ -305,19 +305,19 @@ def BroadcastStreaming(url, cid):
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
        gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
+       gevent.sleep()
 
-def write_chunk(cid, client, chunk):
-    with gevent.timeout.Timeout(5, False) as timer:
-       try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk)) if client.transcoder is None else client.out.write(chunk)
-       except (SocketException, AttributeError): # The client disconnected himself from broadcast
-          if AceStuff.clientcounter.deleteClient(cid, client) == 0:
-             logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
-          else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
+def write_chunk(cid, client, chunk, timeout=5.0):
+    try: gevent.timeout.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+    except (SocketException, AttributeError): # The client disconnected himself from broadcast
+       if AceStuff.clientcounter.deleteClient(cid, client) == 0:
+          logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
+       else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
 
-       except gevent.timeout.Timeout: # Client did not read the data for 5 sec disconnect it
-          if AceStuff.clientcounter.deleteClient(cid, client) == 0:
-             logger.warning('Broadcast "%s" stoped. Last client disconnected. Client %s does not read data until %s' % (client.channelName, client.clientip, timer))
-          else: logger.info('Streaming "%s" to %s finished. Client does not read data until %s' % (client.channelName, client.clientip, timer))
+    except gevent.timeout.Timeout: # Client did not read the data for 5 sec disconnect it
+       if AceStuff.clientcounter.deleteClient(cid, client) == 0:
+          logger.warning('Broadcast "%s" stoped. Last client disconnected. Client %s does not read data until %ssec' % (client.channelName, client.clientip, timeout))
+       else: logger.info('Streaming "%s" to %s finished. Client does not read data until %ssec' % (client.channelName, client.clientip, timeout))
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
@@ -361,7 +361,7 @@ def findProcess(name):
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
+        if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy(); gevent.sleep(1)
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try:
                 os.remove(AceStuff.acedir + '\\acestream.port')
@@ -410,6 +410,14 @@ def check_compatibility(gevent_version, psutil_version):
     assert minor >= 3
     assert patch >= 0
 
+def downspeed():
+    '''
+    https://github.com/bertrandmartel/speed-test-lib/blob/master/server_list.md
+    '''
+    start = gevent.time.time()
+    file = requests.get('http://speedtest.ftp.otenet.gr/files/test1Mb.db', stream=False)
+    file_size = int(file.headers['Content-Length'])/10000
+    return round(file_size / (gevent.time.time() - start))
 
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
@@ -429,6 +437,9 @@ except (AssertionError, ValueError):
 if AceConfig.httphost == 'auto':
     AceConfig.httphost = get_ip_address()
     logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
+
+### Detect download speed
+logger.debug('Determined download speed: %s Mbit/s' % downspeed())
 
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:

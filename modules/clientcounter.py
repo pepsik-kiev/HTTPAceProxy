@@ -32,10 +32,8 @@ class ClientCounter(object):
         Adds client to the dictionary list by CID key and return their number
         '''
         clients = self.getClientsList(cid)
-        if clients:
-            client.ace = clients[0].ace; self.idleAce.destroy()
-        else:
-            client.ace = self.idleAce
+        if clients: client.ace = clients[0].ace; self.idleAce.destroy()
+        else: client.ace = self.idleAce
         self.streams.setdefault(cid,[]).append(client)
         self.idleAce = None
         return self.getClientsQuantity(cid)
@@ -56,7 +54,7 @@ class ClientCounter(object):
                client.ace.STOP()
                self.idleAce = client.ace
                self.idleAce.reset()
-            except: client.ace.destroy(); self.idleAce = None
+            except: self.idleAce = None
             finally: return 0
 
     def deleteAll(self, cid):
@@ -72,7 +70,7 @@ class ClientCounter(object):
                clients[0].ace.STOP()
                self.idleAce = clients[0].ace
                self.idleAce.reset()
-            except: clients[0].ace.destroy(); self.idleAce = None
+            except: self.idleAce = None
         for c in clients:
             if c.transcoder is not None:
                try: c.transcoder.kill()
