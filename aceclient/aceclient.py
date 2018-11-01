@@ -144,8 +144,8 @@ class AceClient(object):
         Stop video method
         '''
         self._state = AsyncResult()
+        self._write(AceMessage.request.STOP)
         try:
-            self._write(AceMessage.request.STOP)
             self._state.get(timeout=self._resulttimeout)
             self._started_again.clear()
             self._url.set()

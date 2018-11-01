@@ -32,7 +32,7 @@ except: from http.server import HTTPServer, BaseHTTPRequestHandler
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
-from gevent.socket import socket, AF_INET, SOCK_DGRAM, IPPROTO_TCP, TCP_NODELAY, SOCK_STREAM, error as SocketException
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
@@ -73,11 +73,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
         Close connection with error
         '''
         if logmsg: logging.log(loglevel, logmsg)
-        if self.connection:
-            try:
-                self.send_error(errorcode)
-                self.end_headers()
-            except: pass
+        try:
+           self.send_error(errorcode)
+           self.end_headers()
+        except: pass
 
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
@@ -85,13 +84,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        logger = logging.getLogger('do_GET')
         # Current greenlet
         self.requestGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
-        logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
-        logger.debug('Headers: %s' % dict(self.headers))
+        logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
+        logging.debug('Headers: %s' % dict(self.headers))
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
 
@@ -116,7 +114,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             except SocketException: pass
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                logger.error(traceback.format_exc())
+                logging.error(traceback.format_exc())
             finally: return
         self.handleRequest(headers_only)
 
@@ -168,7 +166,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.channelName = NAME if not channelName else channelName
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
         except Exception as e:
-            self.dieWithError(503, '%s' %s, logging.ERROR)
+            self.dieWithError(503, '%s' % repr(e), logging.ERROR)
             if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
             return
 
@@ -220,7 +218,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         finally: self.disconnectGreenlet.join() # Waiting until request complite or client disconnected
 
-    def disconnectDetector(self, CID):
+    def disconnectDetector(self, cid):
         try:
             while 1:
                if not self.rfile.read(): break
@@ -229,9 +227,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             try:
                logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
                if self.transcoder:
-                  self.transcoder.kill()
-                  logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
-               if AceStuff.clientcounter.deleteClient(CID, self) == 0:
+                  self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+               if AceStuff.clientcounter.deleteClient(cid, self) == 0:
                   logging.warning('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
                self.requestGreenlet.kill()
             except: pass
@@ -318,23 +315,23 @@ def BroadcastStreaming(url, cid):
     try:
        if url.endswith('.m3u8'): # AceEngine return link for HLS stream
           used_chunks = []
-          while AceStuff.clientcounter.getClientsQuantity(cid) != 0:
+          while AceStuff.clientcounter.getClientsList(cid):
               with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as m3uList:
                  for line in m3uList.iter_lines():
                     if line.startswith(b'download not found'): return
                     if line.startswith(b'http://') and line not in used_chunks:
                        with requests.get(line, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
-                           RAWDataReader(stream, cid)
+                           StreamDataReader(stream, cid)
                        used_chunks.append(line)
                        if len(used_chunks) > 15: used_chunks.pop(0)
        else: # AceStream return link for HTTP stream
             with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
-                RAWDataReader(stream, cid)
+                StreamDataReader(stream, cid)
     except Exception as err:
            logger.error('StreamReader error: %s' % repr(err))
            gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
 
-def RAWDataReader(stream, cid):
+def StreamDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
        gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
