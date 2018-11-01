@@ -32,7 +32,7 @@ except: from http.server import HTTPServer, BaseHTTPRequestHandler
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
-from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, IPPROTO_TCP, TCP_NODELAY, SOCK_STREAM, error as SocketException
 
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
@@ -52,14 +52,16 @@ class HTTPServer(HTTPServer):
 
     def __new_request(self, handlerClass, request, address, server):
         try: handlerClass(request, address, server)
-        except SocketException: pass # fix the broken pipe errors#
+        except SocketException: pass # fix the broken pipe errors
         except Exception as e: logger.error(traceback.format_exc())
         self.shutdown_request(request)
+
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
+    default_request_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -84,6 +86,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         GET request handler
         '''
         logger = logging.getLogger('do_GET')
+        # Current greenlet
+        self.requestGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logger.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -154,8 +158,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
         self.connectionTime = gevent.time.time()
-        self.transcoder = CID = NAME = None
-        self.out = self.wfile
         try:
             if not AceStuff.clientcounter.idleAce:
                logger.debug('Create connection to AceEngine.....')
@@ -165,7 +167,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
                CID, NAME = AceStuff.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
             self.channelName = NAME if not channelName else channelName
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
+        except Exception as e:
+            self.dieWithError(503, '%s' %s, logging.ERROR)
+            if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
+            return
 
+        self.transcoder = None
+        self.out = self.wfile
+        self.disconnectGreenlet = gevent.spawn(self.disconnectDetector, CID)
+        try:
             # If &fmt transcode key present in request
             fmt = self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
@@ -173,12 +183,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
                     popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
                                      'stdout': self.wfile, 'stderr': stderr, 'shell': False }
-                    self.transcoder = gevent.subprocess.Popen(AceConfig.transcodecmd[fmt], **popen_params)
+
+                    self.transcoder = gevent.event.AsyncResult()
+                    gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
+                    self.transcoder = self.transcoder.get(timeout=2.0)
                     self.out = self.transcoder.stdin
                     logger.info('Ffmpeg transcoding for %s started' % self.clientip)
                 else:
                     logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
-
             # Sending videostream headers to client
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
@@ -195,16 +207,36 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             if AceStuff.clientcounter.addClient(CID, self) == 1:
                # If there is no existing broadcast we create it
-               logger.warning('Create a broadcast "%s"' % self.channelName)
-               gevent.spawn(BroadcastStreaming, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
-               self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
-               logger.warning('Broadcast "%s" created' % self.channelName)
-
-            if self.transcoder: self.transcoder.wait(); logger.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+               logger.warning('Getting a link to the broadcast "%s"' % self.channelName)
+               url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
+               if url:
+                  gevent.spawn(BroadcastStreaming, url, CID)
+                  self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
+                  logger.warning('Broadcast "%s" created' % self.channelName)
 
         except aceclient.AceException as e:
-            if CID: AceStuff.clientcounter.deleteAll(CID)
-            self.dieWithError(500, '%s' % repr(e))
+            logger.error('%s' % repr(e))
+            gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
+
+        finally: self.disconnectGreenlet.join() # Waiting until request complite or client disconnected
+
+    def disconnectDetector(self, CID):
+        try:
+            while 1:
+               if not self.rfile.read(): break
+        except: pass
+        finally:
+            try:
+               logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+               if self.transcoder:
+                  self.transcoder.kill()
+                  logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+               if AceStuff.clientcounter.deleteClient(CID, self) == 0:
+                  logging.warning('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+               self.requestGreenlet.kill()
+            except: pass
+            finally: gevent.sleep()
+        return
 
 class AceStuff(object):
     '''
@@ -299,25 +331,24 @@ def BroadcastStreaming(url, cid):
             with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
                 RAWDataReader(stream, cid)
     except Exception as err:
-           AceStuff.clientcounter.deleteAll(cid) # Finished streaming to all connected clients for existing broadcast
-           logging.error('StreamReader error: %s' % repr(err))
+           logger.error('StreamReader error: %s' % repr(err))
+           gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
 
 def RAWDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
        gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
-       gevent.sleep()
 
-def write_chunk(cid, client, chunk, timeout=5.0):
-    try: gevent.timeout.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-    except (SocketException, AttributeError): # The client disconnected himself from broadcast
-       if AceStuff.clientcounter.deleteClient(cid, client) == 0:
-          logger.warning('Broadcast "%s" stoped. Last client %s disconnected' % (client.channelName, client.clientip))
-       else: logger.info('Streaming "%s" to %s finished' % (client.channelName, client.clientip))
-
+def write_chunk(cid, client, chunk, timeout = 10.0):
+    try:
+       flag = True
+       gevent.timeout.with_timeout(timeout, client.out.write,  b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
     except gevent.timeout.Timeout: # Client did not read the data for 5 sec disconnect it
-       if AceStuff.clientcounter.deleteClient(cid, client) == 0:
-          logger.warning('Broadcast "%s" stoped. Last client disconnected. Client %s does not read data until %ssec' % (client.channelName, client.clientip, timeout))
-       else: logger.info('Streaming "%s" to %s finished. Client does not read data until %ssec' % (client.channelName, client.clientip, timeout))
+       logging.info('Client %s does not read data until %ssec' % (client.clientip, timeout))
+    except (SocketException, AttributeError): pass # The client disconnected himself from broadcast
+    else: flag = False
+    finally:
+       if flag: client.disconnectGreenlet.kill()
+       gevent.sleep()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

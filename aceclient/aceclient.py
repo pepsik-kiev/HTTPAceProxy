@@ -144,8 +144,8 @@ class AceClient(object):
         Stop video method
         '''
         self._state = AsyncResult()
-        self._write(AceMessage.request.STOP)
         try:
+            self._write(AceMessage.request.STOP)
             self._state.get(timeout=self._resulttimeout)
             self._started_again.clear()
             self._url.set()
@@ -199,8 +199,8 @@ class AceClient(object):
         timeout = self._resulttimeout if not timeout else timeout
         while 1:
            try: self._recvbuffer = gevent.timeout.with_timeout(timeout, self._socket.read_until, '\r\n', None).strip()
-           except EOFError:
-               logging.error('Error reading data from AceEngine API port')
+           except EOFError as err:
+               logging.error('AceException: %s' % repr(err))
                self.destroy(); self._socket.close(); return
            # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
            except gevent.socket.timeout: pass

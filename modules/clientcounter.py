@@ -56,22 +56,3 @@ class ClientCounter(object):
                self.idleAce.reset()
             except: self.idleAce = None
             finally: return 0
-
-    def deleteAll(self, cid):
-        '''
-        Remove all Clients from dict by CID
-        '''
-        clients = self.getClientsList(cid)
-        if not clients: return
-        del self.streams[cid]
-        if self.idleAce: clients[0].ace.destroy()
-        else:
-            try:
-               clients[0].ace.STOP()
-               self.idleAce = clients[0].ace
-               self.idleAce.reset()
-            except: self.idleAce = None
-        for c in clients:
-            if c.transcoder is not None:
-               try: c.transcoder.kill()
-               except: pass
