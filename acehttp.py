@@ -167,7 +167,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
         except Exception as e:
             self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-            if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
+            if AceStuff.clientcounter.idleAce:
+                AceStuff.clientcounter.idleAce.destroy()
+                AceStuff.clientcounter.idleAce = None
             return
 
         self.transcoder = None
