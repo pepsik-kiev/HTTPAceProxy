@@ -76,7 +76,7 @@ class AceClient(object):
         '''
         # Send SHUTDOWN to AceEngine
         try: self._write(AceMessage.request.SHUTDOWN)
-        except: self._socket.close() # Close socket if exceptions on destroy
+        except: pass # Ignore exceptions on destroy
 
     def reset(self):
         '''
@@ -92,7 +92,7 @@ class AceClient(object):
             self._socket.write('%s\r\n' % message)
             logging.debug('>>> %s' % message)
         except gevent.socket.error:
-            self._socket.close()
+            self._socket.close(); self._socket = None
             raise AceException('Error writing data to AceEngine API port')
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
@@ -197,11 +197,12 @@ class AceClient(object):
         Data receiver method for greenlet
         '''
         timeout = self._resulttimeout if not timeout else timeout
-        while 1:
+        while self._socket:
            try: self._recvbuffer = gevent.timeout.with_timeout(timeout, self._socket.read_until, '\r\n', None).strip()
            except EOFError as err:
                logging.error('AceException: %s' % repr(err))
-               self.destroy(); self._socket.close(); return
+               self._socket.close(); self._socket = None
+               return
            # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
            except gevent.socket.timeout: pass
            # SHUTDOWN socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
