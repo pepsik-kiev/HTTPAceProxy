@@ -76,7 +76,7 @@ class AceClient(object):
         '''
         # Send SHUTDOWN to AceEngine
         try: self._write(AceMessage.request.SHUTDOWN)
-        except: pass # Ignore exceptions on destroy
+        except: self._socket.close() # Close socket if exceptions on destroy
 
     def reset(self):
         '''

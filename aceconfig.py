@@ -29,7 +29,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # On Windows Ace Engine refreshes acestream.port file only after loading GUI
     # Loading takes about ~10-15 seconds and we need to wait before taking port out of it
     # Set this to 0 if you don't use proxy at startup or don't need to wait
-    acestartuptimeout = 10
+    acestartuptimeout = 15
     # Ace Stream Engine connection timeout
     aceconntimeout = 5
     # Ace Stream Engine authentication result & API port answers timeout
@@ -103,7 +103,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Logging configuration
     #
     # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    loglevel = logging.CRITICAL
+    loglevel = logging.INFO
     # Log message format
     logfmt = '%(filename)-20s [LINE:%(lineno)-4s]# %(levelname)-8s [%(asctime)s] %(message)s'
     #logfmt = '%(filename)s - %(name)s - %(threadName)s - [LINE:%(lineno)s]# - %(levelname)s - [%(asctime)s] - %(message)s' # for debug
