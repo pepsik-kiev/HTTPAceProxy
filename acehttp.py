@@ -56,7 +56,6 @@ class HTTPServer(HTTPServer):
         except Exception as e: logger.error(traceback.format_exc())
         self.shutdown_request(request)
 
-
 class HTTPHandler(BaseHTTPRequestHandler):
 
     server_version = 'HTTPAceProxy'
@@ -174,7 +173,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         self.transcoder = None
         self.out = self.wfile
-        self.disconnectGreenlet = gevent.spawn(self.disconnectDetector, CID)
+        self.disconnectGreenlet = gevent.spawn(self.disconnectDetector, CID) # client disconnection watchdog
         try:
             # If &fmt transcode key present in request
             fmt = self.reqparams.get('fmt', [''])[0]
@@ -183,12 +182,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
                     popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
                                      'stdout': self.wfile, 'stderr': stderr, 'shell': False }
-
-                    self.transcoder = gevent.event.AsyncResult()
-                    gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
-                    self.transcoder = self.transcoder.get(timeout=2.0)
-                    self.out = self.transcoder.stdin
-                    logger.info('Ffmpeg transcoding for %s started' % self.clientip)
+                    try:
+                       self.transcoder = gevent.event.AsyncResult()
+                       gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
+                       self.transcoder = self.transcoder.get(timeout=2.0)
+                       self.out = self.transcoder.stdin
+                       logger.info('Ffmpeg transcoding for %s started' % self.clientip)
+                    except:
+                       logger.error('Error starting ffmpeg! Is ffmpeg installed?')
+                       self.transcoder = None; self.out = self.wfile
                 else:
                     logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
             # Sending videostream headers to client
@@ -335,9 +337,9 @@ def BroadcastStreaming(url, cid):
 
 def StreamDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
+       gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk, AceConfig.videotimeout) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
-def write_chunk(cid, client, chunk, timeout = 10.0):
+def write_chunk(cid, client, chunk, timeout=5.0):
     try:
        flag = True
        gevent.timeout.with_timeout(timeout, client.out.write,  b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
@@ -391,19 +393,21 @@ def findProcess(name):
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
-        if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy(); gevent.sleep(1)
+        if AceStuff.clientcounter.idleAce:
+            AceStuff.clientcounter.idleAce.destroy(); gevent.sleep(1)
+        AceStuff.ace.terminate()
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try:
                 os.remove(AceStuff.acedir + '\\acestream.port')
                 for proc in psutil.process_iter():
-                    # check whether the process name matches
-                    if proc.name() == 'ace_engine.exe': proc.kill()
+                   if proc.name() == 'ace_engine.exe': proc.kill()
             except: pass
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     clean_proc()
+    server.server_close()
     logger.info('Bye Bye .....')
     sys.exit()
 
@@ -452,7 +456,7 @@ def downspeed():
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
-if AceConfig.acespawn or not AceConfig.transcodecmd: DEVNULL = open(os.devnull, 'wb')
+if AceConfig.acespawn or AceConfig.transcodecmd: DEVNULL = open(os.devnull, 'wb')
 
 logger.info('Ace Stream HTTP Proxy server on Python %s starting .....' % sys.version.split()[0])
 logger.debug('Using: gevent %s, psutil %s' % (gevent.__version__, psutil.__version__))
