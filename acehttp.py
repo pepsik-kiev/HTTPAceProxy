@@ -337,7 +337,7 @@ def BroadcastStreaming(url, cid):
 
 def StreamDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
+       gevent.joinall([gevent.spawn(write_chunk, client, chunk, 10.0) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
 def write_chunk(client, chunk, timeout=AceConfig.videotimeout):
     try:
