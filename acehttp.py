@@ -337,13 +337,13 @@ def BroadcastStreaming(url, cid):
 
 def StreamDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       gevent.joinall([gevent.spawn(write_chunk, cid, client, chunk, AceConfig.videotimeout) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
+       gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
 
-def write_chunk(cid, client, chunk, timeout=5.0):
+def write_chunk(client, chunk, timeout=AceConfig.videotimeout):
     try:
        flag = True
        gevent.timeout.with_timeout(timeout, client.out.write,  b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-    except gevent.timeout.Timeout: # Client did not read the data for 5 sec disconnect it
+    except gevent.timeout.Timeout: # Client did not read the data for N sec disconnect it
        logging.info('Client %s does not read data until %ssec' % (client.clientip, timeout))
     except (SocketException, AttributeError): pass # The client disconnected himself from broadcast
     else: flag = False
