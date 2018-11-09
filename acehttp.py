@@ -196,9 +196,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # Sending videostream headers to client
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
-            proxy_headers = { 'Connection': 'Keep-Alive', 'Keep-Alive': 'timeout=%s, max=100' % AceConfig.videotimeout,
-                              'Accept-Ranges': 'none', 'Content-Type': 'application/octet-stream',
-                              'Cache-Control': 'no-cache, max-age=0', 'Transfer-Encoding': 'chunked' }
+            proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Transfer-Encoding': 'chunked',
+                              'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-cache, max-age=0' }
+
             if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
             response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
@@ -346,7 +346,7 @@ def write_chunk(client, chunk, timeout=5.0):
     '''
     try:
        flag = True
-       gevent.timeout.with_timeout(timeout, client.out.write,  b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+       gevent.timeout.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
     except gevent.timeout.Timeout: # Client did not read the data for N sec disconnect it
        logging.info('Client %s does not read data until %ssec' % (client.clientip, timeout))
     except (SocketException, AttributeError): pass # The client disconnected himself from broadcast
