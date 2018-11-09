@@ -154,6 +154,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
+
         self.connectionTime = gevent.time.time()
         try:
             if not AceStuff.clientcounter.idleAce:
@@ -222,14 +223,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
             logger.error('%s' % repr(e))
             gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
 
-        except gevent.GreenletExit:
+        except gevent.GreenletExit: # Client disconnected
             logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
-            if self.transcoder:
-               self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
 
         finally:
+            if self.transcoder:
+               self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
             if AceStuff.clientcounter.deleteClient(CID, self) == 0:
                logging.warning('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+            return
 
     def disconnectDetector(self, cid):
         try: self.rfile.read()
@@ -334,14 +336,14 @@ def BroadcastStreaming(url, cid):
 
 def StreamDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       # send current chunk to all expecting clients and wait until they all read it
        clients = AceStuff.clientcounter.getClientsList(cid)
-       if clients: gevent.joinall([gevent.spawn(write_chunk, client, chunk, 10.0) for client in clients if chunk])
+       # send current chunk to all expecting clients and wait until they all read it
+       if clients: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
        else: return
 
 def write_chunk(client, chunk, timeout=5.0):
     '''
-    timeout - maximum timeout of writing data to the socket.
+    timeout - maximum time of writing data to the socket.
     If in the allotted time the client has not read anything - turn it off.
     '''
     try:
