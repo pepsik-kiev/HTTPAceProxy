@@ -216,28 +216,25 @@ class HTTPHandler(BaseHTTPRequestHandler):
                   self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
                   logger.warning('Broadcast "%s" created' % self.channelName)
 
+            self.disconnectGreenlet.join() # Waiting until request complite or client disconnected
+
         except aceclient.AceException as e:
             logger.error('%s' % repr(e))
             gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
 
-        finally: self.disconnectGreenlet.join() # Waiting until request complite or client disconnected
+        except gevent.GreenletExit:
+            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+            if self.transcoder:
+               self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+
+        finally:
+            if AceStuff.clientcounter.deleteClient(CID, self) == 0:
+               logging.warning('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 
     def disconnectDetector(self, cid):
-        try:
-            while 1:
-               if not self.rfile.read(): break
+        try: self.rfile.read()
         except: pass
-        finally:
-            try:
-               logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
-               if self.transcoder:
-                  self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
-               if AceStuff.clientcounter.deleteClient(cid, self) == 0:
-                  logging.warning('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-               self.requestGreenlet.kill()
-            except: pass
-            finally: gevent.sleep()
-        return
+        finally: self.requestGreenlet.kill()
 
 class AceStuff(object):
     '''
@@ -337,9 +334,16 @@ def BroadcastStreaming(url, cid):
 
 def StreamDataReader(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       gevent.joinall([gevent.spawn(write_chunk, client, chunk, 10.0) for client in AceStuff.clientcounter.getClientsList(cid) if chunk])
+       # send current chunk to all expecting clients and wait until they all read it
+       clients = AceStuff.clientcounter.getClientsList(cid)
+       if clients: gevent.joinall([gevent.spawn(write_chunk, client, chunk, 10.0) for client in clients if chunk])
+       else: return
 
-def write_chunk(client, chunk, timeout=AceConfig.videotimeout):
+def write_chunk(client, chunk, timeout=5.0):
+    '''
+    timeout - maximum timeout of writing data to the socket.
+    If in the allotted time the client has not read anything - turn it off.
+    '''
     try:
        flag = True
        gevent.timeout.with_timeout(timeout, client.out.write,  b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
