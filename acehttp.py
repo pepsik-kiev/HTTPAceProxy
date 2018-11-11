@@ -174,6 +174,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         self.transcoder = None
         self.out = self.wfile
+        self.queue = gevent.queue.Queue(maxsize=10)
         try:
             self.disconnectGreenlet = gevent.spawn(self.disconnectDetector) # client disconnection watchdog
             # If &fmt transcode key present in request
@@ -210,18 +211,19 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             if AceStuff.clientcounter.addClient(CID, self) == 1:
                 # If there is no existing broadcast we create it
-                self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype, CID)
+                gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
 
             self.disconnectGreenlet.join() # Waiting until request complite or client disconnected
 
         except aceclient.AceException as e:
-            self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+            gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(CID)])
             gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
 
-        except gevent.GreenletExit: # Client disconnected
-            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+        except gevent.GreenletExit: pass # Client disconnected
 
         finally:
+            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
             if self.transcoder:
                self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
             if AceStuff.clientcounter.deleteClient(CID, self) == 0:
@@ -301,6 +303,41 @@ def checkAce():
             logger.error("Can't spawn Ace Stream!")
             return False
     else: return True
+
+def BroadcastStreamer(url, cid):
+    try:
+        if url.endswith('.m3u8'): # AceEngine return link for HLS stream
+           used_chunks = []
+           while  AceStuff.clientcounter.getClientsList(cid):
+              with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as m3uList:
+                 for line in m3uList.iter_lines():
+                    if line.startswith(b'download not found'): return
+                    if line.startswith(b'http://') and line not in used_chunks:
+                        with requests.get(line, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
+                            StreamReader(stream, cid)
+                        used_chunks.append(line)
+                        if len(used_chunks) > 15: used_chunks.pop(0)
+        else: # AceStream return link for HTTP stream
+            with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
+                StreamReader(stream, cid)
+    except Exception as err: # requests errors
+            gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(cid)])
+            gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
+
+def StreamReader(stream, cid):
+    for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
+       clients = AceStuff.clientcounter.getClientsList(cid)
+       # send current chunk to all expecting clients and wait until they all read it
+       if clients: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
+       else: break
+
+def write_chunk(client, chunk, timeout=5.0):
+    try: gevent.timeout.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+    except gevent.timeout.Timeout: # Client did not read the data from socket for N sec - disconnect it
+       logging.info('Client %s does not read data until %ssec' % (client.clientip, timeout))
+       client.disconnectGreenlet.kill()
+    except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+    finally: gevent.sleep()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

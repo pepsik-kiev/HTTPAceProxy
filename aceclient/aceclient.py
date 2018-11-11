@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent
+import gevent, copy
 from gevent.event import AsyncResult, Event
 import telnetlib
 import logging
@@ -68,7 +68,7 @@ class AceClient(object):
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        else: gevent.spawn(self._recvData, 30.0)
+        else: gevent.spawn(self._recvData, 60.0)
 
     def destroy(self):
         '''
@@ -125,51 +125,18 @@ class AceClient(object):
             params_dict = {'use_stop_notifications': '1'}
             self._write(AceMessage.request.SETOPTIONS(params_dict))
 
-    def START(self, command, paramsdict, acestreamtype, cid):
+    def START(self, command, paramsdict, acestreamtype):
         '''
         Start video method
         '''
         paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
         self._url = AsyncResult()
         self._write(AceMessage.request.START(command.upper(), paramsdict))
-        try:
-            # Get url for play from AceEngine and rewriting host:port for use with 'remote' AceEngine
-            url = requests.compat.urlparse(self._url.get(timeout=self._videotimeout))._replace(netloc='%s:%s' % (self._ace['aceHostIP'], self._ace['aceHTTPport'])).geturl()
-            self._write(AceMessage.request.EVENT('play'))
-            if url.endswith('.m3u8'): # AceEngine return link for HLS stream
-               used_chunks = []
-               while self._clientcounter.getClientsList(cid):
-                  with requests.get(url, stream=True, timeout=(5, self._videotimeout)) as m3uList:
-                     for line in m3uList.iter_lines():
-                        if line.startswith(b'download not found'): return
-                        if line.startswith(b'http://') and line not in used_chunks:
-                            with requests.get(line, stream=True, timeout=(5, self._videotimeout)) as stream:
-                                self.StreamReader(stream, cid)
-                            used_chunks.append(line)
-                            if len(used_chunks) > 15: used_chunks.pop(0)
-            else: # AceStream return link for HTTP stream
-                with requests.get(url, stream=True, timeout=(5, self._videotimeout)) as stream:
-                     self.StreamReader(stream, cid)
-        except Exception as err: # requests errors
-            raise AceException('%s' % repr(err))
+         # Get url for play from AceEngine and rewriting host:port for use with 'remote' AceEngine
+        try: return requests.compat.urlparse(self._url.get(timeout=self._videotimeout))._replace(netloc='%s:%s' % (self._ace['aceHostIP'], self._ace['aceHTTPport'])).geturl()
         except gevent.Timeout:
             errmsg = 'Engine response time %ssec exceeded. START URL not resived!' % self._videotimeout
             raise AceException(errmsg)
-
-    def StreamReader(self, stream, cid):
-        for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-           clients = self._clientcounter.getClientsList(cid)
-           # send current chunk to all expecting clients and wait until they all read it
-           if clients: gevent.joinall([gevent.spawn(self.write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
-           else: break
-
-    def write_chunk(self, client, chunk, timeout=5.0):
-        try: gevent.timeout.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-        except gevent.timeout.Timeout: # Client did not read the data from socket for N sec - disconnect it
-           logging.info('Client %s does not read data until %ssec' % (client.clientip, timeout))
-           client.disconnectGreenlet.kill()
-        except (gevent.socket.error, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
-        finally: gevent.sleep()
 
     def STOP(self):
         '''

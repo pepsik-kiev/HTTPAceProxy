@@ -6,7 +6,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 class ClientCounter(object):
 
     def __init__(self):
-        self.streams = {}   # {'CID': [client1, client2,....]} dict of current broadcasts and clients
+        self.streams = {}   # {'CID':[client1, client2,....]} dict of current broadcasts and clients
         self.idleAce = None
 
     def getClientsQuantity(self, cid):
@@ -34,7 +34,7 @@ class ClientCounter(object):
         clients = self.getClientsList(cid)
         if clients: client.ace = clients[0].ace; self.idleAce.destroy()
         else: client.ace = self.idleAce
-        self.streams.setdefault(cid,[]).append(client)
+        self.streams.setdefault(cid, []).append(client)
         self.idleAce = None
         return self.getClientsQuantity(cid)
 
