@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent, copy
+import gevent
 from gevent.event import AsyncResult, Event
 import telnetlib
 import logging

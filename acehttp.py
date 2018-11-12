@@ -174,7 +174,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         self.transcoder = None
         self.out = self.wfile
-        self.queue = gevent.queue.Queue(maxsize=10)
         try:
             self.disconnectGreenlet = gevent.spawn(self.disconnectDetector) # client disconnection watchdog
             # If &fmt transcode key present in request
@@ -214,7 +213,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
                 self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
 
-            self.disconnectGreenlet.join() # Waiting until request complite or client disconnected
+            self.disconnectGreenlet.join() # Wait until request complite or client disconnected
 
         except aceclient.AceException as e:
             gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(CID)])
