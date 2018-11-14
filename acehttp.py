@@ -67,6 +67,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', requests.compat.unquote(self.requestline).decode('utf8'), str(code), str(size))
 
+    def finish(self):
+       # Ensure any buffered output has been transmitted and close the stream
+       if not self.wfile.closed: self.wfile.flush()
+       self.wfile.close()
+       self.rfile.close()
+
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
         Close connection with error
@@ -198,7 +204,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
             proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Transfer-Encoding': 'chunked',
-                              'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-cache, max-age=0' }
+                              'Content-Type': 'application/octet-stream', 'Pragma': 'no-cache', 'Expires': '-1',
+                              'Cache-Control': 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0' }
 
             if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
@@ -210,7 +217,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
             if AceStuff.clientcounter.addClient(CID, self) == 1:
                 # If there is no existing broadcast we create it
-                gevent.spawn(BroadcastStreamer, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+                gevent.spawn(StreamReader, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
                 self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
 
             self.disconnectGreenlet.join() # Wait until request complite or client disconnected
@@ -303,40 +310,40 @@ def checkAce():
             return False
     else: return True
 
-def BroadcastStreamer(url, cid):
+def StreamReader(url, cid):
     try:
         if url.endswith('.m3u8'): # AceEngine return link for HLS stream
            used_chunks = []
-           while  AceStuff.clientcounter.getClientsList(cid):
+           while AceStuff.clientcounter.getClientsList(cid):
               with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as m3uList:
                  for line in m3uList.iter_lines():
                     if line.startswith(b'download not found'): return
                     if line.startswith(b'http://') and line not in used_chunks:
                         with requests.get(line, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
-                            StreamReader(stream, cid)
+                           StreamWriter(stream, cid)
                         used_chunks.append(line)
                         if len(used_chunks) > 15: used_chunks.pop(0)
         else: # AceStream return link for HTTP stream
-            with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
-                StreamReader(stream, cid)
+              with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
+                 StreamWriter(stream, cid)
     except Exception as err: # requests errors
             gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(cid)])
             gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
 
-def StreamReader(stream, cid):
+def StreamWriter(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
        clients = AceStuff.clientcounter.getClientsList(cid)
        # send current chunk to all expecting clients and wait until they all read it
        if clients: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
-       else: break
+       else: return
 
 def write_chunk(client, chunk, timeout=5.0):
-    try: gevent.timeout.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-    except gevent.timeout.Timeout: # Client did not read the data from socket for N sec - disconnect it
-       logging.info('Client %s does not read data until %ssec' % (client.clientip, timeout))
-       client.disconnectGreenlet.kill()
-    except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
-    finally: gevent.sleep()
+    with gevent.Timeout(timeout, False) as timer:
+       try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+       except gevent.timeout.Timeout: # Client did not read the data from socket for N sec - disconnect it
+          logging.info('Client %s does not read data until %s' % (client.clientip, timer))
+          client.disconnectGreenlet.kill()
+       except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
