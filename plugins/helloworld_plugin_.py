@@ -15,10 +15,16 @@ class Helloworld(AceProxyPlugin):
 
     def handle(self, connection, headers_only=False):
         connection.send_response(200)
-        connection.end_headers()
-        
+
         if headers_only:
+            connection.send_header('Connection', 'close')
+            connection.end_headers()
             return
-        
-        connection.wfile.write(
-            '<html><body><h3>Hello world!</h3></body></html>')
+
+        hello_world = b"""<html><body><h3>Hello world!</h3></body></html>"""
+
+        connection.send_header('Content-type', 'text/html; charset=utf-8')
+        connection.send_header('Content-Length', len(hello_world))
+        connection.end_headers()
+
+        connection.wfile.write(hello_world)
