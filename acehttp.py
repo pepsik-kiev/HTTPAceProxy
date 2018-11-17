@@ -43,18 +43,18 @@ from aceconfig import AceConfig
 class HTTPServer(HTTPServer):
 
     def process_request(self, request, client_address):
-        # If firewall enabled
-        if AceConfig.firewall and not checkFirewall(client_address[0]):
-           logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
-           return
-        # Check AceStream engine is alive and handle request
-        if checkAce(): gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+       # If firewall enabled
+       if AceConfig.firewall and not checkFirewall(client_address[0]):
+          logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
+          return
+       # Check AceStream engine is alive and handle request
+       if checkAce(): gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
 
     def __new_request(self, handlerClass, request, address, server):
-        try: handlerClass(request, address, server)
-        except SocketException: pass # fix the broken pipe errors
-        except Exception as e: logger.error(traceback.format_exc())
-        self.shutdown_request(request)
+       try: handlerClass(request, address, server)
+       except SocketException: pass # fix the broken pipe errors
+       except Exception as e: logger.error(traceback.format_exc())
+       self.shutdown_request(request)
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -94,7 +94,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
-        logging.debug('Headers: %s' % dict(self.headers))
+        logging.debug('Client headers: %s' % dict(self.headers))
         params = requests.compat.urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
 
@@ -332,18 +332,18 @@ def StreamReader(url, cid):
 
 def StreamWriter(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-       clients = AceStuff.clientcounter.getClientsList(cid)
-       # send current chunk to all expecting clients and wait until they all read it
-       if clients: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
-       else: return
+        clients = AceStuff.clientcounter.getClientsList(cid)
+        if not clients: return
+        # send current chunk to all expecting clients and wait until they all read it
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
 
 def write_chunk(client, chunk, timeout=5.0):
     with gevent.Timeout(timeout, False) as timer:
-       try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-       except gevent.timeout.Timeout: # Client did not read the data from socket for N sec - disconnect it
-          logging.info('Client %s does not read data until %s' % (client.clientip, timer))
-          client.disconnectGreenlet.kill()
-       except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
+            logging.info('Client %s does not read data until %s' % (client.clientip, timer))
+            client.disconnectGreenlet.kill()
+        except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

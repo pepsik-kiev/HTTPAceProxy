@@ -68,14 +68,16 @@ class AceClient(object):
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        else: gevent.spawn(self._recvData, 60.0)
+        else: gevent.spawn(self._recvData, 60)
 
     def destroy(self):
         '''
         AceClient Destructor
         '''
         # Send SHUTDOWN to AceEngine
-        try: self._write(AceMessage.request.SHUTDOWN)
+        try:
+           self._write(AceMessage.request.SHUTDOWN)
+           self._clientcounter.idleAce = None
         except: pass # Ignore exceptions on destroy
 
     def reset(self):
@@ -132,7 +134,7 @@ class AceClient(object):
         paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
         self._url = AsyncResult()
         self._write(AceMessage.request.START(command.upper(), paramsdict))
-         # Get url for play from AceEngine and rewriting host:port for use with 'remote' AceEngine
+        # Get url for play from AceEngine and rewriting host:port for use with 'remote' AceEngine
         try: return requests.compat.urlparse(self._url.get(timeout=self._videotimeout))._replace(netloc='%s:%s' % (self._ace['aceHostIP'], self._ace['aceHTTPport'])).geturl()
         except gevent.Timeout:
             errmsg = 'Engine response time %ssec exceeded. START URL not resived!' % self._videotimeout
@@ -186,25 +188,23 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def _recvData(self,timeout=None):
+    def _recvData(self,timeout=30):
         '''
         Data receiver method for greenlet
         '''
         while self._socket:
-           with gevent.Timeout(self._resulttimeout if not timeout else timeout, False) as timer:
-               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
-               except EOFError as err:
-                  logging.error('AceException:%s' % repr(err))
-                  self._socket.close(); self._socket = None
-                  return
-               # Ignore error occurs while reading blank lines from socket in STATE 0 (IDLE)
-               except gevent.socket.timeout: pass
-               # SHUTDOWN socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
-               except gevent.timeout.Timeout: self.destroy(); self._clientcounter.idleAce = None; return
+           gevent.sleep()
+           try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
+           except EOFError as err:
+                logging.error('AceException:%s' % repr(err))
+                self._socket.close(); self._socket = None
+                return
            # Parsing everything only if the string is not empty
            logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+           # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
+           if not self._recvbuffer: self.destroy()
            # HELLOTS
-           if self._recvbuffer.startswith('HELLOTS'):
+           elif self._recvbuffer.startswith('HELLOTS'):
                # version=engine_version version_code=version_code key=request_key http_port=http_port
                self._auth.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
            # NOTREADY

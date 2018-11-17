@@ -102,8 +102,8 @@ class Torrenttv(AceProxyPlugin):
             if not path.endswith('.ts'):
                 connection.dieWithError(404, 'Invalid path: %s' % requests.compat.unquote(path), logging.ERROR)
                 return
-            try: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3]).decode('utf-8')
-            except AttributeError: name = requests.compat.unquote(path.rsplit('/', 1)[1][:-3])
+            name = path.rsplit('/', 1)[1][:-3]
+            name = requests.compat.unquote(name) if requests.compat.is_py3 else requests.compat.unquote(name).decode('utf-8')
             url = self.channels.get(name, None)
             if url is None:
                 connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
