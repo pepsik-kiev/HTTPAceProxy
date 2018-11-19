@@ -62,9 +62,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
     default_request_version = 'HTTP/1.1'
 
-    rbufsize = -1
-    wbufsize = -1
-
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
     def log_request(self, code='-', size='-'): pass
@@ -86,8 +83,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        # Current greenlet
-        self.requestGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -178,7 +173,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.transcoder = None
         self.out = self.wfile
         try:
-            self.disconnectGreenlet = gevent.spawn(self.disconnectDetector) # client disconnection watchdog
+            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
             # If &fmt transcode key present in request
             fmt = self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
@@ -217,11 +212,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 gevent.spawn(StreamReader, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
                 self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
 
-            self.disconnectGreenlet.join() # Wait until request complite or client disconnected
+            self.connectGreenlet.join() # Wait until request complite or client disconnected
 
         except aceclient.AceException as e:
             gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(CID)])
-            gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
+            gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
 
         except gevent.GreenletExit: pass # Client disconnected
 
@@ -233,10 +228,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
             return
 
-    def disconnectDetector(self):
+    def connectDetector(self):
         try: self.rfile.read()
         except: pass
-        finally: self.requestGreenlet.kill()
 
 class AceStuff(object):
     '''
@@ -325,20 +319,20 @@ def StreamReader(url, cid):
                  StreamWriter(stream, cid)
     except Exception as err: # requests errors
             gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(cid)])
-            gevent.joinall([gevent.spawn(client.disconnectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
+            gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
 
 def StreamWriter(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
         clients = AceStuff.clientcounter.getClientsList(cid)
         if not clients: return
         # send current chunk to all expecting clients and wait until they all read it
-        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
 
 def write_chunk(client, chunk, timeout=5.0):
     try: gevent.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
     except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
-        logging.warning('Client %s does not read data until %ssec' % (client.clientip, timeout))
-        client.disconnectGreenlet.kill()
+         logging.warning('Client %s does not read data until %ssec' % (client.clientip, timeout))
+         client.connectGreenlet.kill()
     except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
 
 def checkFirewall(clientip):
