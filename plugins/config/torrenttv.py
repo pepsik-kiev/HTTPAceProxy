@@ -12,7 +12,7 @@ proxies = None
 url=''
 
 # TV Guide URL
-tvgurl = 'http://1ttvapi.top/ttv.xmltv.xml.gz'
+tvgurl = 'https://goo.gl/Fymx45'
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 

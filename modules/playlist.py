@@ -11,12 +11,18 @@ class PlaylistConfig():
     # Channel names mapping. You may use this to rename channels.
     m3uchannelnames = dict()
     # Examples:
-    m3uchannelnames['A1'] = 'Amedia 1'
-    m3uchannelnames['A2'] = 'Amedia 2'
+    m3uchannelnames['Amedia 1'] = 'A1'
+    m3uchannelnames['Amedia 2'] = 'A2'
     m3uchannelnames['Da Vinci'] = 'Da Vinci Learning'
+    m3uchannelnames['SET'] = 'Sony channel'
+    m3uchannelnames['SET HD'] = 'Sony channel HD'
+    m3uchannelnames['History 2 HD'] = 'H2 HD'
     m3uchannelnames['5 канал'] = 'Пятый канал'
-    m3uchannelnames['TV XXI'] = 'TV XXI (TV21)'
+    m3uchannelnames['TV XXI (TV21)'] = 'TV XXI'
+    m3uchannelnames['TV1000 Action East'] = 'TV 1000 Action'
+    m3uchannelnames['TV 1000 Action East'] = 'TV 1000 Action'
     m3uchannelnames['TV1000 Русское кино'] = 'TV 1000 Русское кино'
+    m3uchannelnames['Enter Film'] = 'Enter-фильм'
     m3uchannelnames['Travel+Adventure'] = 'Travel + Adventure'
     m3uchannelnames['Первый'] = 'Первый канал'
     m3uchannelnames['ТВ3'] = 'ТВ 3'

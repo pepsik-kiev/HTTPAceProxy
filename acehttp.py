@@ -62,16 +62,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
     default_request_version = 'HTTP/1.1'
 
+    rbufsize = -1
+    wbufsize = -1
+
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', requests.compat.unquote(self.requestline).decode('utf8'), str(code), str(size))
-
-    def finish(self):
-       # Ensure any buffered output has been transmitted and close the stream
-       if not self.wfile.closed: self.wfile.flush()
-       self.wfile.close()
-       self.rfile.close()
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -338,12 +335,11 @@ def StreamWriter(stream, cid):
         gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.requestGreenlet])
 
 def write_chunk(client, chunk, timeout=5.0):
-    with gevent.Timeout(timeout, False) as timer:
-        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
-            logging.info('Client %s does not read data until %s' % (client.clientip, timer))
-            client.disconnectGreenlet.kill()
-        except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+    try: gevent.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+    except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
+        logging.warning('Client %s does not read data until %ssec' % (client.clientip, timeout))
+        client.disconnectGreenlet.kill()
+    except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

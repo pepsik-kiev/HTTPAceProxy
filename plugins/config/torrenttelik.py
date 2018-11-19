@@ -11,7 +11,7 @@ proxies = None
 url = ''
 
 # EPG urls & EPG timeshift
-tvgurl = 'http://www.teleguide.info/download/new3/jtv.zip'
+tvgurl = 'https://goo.gl/Fymx45'
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 
