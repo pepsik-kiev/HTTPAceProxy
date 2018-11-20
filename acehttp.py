@@ -61,7 +61,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
     default_request_version = 'HTTP/1.1'
-    wbufsize = -1
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -84,6 +83,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
+        # Get current greenlet
+        self.handleGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -232,6 +233,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def connectDetector(self):
         try: self.rfile.read()
         except: pass
+        finally: self.handleGreenlet.kill()
 
 class AceStuff(object):
     '''
