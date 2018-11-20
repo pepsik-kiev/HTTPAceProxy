@@ -137,8 +137,9 @@ class AceClient(object):
         # Get url for play from AceEngine and rewriting host:port for use with 'remote' AceEngine
         try: return requests.compat.urlparse(self._url.get(timeout=self._videotimeout))._replace(netloc='%s:%s' % (self._ace['aceHostIP'], self._ace['aceHTTPport'])).geturl()
         except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. START URL not resived!' % self._videotimeout
+            errmsg = 'START URL not resived! Engine response time %ssec exceeded' % self._videotimeout
             raise AceException(errmsg)
+        except: pass # URL get process interrupted by client
 
     def STOP(self):
         '''

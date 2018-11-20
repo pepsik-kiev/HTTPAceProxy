@@ -83,8 +83,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        # Get current greenlet
-        self.handleGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -175,7 +173,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.transcoder = None
         self.out = self.wfile
         try:
-            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
+            self.connectGreenlet = gevent.spawn(self.connectDetector, CID) # client disconnection watchdog
             # If &fmt transcode key present in request
             fmt = self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
@@ -220,20 +218,17 @@ class HTTPHandler(BaseHTTPRequestHandler):
             gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(CID)])
             gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
 
-        except gevent.GreenletExit: pass # Client disconnected
+        except gevent.GreenletExit: pass  # Client disconnected
 
-        finally:
-            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
-            if self.transcoder:
-               self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
-            if AceStuff.clientcounter.deleteClient(CID, self) == 0:
-               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-            return
-
-    def connectDetector(self):
+    def connectDetector(self, cid):
         try: self.rfile.read()
         except: pass
-        finally: self.handleGreenlet.kill()
+        finally:
+             logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+             if self.transcoder:
+                self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+             if AceStuff.clientcounter.deleteClient(cid, self) == 0:
+                logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 
 class AceStuff(object):
     '''
