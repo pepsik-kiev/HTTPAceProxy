@@ -195,6 +195,7 @@ class AceClient(object):
         while self._socket:
            gevent.sleep()
            try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
+           except gevent.socket.timeout: pass
            except EOFError as err:
                 logging.error('AceException:%s' % repr(err))
                 self._socket.close(); self._socket = None

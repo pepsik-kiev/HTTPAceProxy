@@ -38,6 +38,14 @@ class PlaylistConfig():
     m3uchannelnames['Иллюзион +'] = 'Иллюзион+'
     m3uchannelnames['РТВ - Любимое кино'] = 'Наше Любимое Кино'
     m3uchannelnames['ТВ Центр'] = 'ТВЦ'
+    m3uchannelnames['UA:Крим'] = 'UA Крим'
+    m3uchannelnames['UA:Перший'] = 'UA Перший'
+    m3uchannelnames['UA:Культура'] = 'UA Культура'
+    m3uchannelnames['UA:TV'] = 'UA TV'
+    m3uchannelnames['UA:Житомир'] = 'UA Житомир'
+    m3uchannelnames['VH1'] = 'VH1 European'
+    m3uchannelnames['1 HD'] = '1HD Music Television'
+    m3uchannelnames['1Music (Hungary)'] = '1 Music Channel (Hungary)'
 
     # Similar to m3uchannelnames but for groups
     m3ugroupnames = dict()
