@@ -196,8 +196,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
             proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Transfer-Encoding': 'chunked',
-                              'Content-Type': 'application/octet-stream', 'Pragma': 'no-cache', 'Expires': '-1',
-                              'Cache-Control': 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0' }
+                              'Content-Type': 'application/octet-stream' }
 
             if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
