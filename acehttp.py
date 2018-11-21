@@ -324,7 +324,7 @@ def StreamWriter(stream, cid):
         clients = AceStuff.clientcounter.getClientsList(cid)
         if not clients: return
         # send current chunk to all expecting clients and wait until they all read it
-        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk, AceConfig.videotimeout) for client in clients if chunk])
 
 def write_chunk(client, chunk, timeout=5.0):
     try: gevent.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
