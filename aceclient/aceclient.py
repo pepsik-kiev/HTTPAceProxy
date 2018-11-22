@@ -108,8 +108,8 @@ class AceClient(object):
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try: params = self._auth.get(timeout=self._resulttimeout)
-        except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. HELLOTS not resived!' % self._resulttimeout
+        except gevent.Timeout as t:
+            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
             raise AceException(errmsg)
 
         self._auth = AsyncResult()
@@ -119,8 +119,8 @@ class AceClient(object):
                errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
                raise AceException(errmsg)
                return
-        except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. AUTH not resived!' % self._resulttimeout
+        except gevent.Timeout as t:
+            errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
             raise AceException(errmsg)
 
         if int(params.get('version_code', 0)) >= 3003600: # Display download_stopped massage
@@ -129,17 +129,15 @@ class AceClient(object):
 
     def START(self, command, paramsdict, acestreamtype):
         '''
-        Start video method
+        Start video method. Get url for play from AceEngine
         '''
         paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
         self._url = AsyncResult()
         self._write(AceMessage.request.START(command.upper(), paramsdict))
-        # Get url for play from AceEngine and rewriting host:port for use with 'remote' AceEngine
-        try: return requests.compat.urlparse(self._url.get(timeout=self._videotimeout))._replace(netloc='%s:%s' % (self._ace['aceHostIP'], self._ace['aceHTTPport'])).geturl()
-        except gevent.Timeout:
-            errmsg = 'START URL not resived! Engine response time %ssec exceeded' % self._videotimeout
+        try: return self._url.get(timeout=self._videotimeout)
+        except gevent.Timeout as t:
+            errmsg = 'START URL not resived! Engine response time %s exceeded' % t
             raise AceException(errmsg)
-        except: pass # URL get process interrupted by client
 
     def STOP(self):
         '''
@@ -148,16 +146,16 @@ class AceClient(object):
         self._state = AsyncResult()
         self._write(AceMessage.request.STOP)
         try: self._state.get(timeout=self._resulttimeout)
-        except gevent.Timeout:
-            errmsg = 'Engine response time %ssec exceeded. STATE 0 (IDLE) not resived!' % self._resulttimeout
+        except gevent.Timeout as t:
+            errmsg = 'Engine response time %s exceeded. STATE 0 (IDLE) not resived!' % t
             raise AceException(errmsg)
 
     def LOADASYNC(self, command, params):
         self._loadasync = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1, 100000), params))
         try: return self._loadasync.get(timeout=self._resulttimeout) # Get _contentinfo json
-        except gevent.Timeout:
-            errmsg = 'Engine response %ssec time exceeded. LOADARESP not resived!' % self._resulttimeout
+        except gevent.Timeout as t:
+            errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
             raise AceException(errmsg)
 
     def GETCONTENTINFO(self, command, value):
@@ -171,8 +169,8 @@ class AceClient(object):
             self._cid = AsyncResult()
             self._write(AceMessage.request.GETCID(paramsdict))
             try: return self._cid.get(timeout=self._resulttimeout)[2:] # ##CID
-            except gevent.Timeout:
-                 errmsg = 'Engine response time %ssec exceeded. CID not resived!' % self._resulttimeout
+            except gevent.Timeout as t:
+                 errmsg = 'Engine response time %s exceeded. CID not resived!' % t
                  raise AceException(errmsg)
         else:
             errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
@@ -261,9 +259,9 @@ class AceClient(object):
                elif 'showurl' in self._tempevent: pass
                elif 'download_stopped' in self._tempevent: pass
            # PAUSE
-           elif self._recvbuffer.startswith('PAUSE'): self._write(AceMessage.request.EVENT('pause'))
+           elif self._recvbuffer.startswith('PAUSE'): pass #self._write(AceMessage.request.EVENT('pause'))
            # RESUME
-           elif self._recvbuffer.startswith('RESUME'): self._write(AceMessage.request.EVENT('play'))
+           elif self._recvbuffer.startswith('RESUME'): pass #self._write(AceMessage.request.EVENT('play'))
            # STOP
            elif self._recvbuffer.startswith('STOP'): pass
            # SHUTDOWN

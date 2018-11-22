@@ -15,6 +15,8 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
+#gevent.config.loop = ['libuv-cffi', 'libev-cffi', 'libev-cext']
+gevent.config.track_greenlet_tree = False
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
@@ -161,8 +163,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                AceStuff.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
             if self.reqtype not in ('direct_url', 'efile_url'):
                CID, NAME = AceStuff.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-            self.channelName = NAME if not channelName else channelName
-            self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
         except Exception as e:
             self.dieWithError(503, '%s' % repr(e), logging.ERROR)
             if AceStuff.clientcounter.idleAce:
@@ -170,6 +170,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 AceStuff.clientcounter.idleAce = None
             return
 
+        self.channelName = NAME if not channelName else channelName
+        self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
         self.transcoder = None
         self.out = self.wfile
         try:
@@ -209,7 +211,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if AceStuff.clientcounter.addClient(CID, self) == 1:
                 # If there is no existing broadcast we create it
                 gevent.spawn(StreamReader, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
-                self.ace._write(aceclient.acemessages.AceMessage.request.EVENT('play'))
 
             self.connectGreenlet.join() # Wait until request complite or client disconnected
 
@@ -218,6 +219,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
 
         except gevent.GreenletExit: pass  # Client disconnected
+        finally: return
 
     def connectDetector(self, cid):
         try: self.rfile.read()
@@ -299,6 +301,9 @@ def checkAce():
     else: return True
 
 def StreamReader(url, cid):
+    if url is None: return
+    if not AceStuff.ace: #Rewrite host:port for remote AceEngine
+       url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
     try:
         if url.endswith('.m3u8'): # AceEngine return link for HLS stream
            used_chunks = []
@@ -323,12 +328,12 @@ def StreamWriter(stream, cid):
         clients = AceStuff.clientcounter.getClientsList(cid)
         if not clients: return
         # send current chunk to all expecting clients and wait until they all read it
-        gevent.joinall([gevent.spawn(write_chunk, client, chunk, AceConfig.videotimeout) for client in clients if chunk])
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.connectDetector])
 
 def write_chunk(client, chunk, timeout=5.0):
     try: gevent.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-    except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
-         logging.warning('Client %s does not read data until %ssec' % (client.clientip, timeout))
+    except gevent.Timeout as t: # Client did not read the data from socket for N sec - disconnect it
+         logging.warning('Client %s does not read data until %s' % (client.clientip, t))
          client.connectGreenlet.kill()
     except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
 
