@@ -15,8 +15,6 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
-#gevent.config.loop = ['libuv-cffi', 'libev-cffi', 'libev-cext']
-gevent.config.track_greenlet_tree = False
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 
@@ -303,7 +301,7 @@ def checkAce():
 def StreamReader(url, cid):
     if url is None: return
     if not AceStuff.ace: #Rewrite host:port for remote AceEngine
-       url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
+        url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
     try:
         if url.endswith('.m3u8'): # AceEngine return link for HLS stream
            used_chunks = []
@@ -320,8 +318,8 @@ def StreamReader(url, cid):
               with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
                  StreamWriter(stream, cid)
     except Exception as err: # requests errors
-            gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(cid)])
-            gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
+           gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(cid)])
+           gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
 
 def StreamWriter(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
@@ -333,8 +331,8 @@ def StreamWriter(stream, cid):
 def write_chunk(client, chunk, timeout=5.0):
     try: gevent.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
     except gevent.Timeout as t: # Client did not read the data from socket for N sec - disconnect it
-         logging.warning('Client %s does not read data until %s' % (client.clientip, t))
-         client.connectGreenlet.kill()
+        logging.warning('Client %s does not read data until %s' % (client.clientip, t))
+        client.connectGreenlet.kill()
     except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
 
 def checkFirewall(clientip):
