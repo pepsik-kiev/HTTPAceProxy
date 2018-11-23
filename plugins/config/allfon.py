@@ -8,7 +8,7 @@ Allfon.tv Playlist Downloader Plugin configuration file
 proxies = None
 
 # Insert your allfon.tv playlist URL here
-url = 'https://allfon-tv.com/autogenplaylist/allfontv.m3u'
+url = 'http://allfon-tv.com/autogenplaylist/allfontv.m3u'
 
 # EPG urls & EPG timeshift
 tvgurl = 'https://goo.gl/Fymx45'
