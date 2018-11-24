@@ -37,7 +37,7 @@ class Torrenttelik(AceProxyPlugin):
     def downloadPlaylist(self, url):
         headers = {'User-Agent': 'Magic Browser'}
         try:
-            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30).json()
+            Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30)
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
         except requests.exceptions.ConnectionError:
@@ -66,7 +66,7 @@ class Torrenttelik(AceProxyPlugin):
         Torrenttelik.logger.debug('Generating requested m3u playlist')
 
         try:
-            for channel in Torrenttelik.playlist['channels']:
+            for channel in Torrenttelik.playlist.json()['channels']:
                 channel['group'] = channel.get('cat', '')
                 channel['url'] = 'acestream://%s' % channel.get('url', '')
                 playlistgen.addItem(channel)
