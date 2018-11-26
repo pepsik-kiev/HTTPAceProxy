@@ -75,10 +75,9 @@ class AceClient(object):
         AceClient Destructor
         '''
         # Send SHUTDOWN to AceEngine
-        try:
-           self._write(AceMessage.request.SHUTDOWN)
-           self._clientcounter.idleAce = None
+        try: self._write(AceMessage.request.SHUTDOWN)
         except: pass # Ignore exceptions on destroy
+        finally: self._clientcounter.idleAce = None
 
     def reset(self):
         '''
@@ -191,13 +190,13 @@ class AceClient(object):
         '''
         Data receiver method for greenlet
         '''
-        while self._socket:
+        while 1:
            try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
            except gevent.socket.timeout: pass
            except EOFError as err:
               logging.error('AceException:%s' % repr(err))
-              self._socket.close(); self._socket = None
-              return
+              self._socket.close()
+              break
            else:
               # Parsing everything only if the string is not empty
               logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
@@ -266,5 +265,5 @@ class AceClient(object):
               # STOP
               elif self._recvbuffer.startswith('STOP'): pass
               # SHUTDOWN
-              elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); return
+              elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
            finally: gevent.sleep()

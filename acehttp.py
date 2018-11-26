@@ -54,13 +54,14 @@ class HTTPServer(HTTPServer):
        try: handlerClass(request, address, server)
        except SocketException: pass # fix the broken pipe errors
        except Exception as e: logger.error(traceback.format_exc())
-       self.shutdown_request(request)
+       finally: self.shutdown_request(request)
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
     default_request_version = 'HTTP/1.1'
+    wbufsize = -1
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -83,6 +84,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
+        # Current greenlet
+        self.handleGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -100,10 +103,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
             if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceStuff.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-                return
+                self.handleGreenlet.kill()
         except IndexError:
             self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-            return
+            self.handleGreenlet.kill()
 
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
@@ -112,7 +115,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                 logging.error(traceback.format_exc())
-            finally: return
+            finally: self.handleGreenlet.kill()
         self.handleRequest(headers_only)
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
@@ -122,7 +125,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Limit on the number of clients connected to broadcasts
         if 0 < AceConfig.maxconns <= AceStuff.clientcounter.totalClients():
             self.dieWithError(503, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)  # 503 Service Unavailable
-            return
+            self.handleGreenlet.kill()
 
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
@@ -132,7 +135,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
             if not self.path.endswith(self.videoextdefaults):
                 self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-                return
+                self.handleGreenlet.kill()
         except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
@@ -143,7 +146,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'video/mp2t')
             self.send_header('Connection', 'Close')
             self.end_headers()
-            return
+            self.handleGreenlet.kill()
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
@@ -166,14 +169,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if AceStuff.clientcounter.idleAce:
                 AceStuff.clientcounter.idleAce.destroy()
                 AceStuff.clientcounter.idleAce = None
-            return
+            self.handleGreenlet.kill()
 
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
         self.transcoder = None
         self.out = self.wfile
         try:
-            self.connectGreenlet = gevent.spawn(self.connectDetector, CID) # client disconnection watchdog
+            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
             # If &fmt transcode key present in request
             fmt = self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
@@ -215,19 +218,18 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except aceclient.AceException as e:
             gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(CID)])
             gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(CID)])
-
         except gevent.GreenletExit: pass  # Client disconnected
-        finally: return
-
-    def connectDetector(self, cid):
-        try: self.rfile.read()
-        except: pass
         finally:
              logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
              if self.transcoder:
                 self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
-             if AceStuff.clientcounter.deleteClient(cid, self) == 0:
+             if AceStuff.clientcounter.deleteClient(CID, self) == 0:
                 logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+
+    def connectDetector(self):
+        try: self.rfile.read()
+        except: pass
+        finally: self.handleGreenlet.kill()
 
 class AceStuff(object):
     '''
@@ -317,6 +319,7 @@ def StreamReader(url, cid):
         else: # AceStream return link for HTTP stream
               with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
                  StreamWriter(stream, cid)
+
     except Exception as err: # requests errors
            gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceStuff.clientcounter.getClientsList(cid)])
            gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceStuff.clientcounter.getClientsList(cid)])
@@ -329,11 +332,13 @@ def StreamWriter(stream, cid):
         gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.connectDetector])
 
 def write_chunk(client, chunk, timeout=5.0):
-    try: gevent.with_timeout(timeout, client.out.write, b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-    except gevent.Timeout as t: # Client did not read the data from socket for N sec - disconnect it
-        logging.warning('Client %s does not read data until %s' % (client.clientip, t))
-        client.connectGreenlet.kill()
-    except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+    with gevent.Timeout(timeout, False) as t:
+        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
+            logging.warning('Client %s does not read data until %s' % (client.clientip, t))
+            client.connectGreenlet.kill()
+        except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+        finally: gevent.sleep()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
