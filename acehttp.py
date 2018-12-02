@@ -61,7 +61,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
     default_request_version = 'HTTP/1.1'
-    wbufsize = -1
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -103,19 +102,18 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
             if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceStuff.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-                self.handleGreenlet.kill()
+                return
         except IndexError:
             self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-            self.handleGreenlet.kill()
+            return
 
         # Handle request with plugin handler
         if self.reqtype in AceStuff.pluginshandlers:
             try: AceStuff.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-            except SocketException: pass
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                 logging.error(traceback.format_exc())
-            finally: self.handleGreenlet.kill()
+            finally: return
         self.handleRequest(headers_only)
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
@@ -125,7 +123,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Limit on the number of clients connected to broadcasts
         if 0 < AceConfig.maxconns <= AceStuff.clientcounter.totalClients():
             self.dieWithError(503, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)  # 503 Service Unavailable
-            self.handleGreenlet.kill()
+            return
 
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
@@ -135,7 +133,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
             if not self.path.endswith(self.videoextdefaults):
                 self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-                self.handleGreenlet.kill()
+                return
         except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
@@ -146,7 +144,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'video/mp2t')
             self.send_header('Connection', 'Close')
             self.end_headers()
-            self.handleGreenlet.kill()
+            return
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
@@ -166,10 +164,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
                CID, NAME = AceStuff.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
         except Exception as e:
             self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-            if AceStuff.clientcounter.idleAce:
-                AceStuff.clientcounter.idleAce.destroy()
-                AceStuff.clientcounter.idleAce = None
-            self.handleGreenlet.kill()
+            if AceStuff.clientcounter.idleAce: AceStuff.clientcounter.idleAce.destroy()
+            return
 
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
@@ -225,6 +221,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
              if AceStuff.clientcounter.deleteClient(CID, self) == 0:
                 logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+             return
 
     def connectDetector(self):
         try: self.rfile.read()
@@ -383,7 +380,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         if AceStuff.clientcounter.idleAce:
-            AceStuff.clientcounter.idleAce.destroy(); gevent.sleep(1)
+            AceStuff.clientcounter.idleAce.destroy()
         AceStuff.ace.terminate()
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try:

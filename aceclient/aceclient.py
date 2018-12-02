@@ -31,7 +31,7 @@ class AceClient(object):
         # AceEngine socket
         self._socket = None
         # AceEngine read result timeout
-        self._resulttimeout = float(result_timeout)
+        self._resulttimeout = result_timeout
         # AceEngine product key
         self._product_key = None
         # Result (Created with AsyncResult() on call)
@@ -51,8 +51,7 @@ class AceClient(object):
         # Current STATE
         self._state = AsyncResult()
         # Current AUTH
-        self._gender = None
-        self._age = None
+        self._gender = self._age = None
         # Seekback seconds.
         self._seekback = None
         # Did we get START command again? For seekback.
@@ -61,14 +60,13 @@ class AceClient(object):
         self._clientcounter = clientcounter
         # AceConfig.ace
         self._ace = ace
+
         try:
            self._socket = Telnet(self._ace['aceHostIP'], self._ace['aceAPIport'], connect_timeout)
            logging.debug('Successfully connected to AceStream on %s:%s' % (self._ace['aceHostIP'], self._ace['aceAPIport']))
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        else: gevent.spawn(self._recvData, 60)
 
     def destroy(self):
         '''
@@ -77,7 +75,9 @@ class AceClient(object):
         # Send SHUTDOWN to AceEngine
         try: self._write(AceMessage.request.SHUTDOWN)
         except: pass # Ignore exceptions on destroy
-        finally: self._clientcounter.idleAce = None
+        finally:
+             self._clientcounter.idleAce = None
+             if self._socket: self._recvData.kill()
 
     def reset(self):
         '''
@@ -101,8 +101,10 @@ class AceClient(object):
         self._age = age
         self._product_key = product_key
         self._seekback = videoseekback
-        self._videotimeout = float(videotimeout)
+        self._videotimeout = videotimeout
         self._started_again.clear()
+        # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
+        self._recvData = gevent.spawn(self._recvData, self._videotimeout)
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -117,7 +119,6 @@ class AceClient(object):
             if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
                errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
                raise AceException(errmsg)
-               return
         except gevent.Timeout as t:
             errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
             raise AceException(errmsg)
@@ -194,9 +195,7 @@ class AceClient(object):
            try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
            except gevent.socket.timeout: pass
            except EOFError as err:
-              logging.error('AceException:%s' % repr(err))
-              self._socket.close()
-              break
+              logging.error('AceException:%s' % repr(err)); self.destroy()
            else:
               # Parsing everything only if the string is not empty
               logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
@@ -225,8 +224,7 @@ class AceClient(object):
               elif self._recvbuffer.startswith('LOADRESP'):
                   self._loadasync.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
               # STATE
-              elif self._recvbuffer.startswith('STATE'): # tuple of (state_id, time of appearance)
-                  self._state.set((self._recvbuffer.split()[1], gevent.time.time()))
+              elif self._recvbuffer.startswith('STATE'): self._state.set(self._recvbuffer.split()[1]) # STATE state_id
               # STATUS
               elif self._recvbuffer.startswith('STATUS'):
                   self._tempstatus = self._recvbuffer.split()[1]
@@ -241,8 +239,8 @@ class AceClient(object):
                   elif self._tempstatus.startswith('main:dl'): pass
                      #values = list(map(int, self._tempstatus.split(';')[1:]))
                      #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
-                  elif self._tempstatus.startswith('main:err'): # err;error_id;error_message
-                     self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
+                  elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
+                     #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
               # CID
               elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
               # INFO
@@ -263,7 +261,6 @@ class AceClient(object):
               # RESUME
               elif self._recvbuffer.startswith('RESUME'): pass #self._write(AceMessage.request.EVENT('play'))
               # STOP
-              elif self._recvbuffer.startswith('STOP'): pass
+              elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
               # SHUTDOWN
-              elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
-           finally: gevent.sleep()
+              elif self._recvbuffer.startswith('SHUTDOWN'): self.destroy()

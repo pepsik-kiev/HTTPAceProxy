@@ -31,11 +31,12 @@ class ClientCounter(object):
         '''
         Adds client to the dictionary list by CID key and return their number
         '''
-        clients = self.getClientsList(cid)
-        if clients: client.ace = clients[0].ace; self.idleAce.destroy()
-        else: client.ace = self.idleAce
+        try:
+            client.ace = self.getClientsList(cid)[0].ace
+            self.idleAce.destroy()
+        except: client.ace = self.idleAce
+        finally: self.idleAce = None
         self.streams.setdefault(cid, []).append(client)
-        self.idleAce = None
         return self.getClientsQuantity(cid)
 
     def deleteClient(self, cid, client):
