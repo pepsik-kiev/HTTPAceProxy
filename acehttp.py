@@ -326,16 +326,19 @@ def StreamWriter(stream, cid):
         clients = AceStuff.clientcounter.getClientsList(cid)
         if not clients: return
         # send current chunk to all expecting clients and wait until they all read it
-        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.connectDetector])
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
 
 def write_chunk(client, chunk, timeout=5.0):
-    with gevent.Timeout(timeout, False) as t:
-        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
-            logging.warning('Client %s does not read data until %s' % (client.clientip, t))
-            client.connectGreenlet.kill()
-        except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
-        finally: gevent.sleep()
+    timer = gevent.Timeout(timeout)
+    timer.start()
+    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+    except gevent.Timeout as t: # Client did not read the data from socket for N sec - disconnect it
+       if t is timer:
+           logging.warning('Client %s does not read data until %s' % (client.clientip, t))
+           client.connectGreenlet.kill()
+       else: logging.error('Unexpected timeout error writing to socket!')
+    except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+    finally: timer.close()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
