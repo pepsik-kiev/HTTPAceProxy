@@ -77,7 +77,8 @@ class AceClient(object):
         except: pass # Ignore exceptions on destroy
         finally:
              self._clientcounter.idleAce = None
-             if self._socket: self._recvData.kill()
+             if self._socket:
+                self._socket.close(); self._socket = None
 
     def reset(self):
         '''
@@ -104,7 +105,7 @@ class AceClient(object):
         self._videotimeout = videotimeout
         self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        self._recvData = gevent.spawn(self._recvData, self._videotimeout)
+        gevent.spawn(self._recvData, self._videotimeout)
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -191,7 +192,7 @@ class AceClient(object):
         '''
         Data receiver method for greenlet
         '''
-        while 1:
+        while self._socket:
            try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
            except gevent.socket.timeout: pass
            except EOFError as err:
