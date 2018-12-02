@@ -75,10 +75,7 @@ class AceClient(object):
         # Send SHUTDOWN to AceEngine
         try: self._write(AceMessage.request.SHUTDOWN)
         except: pass # Ignore exceptions on destroy
-        finally:
-             self._clientcounter.idleAce = None
-             if self._socket:
-                self._socket.close(); self._socket = None
+        finally: self._clientcounter.idleAce = None
 
     def reset(self):
         '''
@@ -94,7 +91,6 @@ class AceClient(object):
             self._socket.write('%s\r\n' % message)
             logging.debug('>>> %s' % message)
         except gevent.socket.error:
-            self._socket.close(); self._socket = None
             raise AceException('Error writing data to AceEngine API port')
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
@@ -188,15 +184,16 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def _recvData(self,timeout=30):
+    def _recvData(self, timeout=30):
         '''
         Data receiver method for greenlet
         '''
-        while self._socket:
+        while 1:
            try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
            except gevent.socket.timeout: pass
-           except EOFError as err:
-              logging.error('AceException:%s' % repr(err)); self.destroy()
+           except Exception as err:
+              logging.error('AceException:%s' % repr(err))
+              break
            else:
               # Parsing everything only if the string is not empty
               logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
@@ -264,4 +261,4 @@ class AceClient(object):
               # STOP
               elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
               # SHUTDOWN
-              elif self._recvbuffer.startswith('SHUTDOWN'): self.destroy()
+              elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break

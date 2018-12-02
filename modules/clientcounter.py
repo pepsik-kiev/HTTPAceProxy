@@ -35,8 +35,10 @@ class ClientCounter(object):
             client.ace = self.getClientsList(cid)[0].ace
             self.idleAce.destroy()
         except: client.ace = self.idleAce
-        finally: self.idleAce = None
-        self.streams.setdefault(cid, []).append(client)
+        finally:
+            self.streams.setdefault(cid, []).append(client)
+            self.idleAce = None
+
         return self.getClientsQuantity(cid)
 
     def deleteClient(self, cid, client):

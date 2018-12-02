@@ -380,7 +380,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceStuff.ace):
         if AceStuff.clientcounter.idleAce:
-            AceStuff.clientcounter.idleAce.destroy()
+            AceStuff.clientcounter.idleAce.destroy(); gevent.sleep(1)
         AceStuff.ace.terminate()
         if AceConfig.osplatform == 'Windows' and os.path.isfile(AceStuff.acedir + '\\acestream.port'):
             try:
