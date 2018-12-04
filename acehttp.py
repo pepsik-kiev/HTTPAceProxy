@@ -17,6 +17,8 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
+from gevent.server import StreamServer
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -27,36 +29,34 @@ for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys
 import logging, traceback
 import psutil
 import requests
-try: from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-except: from http.server import HTTPServer, BaseHTTPRequestHandler
+try: from BaseHTTPServer import BaseHTTPRequestHandler
+except: from http.server import BaseHTTPRequestHandler
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
-from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
-
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
 from clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
 
-class HTTPServer(HTTPServer):
+class DummyHTTPServer(StreamServer):
 
-    def process_request(self, request, client_address):
-       # If firewall enabled
-       if AceConfig.firewall and not checkFirewall(client_address[0]):
-          logger.error('Dropping connection from {} due to firewall rules'.format(client_address[0]))
-          return
-       # Check AceStream engine is alive and handle request
-       if checkAce(): gevent.spawn(self.__new_request, self.RequestHandlerClass, request, client_address, self)
+    def handle(self, sock, addr):
 
-    def __new_request(self, handlerClass, request, address, server):
-       try: handlerClass(request, address, server)
-       except SocketException: pass # fix the broken pipe errors
-       except Exception as e: logger.error(traceback.format_exc())
-       finally: self.shutdown_request(request)
+        if AceConfig.firewall and not checkFirewall(addr[0]):
+           logger.error('Dropping connection from {} due to firewall rules'.format(addr[0]))
+           return
 
-class HTTPHandler(BaseHTTPRequestHandler):
+        if checkAce():
+           handler = DummyHTTPHandler(sock, addr, self)
+           try:
+               handler.setup()
+               handler.handle()
+           finally:
+               handler.finish()
+
+class DummyHTTPHandler(BaseHTTPRequestHandler):
 
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
@@ -329,16 +329,13 @@ def StreamWriter(stream, cid):
         gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
 
 def write_chunk(client, chunk, timeout=5.0):
-    timer = gevent.Timeout(timeout)
-    timer.start()
-    try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
-    except gevent.Timeout as t: # Client did not read the data from socket for N sec - disconnect it
-       if t is timer:
+    with gevent.Timeout(timeout, None) as t:
+        try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
+        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
            logging.warning('Client %s does not read data until %s' % (client.clientip, t))
            client.connectGreenlet.kill()
-       else: logging.error('Unexpected timeout error writing to socket!')
-    except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
-    finally: timer.close()
+        except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
+        finally: gevent.sleep()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
@@ -396,7 +393,8 @@ def clean_proc():
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     clean_proc()
-    server.server_close()
+#    server.server_close()
+    server.stop()
     logger.info('Bye Bye .....')
     sys.exit()
 
@@ -433,15 +431,6 @@ def check_compatibility(gevent_version, psutil_version):
     assert minor >= 3
     assert patch >= 0
 
-def downspeed():
-    '''
-    https://github.com/bertrandmartel/speed-test-lib/blob/master/server_list.md
-    '''
-    start = gevent.time.time()
-    file = requests.get('http://speedtest.ftp.otenet.gr/files/test1Mb.db', stream=False)
-    file_size = int(file.headers['Content-Length'])/10000
-    return round(file_size / (gevent.time.time() - start))
-
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
 ### Initial settings for devnull
@@ -460,9 +449,6 @@ except (AssertionError, ValueError):
 if AceConfig.httphost == 'auto':
     AceConfig.httphost = get_ip_address()
     logger.debug('Ace Stream HTTP Proxy server IP: %s autodetected' % AceConfig.httphost)
-
-### Detect download speed
-logger.debug('Determined download speed: %s Mbit/s' % downspeed())
 
 # Check whether we can bind to the defined port safely
 if AceConfig.osplatform != 'Windows' and os.getuid() != 0 and AceConfig.httpport <= 1024:
@@ -531,8 +517,8 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-HTTPServer.allow_reuse_address = True
-server = HTTPServer((AceConfig.httphost, AceConfig.httpport), HTTPHandler)
+pool = gevent.pool.Pool(100)
+server = DummyHTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=pool)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()
