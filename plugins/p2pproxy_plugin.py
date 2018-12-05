@@ -151,10 +151,10 @@ class P2pproxy(AceProxyPlugin):
                                     'Content-Type': 'text/xml;charset=utf-8', 'Content-Length': len(translations_list) }
                 try:
                      h = connection.headers.get('Accept-Encoding').split(',')[0]
-                     translation_list = P2pproxy.compress_method[h].compress(translation_list) + P2pproxy.compress_method[h].flush()
+                     translations_list = P2pproxy.compress_method[h].compress(translations_list) + P2pproxy.compress_method[h].flush()
                      connection.send_header('Content-Encoding', h)
                 except: pass
-                response_headers['Content-Length'] = len(translation_list)
+                response_headers['Content-Length'] = len(translations_list)
                 connection.send_response(200)
                 for k,v in list(response_headers.items()): connection.send_header(k,v)
                 connection.end_headers()
@@ -174,7 +174,7 @@ class P2pproxy(AceProxyPlugin):
             translations_list = TorrentTvApi(config.email, config.password).translations('all', True)
             try:
                 h = connection.headers.get('Accept-Encoding').split(',')[0]
-                translation_list = P2pproxy.compress_method[h].compress(translation_ist) + P2pproxy.compress_method[h].flush()
+                translations_list = P2pproxy.compress_method[h].compress(translations_list) + P2pproxy.compress_method[h].flush()
                 connection.send_header('Content-Encoding', h)
             except: pass
             connection.send_header('Content-Length', len(translations_list))
