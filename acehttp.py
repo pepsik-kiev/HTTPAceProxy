@@ -28,8 +28,7 @@ sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
 import logging, traceback
-import psutil
-import requests
+import psutil, requests
 try: from BaseHTTPServer import BaseHTTPRequestHandler
 except: from http.server import BaseHTTPRequestHandler
 try: from urlparse import parse_qs
@@ -85,7 +84,7 @@ class DummyHTTPHandler(BaseHTTPRequestHandler):
         GET request handler
         '''
         # Current greenlet
-        self.handleGreenlet = gevent.getcurrent()
+        self.handlerGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -227,7 +226,7 @@ class DummyHTTPHandler(BaseHTTPRequestHandler):
     def connectDetector(self):
         try: self.rfile.read()
         except: pass
-        finally: self.handleGreenlet.kill()
+        finally: self.handlerGreenlet.kill()
 
 class AceStuff(object):
     '''
@@ -394,7 +393,6 @@ def clean_proc():
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
     clean_proc()
-#    server.server_close()
     server.stop()
     logger.info('Bye Bye .....')
     sys.exit()
@@ -518,8 +516,8 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-pool = Pool(100) # do not accept more than 100 connections
-server = DummyHTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=pool)
+server = DummyHTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=Pool(100))  # do not accept more than 100 connections 'limit concurrency'
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
+# we use blocking serve_forever() here because we have no other jobs
 try: server.serve_forever()
 except (KeyboardInterrupt, SystemExit): shutdown()

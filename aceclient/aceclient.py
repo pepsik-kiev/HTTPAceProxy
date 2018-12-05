@@ -67,8 +67,6 @@ class AceClient(object):
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        else: # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-           gevent.spawn(self._recvData, 60)
 
     def destroy(self):
         '''
@@ -102,6 +100,8 @@ class AceClient(object):
         self._seekback = videoseekback
         self._videotimeout = videotimeout
         self._started_again.clear()
+        # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
+        gevent.spawn(self._recvData, self._videotimeout)
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -262,3 +262,4 @@ class AceClient(object):
               elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
               # SHUTDOWN
               elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
+           finally: gevent.sleep()
