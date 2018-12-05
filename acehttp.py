@@ -53,6 +53,7 @@ class DummyHTTPServer(StreamServer):
            try:
                handler.setup()
                handler.handle()
+           except: pass
            finally:
                handler.finish()
 

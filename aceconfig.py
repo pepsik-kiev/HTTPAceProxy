@@ -58,7 +58,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     #
     # HTTP Server host.
     # 'auto' - autodetect
-    # '' or '0.0.0.0' - listen on all addresses
+    # '0.0.0.0' - listen on all addresses
     # Or change to whatever IP you want to listen on this IP only
     httphost = 'auto'
     # HTTP Server port (8081 is recommended when using the plugin p2pproxy with TTV widget on SmartTV)
