@@ -18,6 +18,7 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
+from gevent.pool import Pool
 from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 
 import os, sys, glob
@@ -517,7 +518,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceStuff.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-pool = gevent.pool.Pool(100)
+pool = Pool(100) # do not accept more than 100 connections
 server = DummyHTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=pool)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 try: server.serve_forever()
