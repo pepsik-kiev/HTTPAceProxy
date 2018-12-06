@@ -86,10 +86,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
             if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceProxy.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-                return
+                self.handlerGreenlet.kill()
         except IndexError:
             self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-            return
+            self.handlerGreenlet.kill()
 
         # Handle request with plugin handler
         if self.reqtype in AceProxy.pluginshandlers:
@@ -97,7 +97,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                 logging.error(traceback.format_exc())
-            finally: return
+            finally: self.handlerGreenlet.kill()
         self.handleRequest(headers_only)
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
@@ -112,8 +112,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
             if not self.path.endswith(self.videoextdefaults):
                 self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-                return
-        except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
+                self.handlerGreenlet.kill()
+        except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); self.handlerGreenlet.kill()  # 400 Bad Request
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
             # Return 200 and exit
@@ -123,7 +123,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'video/mp2t')
             self.send_header('Connection', 'Close')
             self.end_headers()
-            return
+            self.handlerGreenlet.kill()
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
@@ -144,7 +144,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.dieWithError(503, '%s' % repr(e), logging.ERROR)
             if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.destroy()
-            return
+            self.handlerGreenlet.kill()
 
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
@@ -200,12 +200,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
                 self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
              if AceProxy.clientcounter.deleteClient(CID, self) == 0:
                 logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-             return
+             self.handlerGreenlet.kill()
 
     def connectDetector(self):
         try: self.rfile.read()
         except: pass
-        finally: self.handlerGreenlet.kill()
+        finally: gevent.sleep()
 
 class AceProxy(object):
     '''
@@ -305,16 +305,15 @@ def StreamWriter(stream, cid):
         clients = AceProxy.clientcounter.getClientsList(cid)
         if not clients: return
         # send current chunk to all expecting clients and wait until they all read it
-        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.connectDetector])
 
 def write_chunk(client, chunk, timeout=5.0):
     with gevent.Timeout(timeout, None) as t:
         try: client.out.write(b'%X\r\n%s\r\n' % (len(chunk), chunk) if client.transcoder is None else chunk)
         except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
-           logging.warning('Client %s does not read data until %s' % (client.clientip, t))
-           client.connectGreenlet.kill()
+            logging.warning('Client %s does not read data until %s' % (client.clientip, t))
+            client.connectGreenlet.kill()
         except (SocketException, AttributeError): pass # The client unexpectedly disconnected while writing data to socket
-        finally: gevent.sleep()
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
@@ -368,19 +367,17 @@ def clean_proc():
                    if proc.name() == 'ace_engine.exe': proc.kill()
             except: pass
 
-def connection_handler(sock, address):
-
+def connection_handler(socket, address):
     if AceConfig.firewall and not checkFirewall(address[0]):
         logger.error('Dropping connection from {} due to firewall rules'.format(address[0]))
         return
-
     # Limit on the number of connected clients
     if 0 < AceConfig.maxconns <= AceProxy.clientcounter.totalClients():
         logger.error("Maximum client connections reached, can't serve request from {}".format(address[0]))
         return
-
+    # Check if AceEngine is alive and handle request
     if checkAce():
-        handler = HTTPHandler(sock, address, server)
+        handler = HTTPHandler(socket, address, server)
         try:
            handler.setup()
            handler.handle()
