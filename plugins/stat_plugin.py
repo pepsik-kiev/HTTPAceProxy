@@ -21,9 +21,9 @@ class Stat(AceProxyPlugin):
     handlers = ('stat',)
     logger = logging.getLogger('STAT')
 
-    def __init__(self, AceConfig, AceStuff):
+    def __init__(self, AceConfig, AceProxy):
         self.config = AceConfig
-        self.stuff = AceStuff
+        self.stuff = AceProxy
         self.params = None
 
     def geo_ip_lookup(self, ip_address):

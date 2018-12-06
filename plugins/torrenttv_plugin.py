@@ -25,7 +25,7 @@ class Torrenttv(AceProxyPlugin):
     # ttvplaylist handler is obsolete
     handlers = ('torrenttv', 'ttvplaylist',)
 
-    def __init__(self, AceConfig, AceStuff):
+    def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('torrenttv_plugin')
         self.channels = self.playlist = self.playlisttime = self.etag = self.tvgid = None
         self.logomap = config.logomap

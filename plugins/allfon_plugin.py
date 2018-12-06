@@ -25,7 +25,7 @@ class Allfon(AceProxyPlugin):
     playlist = None
     playlisttime = None
 
-    def __init__(self, AceConfig, AceStuff): pass
+    def __init__(self, AceConfig, AceProxy): pass
 
     def downloadPlaylist(self):
         headers = {'User-Agent': 'Magic Browser'}

@@ -38,7 +38,7 @@ class P2pproxy(AceProxyPlugin):
                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
                         'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
 
-    def __init__(self, AceConfig, AceStuff): pass
+    def __init__(self, AceConfig, AceProxy): pass
 
     def handle(self, connection, headers_only=False):
         P2pproxy.logger.debug('Handling request')

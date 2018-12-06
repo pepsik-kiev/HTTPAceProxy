@@ -22,7 +22,7 @@ class Torrentfilms(AceProxyPlugin):
 
     handlers = ('films', 'proxyfilms')
 
-    def __init__(self, AceConfig, AceStuff):
+    def __init__(self, AceConfig, AceProxy):
         self.config = AceConfig
         self.logger = logging.getLogger('plugin_TorrentFilms')
         self.playlist = []
