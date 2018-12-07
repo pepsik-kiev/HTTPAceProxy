@@ -18,7 +18,7 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
-from gevent.pool import Pool
+#from gevent.pool import Pool
 from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 
 import os, sys, glob
@@ -195,17 +195,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
             gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceProxy.clientcounter.getClientsList(CID)])
         except gevent.GreenletExit: pass  # Client disconnected
         finally:
-             logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
-             if self.transcoder:
-                self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
-             if AceProxy.clientcounter.deleteClient(CID, self) == 0:
-                logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-             self.handlerGreenlet.kill()
+            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+            if self.transcoder:
+               self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
+               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 
     def connectDetector(self):
         try: self.rfile.read()
         except: pass
-        finally: gevent.sleep()
+        finally: self.handlerGreenlet.kill()
 
 class AceProxy(object):
     '''
@@ -512,7 +511,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceProxy.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-server = StreamServer((AceConfig.httphost, AceConfig.httpport), connection_handler, spawn=Pool(None))
+server = StreamServer((AceConfig.httphost, AceConfig.httpport), handle=connection_handler)
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 # we use blocking serve_forever() here because we have no other jobs
 try: server.serve_forever()
