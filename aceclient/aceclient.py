@@ -262,4 +262,3 @@ class AceClient(object):
               elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
               # SHUTDOWN
               elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
-           finally: gevent.sleep()
