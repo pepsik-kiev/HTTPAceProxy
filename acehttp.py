@@ -18,7 +18,6 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
-#from gevent.pool import Pool
 from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
 
 import os, sys, glob
@@ -39,6 +38,20 @@ import aceclient
 from clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
+
+class HTTPServer(StreamServer):
+
+    def handle(self, socket, address):
+        if AceConfig.firewall and not checkFirewall(address[0]):
+           logger.error('Dropping connection from {} due to firewall rules'.format(address[0]))
+           return
+       # Limit on the number of connected clients
+        if 0 < AceConfig.maxconns <= AceProxy.clientcounter.totalClients():
+           logger.error("Maximum client connections reached, can't serve request from {}".format(address[0]))
+           return
+       # Check if AceEngine is alive and handle request
+        if checkAce(): HTTPHandler(socket, address, self).handle_one_request()
+        return
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -107,6 +120,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
                                  '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
                                  '.ogx', '.qt', '.rm', '.swf', '.ts', '.vob', '.wmv', '.wav', '.webm')
+
         # Check if third parameter exists…/self.reqtype/blablablablabla/video.mpg
         # And if it ends with regular video extension
         try:
@@ -366,24 +380,6 @@ def clean_proc():
                    if proc.name() == 'ace_engine.exe': proc.kill()
             except: pass
 
-def connection_handler(socket, address):
-    if AceConfig.firewall and not checkFirewall(address[0]):
-        logger.error('Dropping connection from {} due to firewall rules'.format(address[0]))
-        return
-    # Limit on the number of connected clients
-    if 0 < AceConfig.maxconns <= AceProxy.clientcounter.totalClients():
-        logger.error("Maximum client connections reached, can't serve request from {}".format(address[0]))
-        return
-    # Check if AceEngine is alive and handle request
-    if checkAce():
-        handler = HTTPHandler(socket, address, server)
-        try:
-           handler.setup()
-           handler.handle()
-        except: pass
-        finally: handler.finish()
-    return
-
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
@@ -511,7 +507,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceProxy.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-server = StreamServer((AceConfig.httphost, AceConfig.httpport), handle=connection_handler)
+server = HTTPServer((AceConfig.httphost, AceConfig.httpport))
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
 # we use blocking serve_forever() here because we have no other jobs
 try: server.serve_forever()
