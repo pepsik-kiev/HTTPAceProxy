@@ -52,11 +52,9 @@ class HTTPServer(StreamServer):
            return
         # Check if AceEngine is alive and handle request
         if checkAce():
-           handler = HTTPHandler(socket, address, self)
-           try:
-              handler.setup()
-              handler.handle()
-           finally: handler.finish()
+           try: HTTPHandler(socket, address, self).handle_one_request()
+           except: pass
+        return
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -104,10 +102,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
             if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceProxy.pluginshandlers):
                 self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-                self.handlerGreenlet.kill()
+                return
         except IndexError:
             self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-            self.handlerGreenlet.kill()
+            return
 
         # Handle request with plugin handler
         if self.reqtype in AceProxy.pluginshandlers:
@@ -115,7 +113,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
                 logging.error(traceback.format_exc())
-            finally: self.handlerGreenlet.kill()
+            finally: return
         self.handleRequest(headers_only)
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
@@ -131,8 +129,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
             if not self.path.endswith(self.videoextdefaults):
                 self.dieWithError(400, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-                self.handlerGreenlet.kill()
-        except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); self.handlerGreenlet.kill()  # 400 Bad Request
+                return
+        except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
             # Return 200 and exit
@@ -142,7 +140,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'video/mp2t')
             self.send_header('Connection', 'Close')
             self.end_headers()
-            self.handlerGreenlet.kill()
+            return
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
@@ -152,7 +150,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 
-        self.connectionTime = gevent.time.time()
         try:
             if not AceProxy.clientcounter.idleAce:
                logger.debug('Create connection to AceEngine.....')
@@ -162,15 +159,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
                CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
         except Exception as e:
             self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-            if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.destroy()
-            self.handlerGreenlet.kill()
+            return
 
+        self.connectionTime = gevent.time.time()
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
-        self.transcoder = None
-        self.out = self.wfile
         try:
             self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
+            self.transcoder = None
+            self.out = self.wfile
             # If &fmt transcode key present in request
             fmt = self.reqparams.get('fmt', [''])[0]
             if fmt and AceConfig.osplatform != 'Windows':
@@ -212,13 +209,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except aceclient.AceException as e:
             gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(CID)])
             gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceProxy.clientcounter.getClientsList(CID)])
-        except gevent.GreenletExit: pass  # Client disconnected
+        except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
+        except gevent.GreenletExit: pass # Client disconnected
         finally:
             logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
             if self.transcoder:
                self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
             if AceProxy.clientcounter.deleteClient(CID, self) == 0:
                logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+            return
 
     def connectDetector(self):
         try: self.rfile.read()
@@ -513,6 +512,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
 
 # Start complite. Wating for requests
 server = HTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=Pool(None))
+max_accept = 10
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (server.server_host, server.server_port))
 try: server.serve_forever() # we use blocking serve_forever() here because we have no other jobs
 except (KeyboardInterrupt, SystemExit): shutdown()
