@@ -112,7 +112,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
             try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
             except Exception as e:
                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-                logging.error(traceback.format_exc())
             finally: return
         self.handleRequest(headers_only)
 

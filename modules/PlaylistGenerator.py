@@ -69,11 +69,11 @@ class PlaylistGenerator(object):
             url = item['url']
             if process_url and url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                   item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), quote(item['name'],''))
+                   item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), quote(item['name'].encode('utf-8'),''))
                 elif url.startswith('infohash://'): # For INFOHASHes
-                   item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], quote(item['name'],''))
+                   item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], quote(item['name'].encode('utf-8'),''))
                 elif url.startswith('acestream://'): # For PIDs
-                   item['url'] = 'http://%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], quote(item['name'],''))
+                   item['url'] = 'http://%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], quote(item['name'].encode('utf-8'),''))
                 elif archive and url.isdigit(): # For archive channel id's
                    item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
                 elif not archive and url.isdigit(): # For channel id's
