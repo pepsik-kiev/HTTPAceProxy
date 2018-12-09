@@ -19,6 +19,7 @@ import gevent
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
 from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketException
+from gevent.pool import Pool
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -45,13 +46,17 @@ class HTTPServer(StreamServer):
         if AceConfig.firewall and not checkFirewall(address[0]):
            logger.error('Dropping connection from {} due to firewall rules'.format(address[0]))
            return
-       # Limit on the number of connected clients
+        # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= AceProxy.clientcounter.totalClients():
            logger.error("Maximum client connections reached, can't serve request from {}".format(address[0]))
            return
-       # Check if AceEngine is alive and handle request
-        if checkAce(): HTTPHandler(socket, address, self).handle_one_request()
-        return
+        # Check if AceEngine is alive and handle request
+        if checkAce():
+           handler = HTTPHandler(socket, address, self)
+           try:
+              handler.setup()
+              handler.handle()
+           finally: handler.finish()
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -507,8 +512,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
     AceProxy.pluginlist.append(plugininstance)
 
 # Start complite. Wating for requests
-server = HTTPServer((AceConfig.httphost, AceConfig.httpport))
-logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (AceConfig.httphost, AceConfig.httpport))
-# we use blocking serve_forever() here because we have no other jobs
-try: server.serve_forever()
+server = HTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=Pool(None))
+logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (server.server_host, server.server_port))
+try: server.serve_forever() # we use blocking serve_forever() here because we have no other jobs
 except (KeyboardInterrupt, SystemExit): shutdown()
