@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
 import logging, traceback
-import psutil, requests
+import psutil, requests, signal
 try: from BaseHTTPServer import BaseHTTPRequestHandler
 except: from http.server import BaseHTTPRequestHandler
 try: from urlparse import parse_qs
@@ -188,8 +188,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             # Sending videostream headers to client
             logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
             drop_headers = []
-            proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Transfer-Encoding': 'chunked',
-                              'Content-Type': 'application/octet-stream' }
+            proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none',
+                              'Transfer-Encoding': 'chunked', 'Content-Type': 'video/mp2t' }
 
             if self.transcoder: drop_headers.extend(['Transfer-Encoding'])
 
@@ -200,8 +200,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             if AceProxy.clientcounter.addClient(CID, self) == 1:
-                # If there is no existing broadcast we create it
-                gevent.spawn(StreamReader, self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype), CID)
+               # If there is no existing broadcast we create it
+               playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
+               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
+                  playback_url = requests.compat.urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
+               gevent.spawn(StreamReader, playback_url, CID)
 
             self.connectGreenlet.join() # Wait until request complite or client disconnected
 
@@ -293,35 +296,31 @@ def checkAce():
     else: return True
 
 def StreamReader(url, cid):
-    if url is None: return
-    if not AceProxy.ace: #Rewrite host:port for remote AceEngine
-        url = requests.compat.urlparse(url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
-    try:
-        if url.endswith('.m3u8'): # AceEngine return link for HLS stream
-           used_chunks = []
-           while AceProxy.clientcounter.getClientsList(cid):
-              with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as m3uList:
-                 for line in m3uList.iter_lines():
+    with requests.session() as s:
+        try:
+           # AceEngine return link for HLS stream
+           if url.endswith('.m3u8'):
+              used_chunks = []
+              while 1:
+                 for line in s.get(url, stream=True, timeout=(5, AceConfig.videotimeout)).iter_lines():
                     if line.startswith(b'download not found'): return
                     if line.startswith(b'http://') and line not in used_chunks:
-                        with requests.get(line, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
-                           StreamWriter(stream, cid)
                         used_chunks.append(line)
                         if len(used_chunks) > 15: used_chunks.pop(0)
-        else: # AceStream return link for HTTP stream
-              with requests.get(url, stream=True, timeout=(5, AceConfig.videotimeout)) as stream:
-                 StreamWriter(stream, cid)
+                        if AceProxy.clientcounter.getClientsList(cid):
+                           StreamWriter(s.get(line, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
+                        else: return
+           # AceStream return link for HTTP stream
+           else: StreamWriter(s.get(url, stream=True, timeout=(5, AceConfig.videotimeout)), cid)
 
-    except Exception as err: # requests errors
-           gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(cid)])
-           gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceProxy.clientcounter.getClientsList(cid)])
+        except Exception as err: # requests errors
+              gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(cid)])
+              gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceProxy.clientcounter.getClientsList(cid)])
 
 def StreamWriter(stream, cid):
     for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
-        clients = AceProxy.clientcounter.getClientsList(cid)
-        if not clients: return
-        # send current chunk to all expecting clients and wait until they all read it
-        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk and client.connectDetector])
+        gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in AceProxy.clientcounter.getClientsList(cid)])
+        gevent.sleep()
 
 def write_chunk(client, chunk, timeout=5.0):
     with gevent.Timeout(timeout, None) as t:
@@ -456,11 +455,12 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
         logger.error('Cannot drop privileges to user %s' % AceConfig.aceproxyuser)
         sys.exit(1)
 
-# setting signal handlers
+## setting signal handlers
 try:
-    gevent.signal(gevent.signal.SIGHUP, _reloadconfig)
-    gevent.signal(gevent.signal.SIGTERM or gevent.signal.SIGINT, shutdown)
-except AttributeError: pass  # not available on Windows
+    gevent.signal(signal.SIGHUP, _reloadconfig)
+    gevent.signal(signal.SIGTERM, shutdown)
+    gevent.signal(signal.SIGINT, shutdown)
+except AttributeError: pass  # signal.SIGHUP not available on Windows
 
 # Creating ClientCounter
 AceProxy.clientcounter = ClientCounter()
@@ -511,7 +511,5 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
 
 # Start complite. Wating for requests
 server = HTTPServer((AceConfig.httphost, AceConfig.httpport), spawn=Pool(None))
-max_accept = 10
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (server.server_host, server.server_port))
-try: server.serve_forever() # we use blocking serve_forever() here because we have no other jobs
-except (KeyboardInterrupt, SystemExit): shutdown()
+server.serve_forever()

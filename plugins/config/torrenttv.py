@@ -6,6 +6,8 @@ Torrent-tv.ru Playlist Downloader Plugin configuration file
 # For example you can install tor browser and add in torrc SOCKSPort 9050
 # proxies = {'http' : 'socks5h://127.0.0.1:9050','https' : 'socks5h://127.0.0.1:9050'}
 # If your http-proxy need authentification - proxies = {'https' : 'https://user:password@ip:port'}
+
+#proxies = {'http' : 'socks5h://192.168.2.1:9100', 'https' : 'socks5h://192.168.2.1:9100'}
 proxies = None
 
 # Insert your Torrent-tv.ru playlist URL here
@@ -31,9 +33,8 @@ m3uchanneltemplate = '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-
 # torrent-tv tracker forgetting us.
 #
 # 0 = disabled
-updateevery = 0
+updateevery = 5
 
-# Channel logos mapping
 logobase = 'http://1ttv.org/uploads/'
 logomap = {
     u'#НАШЕ MUSIC HD': logobase + 'vdNuUjpjq4U6cnZ9GnxIjxxPvPkPVl.png',
@@ -108,6 +109,7 @@ logomap = {
     u'AD Sport 1 HD': logobase + 'ewjU0qgQQPtyIadk6ZmDM7kgBplyzh.png',
     u'AD Sport 2 HD': logobase + 'WnnTDAKno85TTnkmyIjCuCh2JWAAeg.png',
     u'ADN 40': logobase + 'RAgL1IDJOmN6F2oXaQdrpEHaJgn6gG.png',
+    u'AIVA Music HD': logobase + 'UBidoK5uRAmJY6dcnxg0KSa3F92siz.png',
     u'AFRICA1': logobase + 'nPMGjkEvoHeVASbPmYuUTotLpI6jjQ.png',
     u'AFRICA3': logobase + 'HvwZbBrYnRXvhebzjK8aCrnhFjnh5a.png',
     u'Aghapy TV': logobase + 'G5QxruXhkn8KIqIKWVUlOCw8WZ2ops.png',
@@ -159,6 +161,7 @@ logomap = {
     u'ATR': logobase + 'uggqxQxxDTuz1P1mY4PZdlRcAKow3F.png',
     u'ATV Azerbaycan': logobase + 'yx7GzFSH3BlxYYa0Nuq4eiVRqxZSa5.png',
     u'Aurora TV': logobase + 'uMQrMUdm0ZLvmH2n72kXEQqf8Kysj4.png',
+    u'Aurora Visual': logobase + 'K1ZhYXoruwAUzSwqL8KFCEhgKJiznb.png',
     u'Az TV': logobase + 'FB2qxgNm8xTU6YiR2fY1jH4PIRR2SF.png',
     u'Babestation': logobase + 'DbvHMminWOobAbD3IliRECsG8RH6uL.png',
     u'Baby TV': logobase + 'IV1Puqsxki1WGIxut4QLpRUZ7yPR8c.png',
@@ -278,7 +281,9 @@ logomap = {
     u'Discovery Turbo Xtra HD': logobase + 'nF2E8OKZHLP7f1WsW7ZL163NAkjPQn.png',
     u'Disney Channel': logobase + 'JxEjTeXwExjnxutQGKJBmMI85tpNqK.png',
     u'Disney Channel (+2)': logobase + 'nn6LfV3ROFIiPztSN76lNa1OSkPFzp.png',
+    u'Disney Channel (+4)': logobase + 'nn6LfV3ROFIiPztSN76lNa1OSkPFzp.png',
     u'Disney Channel Deutschland': logobase + 'e1kmDfajivvLrIILyvMIpAT9JeRd7e.png',
+    u'Disney XD (England)': logobase + 'qcQ0LA89xUZ9XSzOk9SuqQiQzcuGXt.png',
     u'Divinity TV': logobase + 'q2S5vg5C0z4RE5O37rrVnqpQ3Svnm8.png',
     u'DMAX Austria': logobase + '2IJzdBpGH5lY60LJz95mreaKtrGCUu.png',
     u'DocuBox HD': logobase + 'md48U7CLoQ7gUeUynpHj2No5VPXV3m.png',
@@ -680,6 +685,7 @@ logomap = {
     u'Rai News 24': logobase + 'CXDYq1FWPBJgCMUXcOmmfSA4hff9qe.png',
     u'Rai Sport': logobase + 'rAYGUUsl8SfmN6KOEeBOvLkpwIRbmX.png',
     u'RaiNews 24': logobase + 'lSQGWWO5EgBMQYSzctZ6551jifnl8z.png',
+    u'Rai Yo-Yo HD': logobase + 'bsc4xXVFBJ3cc2GHTjdJpvZ6wJHY0M.png',
     u'Ran 1 TV': logobase + '8IZCPcTfE4dNCFIxLDOVy4BY7wrpV5.png',
     u'Real Madrid TV (English)': logobase + 'MTNrAzoBhr6chiVw4J9LZJsra0eG0o.png',
     u'Real Madrid TV (Spanish)': logobase + 'dcEYHAPjBnC6ZvePH7UixXhsHytWHt.png',
@@ -733,6 +739,7 @@ logomap = {
     u'Satisfaction HD': logobase + 'isdNgbfGENuaDPSMzsz8WMjBzc1rah.png',
     u'SBN International': logobase + 'PqgmJNT0zrBVSCsRoGYT91pr9y3Bqf.png',
     u'SciFi Universal': logobase + 'HtJ6UUUl9zFFP0XcgHfuNjbCFatTVz.png',
+    u'Science And Vie TV HD (FR)': logobase + 'cky2EhbYOGajSMolI3wzRntTkfoyPX.png',
     u'SCT': logobase + 'bDRN0guXHaNHruxtyFkpKYz8J09Xj3.png',
     u'SDGF 24': logobase + 'kcAAVen2Pqo9l2jXnOjVRhIPreb13f.png',
     u'Seattle Channel': logobase + 'fd5ElNsgZt24TdcoclTBPVJgrvJL6R.png',
@@ -952,7 +959,7 @@ logomap = {
     u'Xezer TV': logobase + '1i5OaA3fQiek2oK99SneRSm0vwTCkW.png',
     u'XITE 1 HD': logobase + '7CxLU3e4vcSmzkMIMOlGoNlA9eajHD.png',
     u'XITE 2 HD': logobase + 'FrVMPtQCiiFsiwEr0GEmUw6Fs9kSpH.png',
-    u'XITE Music  HD (GR)': logobase + 'FeWCTdXHZKnid3qXQNH7afhkBDdA0t.png',
+    u'XITE Music HD (GR)': logobase + 'FeWCTdXHZKnid3qXQNH7afhkBDdA0t.png',
     u'XSPORT HD': logobase + 'bZNeynR9WQbOqt2NeYq556HqZhBmla.png',
     u'Yaslyk': logobase + 'bztizHZMPcyg132sq89fyVOGaYhTuZ.png',
     u'Yerkir Media TV (Armenia)': logobase + 'srS8LqVDwobCyAC4NzrBh2bVDW9PCn.png',
@@ -960,6 +967,7 @@ logomap = {
     u'ZDF': logobase + '5SH5FeZiITw27CPxscjksZp272u7He.png',
     u'ZDFinfo': logobase + 'pYRaR723RgoEOfYqkQUcFin7hzBfk6.png',
     u'ZDFNeo': logobase + 'IzZ1Jky9uy3oIVlXb7MEHtgMrArFWq.png',
+    u'Zee TV Россия': logobase + '1x5yLKFYH8gBbGmDKTyFKMcGffTPYa.png',
     u'Zest TV': logobase + 'mcF7ChQAr2KdlJ6zlnPLOL7VF3u4IB.png',
     u'Zeta TV': logobase + 'oq14JrtW5WdHXJYbjOctzFkefAYc9R.png',
     u'ZIK (Украина)': logobase + 'dB1PmpYtgeI0C4u7Cv1QoXHlvc4JtT.png',
@@ -980,6 +988,7 @@ logomap = {
     u'Архыз24': logobase + 'tuMbRlnkeMiYQ6u9oeiAVfHF0F20RB.png',
     u'Астрахань 24': logobase + 'FeMgg2g4NLpCyQsSsW61fiTKNhHr47.png',
     u'Астрахань 24 HD': logobase + 'uY5oOpKeVKrOryxdeMtuPwaiAj1Xz1.png',
+    u'Астрахань Спорт HD': logobase + 'TaI7VNP66AwK14pDHCtFoQJDZXEloN.png',
     u'Атамекен (Казахстан)': logobase + '91qNsUznTT6Qs7Badomq4dFeUw0kFL.png',
     u'АТВ Ставрополь': logobase + 'N3CfiozXcw5Kvqwgztz94IXv0W4OEd.png',
     u'Афонтово': logobase + 'XzZ47QdIa6au6seekqdxqk8kUFOGjt.png',
@@ -1134,6 +1143,7 @@ logomap = {
     u'Конный мир HD': logobase + 'q87VlmfaBeBhq8SOhAu0SVPEGjiqWM.png',
     u'Кот ТВ': logobase + 'Rtdtc632nbBQ2TsymgXhkOt7nhytjW.png',
     u'Красная линия': logobase + 'I43S6jd5noclar0LlPJnyY8adonmUV.png',
+    u'Кроха ТВ': logobase + 'erfDIyaeH4D3DsiACWEEnutTEOvtpa.png',
     u'Кроха  ТВ': logobase + 'erfDIyaeH4D3DsiACWEEnutTEOvtpa.png',
     u'Крым 1': logobase + 'DXIF2fKXbbFRcKqPX1tgDA6iP6EWgP.png',
     u'Крым 24': logobase + 'x4s9QQXR8KerO13nlkuEujzcv5ww5F.png',
@@ -1343,6 +1353,7 @@ logomap = {
     u'Радио 1': logobase + 'AC0BxzJlkCnV2tkgto37jY3zRQbZLa.png',
     u'Радио Макс FM': logobase + 'VWA569IoZLHzhtHpvfQZh9hf05SizU.png',
     u'Радио Хит Онлайн (Орск)': logobase + 'IZfWjE1UgEkMhdMZFaWBXv5SezscOP.png',
+    u'Радио Хит ТВ (Орск)': logobase + 'rLxwTTHzgrbsa6rGk0UWRPRCXuehcd.png',
     u'Радио Шансон ТВ': logobase + 'UeSZRz7c0zcwdvilqAcEgY58jS8NGb.png',
     u'Радость моя': logobase + 'VRylZFYgFq7AL0FWcbf5JVOX3desn3.png',
     u'Раз ТВ': logobase + 'CWaPSXdAL4Ejo1wNOqSWNPNVwbbhC7.png',
@@ -1455,6 +1466,7 @@ logomap = {
     u'ТВР 24 (Сергиев Посад)': logobase + 'qgTzZtrzoJCKAdqDZ4ASW80kcMeKtZ.png',
     u'ТДК': logobase + 'eSrHE6Gws4U6JxhFXA3mQ4iDVc0SwS.png',
     u'Театр': logobase + '8qawrcOtzHZTAa3kI0rcDfVFEZoI5u.png',
+    u'ТелеГид ТВ HD': logobase + 'lm5KXmMcuyVCkUlnGY9ZMqN7NeT624.png',
     u'Телевсесвит': logobase + 'luOXi9wlWDPOnpoh6HGvnHKn6VRRqY.png',
     u'Теледом HD': logobase + 'XviuCfRo0T4WFTOhFaC978AwZ1a3Ge.png',
     u'Телекафе': logobase + 'fYRFV5oY197jXcyModfWVs0AlrCOIs.png',
