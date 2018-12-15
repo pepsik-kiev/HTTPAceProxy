@@ -33,7 +33,7 @@ m3uchanneltemplate = '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-
 # torrent-tv tracker forgetting us.
 #
 # 0 = disabled
-updateevery = 5
+updateevery = 0
 
 logobase = 'http://1ttv.org/uploads/'
 logomap = {
