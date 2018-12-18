@@ -202,8 +202,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if AceProxy.clientcounter.addClient(CID, self) == 1:
                # If there is no existing broadcast we create it
                playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
-               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
-                  playback_url = requests.compat.urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
+               playback_url = requests.compat.urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
                gevent.spawn(StreamReader, playback_url, CID)
 
             self.connectGreenlet.join() # Wait until request complite or client disconnected
