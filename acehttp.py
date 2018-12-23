@@ -43,15 +43,13 @@ from aceconfig import AceConfig
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
-    default_request_version = 'HTTP/1.1'
+    request_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', requests.compat.unquote(self.requestline).decode('utf8'), str(code), str(size))
-    def handle_one_request(self):
-        try: BaseHTTPRequestHandler.handle_one_request(self)
-        except: pass
+    def finish(self): pass
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -214,6 +212,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
             if AceProxy.clientcounter.deleteClient(CID, self) == 0:
                logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+            return
 
     def connectDetector(self):
         try: self.rfile.read()
