@@ -26,7 +26,7 @@ base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
-import logging
+import logging, traceback
 import psutil, requests, signal
 try: from BaseHTTPServer import BaseHTTPRequestHandler
 except: from http.server import BaseHTTPRequestHandler
@@ -43,7 +43,6 @@ from aceconfig import AceConfig
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
-    request_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -67,7 +66,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        checkAce()
         # Current greenlet
         self.handlerGreenlet = gevent.getcurrent()
         # Connected client IP address
@@ -134,7 +132,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
             self.send_header('Connection', 'Close')
             self.end_headers()
             return
-
+        # Check is AceEngine alive
+        checkAce()
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict = {}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')
@@ -287,11 +286,24 @@ def checkAce():
 
 def StreamReader(playback_url, cid):
 
-    def write_chunk(client, data, timeout=5.0):
-       try:
-          chunk_size = '%X\r\n' % len(data)
-          chunk = b''.join([chunk_size.encode('utf-8'), data, b'\r\n'])
-          gevent.with_timeout(timeout, client.out.write, chunk if client.transcoder is None else data)
+    def write_chunk(client, data, timeout=5.0, _PY34_EXACTLY=(sys.version_info[:2] == (3, 4)),
+                     _bytearray=bytearray):
+       if not data: return
+       if client.transcoder is None:
+          ## Write the chunked encoding
+          # header
+          if _PY34_EXACTLY:
+             header_str = '%x\r\n' % len(data)
+             towrite = _bytearray(header_str, 'ascii')
+          else:
+             header_str = b'%x\r\n' % len(data)
+             towrite = _bytearray(header_str)
+          # data
+          towrite += data
+          # trailer
+          towrite += b'\r\n'
+          data = towrite
+       try: gevent.with_timeout(timeout, client.out.write, data)
        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
           logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
           client.connectGreenlet.kill()
@@ -316,7 +328,7 @@ def StreamReader(playback_url, cid):
                 for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
                    clients = AceProxy.clientcounter.getClientsList(cid)
                    if not clients: break
-                   gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
+                   gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients])
 
        except Exception as err: # requests errors
            gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(cid)])
