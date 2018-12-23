@@ -18,7 +18,7 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
-from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketError
+from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -290,7 +290,7 @@ def checkAce():
 
 def StreamReader(playback_url, cid):
 
-    def write_chunk(client, data, timeout=5.0, _PY34_EXACTLY=(sys.version_info[:2] == (3, 4)),
+    def write_chunk(client, data, timeout=10.0, _PY34_EXACTLY=(sys.version_info[:2] == (3, 4)),
                      _bytearray=bytearray):
        if not data: return
        if client.transcoder is None:
@@ -308,11 +308,14 @@ def StreamReader(playback_url, cid):
           towrite += b'\r\n'
           data = towrite
 
-       try: gevent.with_timeout(timeout, client.out.write, data)
-       except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
+       try:
+           client.connection.settimeout(timeout)
+           client.out.write(data)
+       except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
           logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
           client.connectGreenlet.kill()
        except: pass # The client unexpectedly disconnected while writing data to socket
+       finally: client.connection.settimeout(None)
 
     with requests.session() as s:
        try:
