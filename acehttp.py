@@ -18,7 +18,7 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
-from gevent.socket import socket, AF_INET, SOCK_DGRAM
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketError
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -26,7 +26,7 @@ base_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(base_dir, 'modules'))
 for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
 
-import logging, traceback
+import logging
 import psutil, requests, signal
 try: from BaseHTTPServer import BaseHTTPRequestHandler
 except: from http.server import BaseHTTPRequestHandler
@@ -46,9 +46,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
+
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', requests.compat.unquote(self.requestline).decode('utf8'), str(code), str(size))
-    def finish(self): pass
+
+    def finish(self):
+        if self.handlerGreenlet: self.handlerGreenlet.kill()
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -78,7 +81,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.dieWithError(401, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)
            return
-
         try:
             self.splittedpath = self.path.split('/')
             self.reqtype = self.splittedpath[1].lower()
@@ -121,7 +123,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
             if not self.path.endswith(self.videoextdefaults):
                 self.dieWithError(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
                 return
-        except IndexError: self.dieWithError(400, 'Bad Request', logging.WARNING); return  # 400 Bad Request
+        except IndexError:
+            self.dieWithError(400, 'Bad Request', logging.WARNING) # 400 Bad Request
+            return
+
         # Pretend to work fine with Fake or HEAD request.
         if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
             # Return 200 and exit
@@ -211,7 +216,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
             if AceProxy.clientcounter.deleteClient(CID, self) == 0:
                logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-            return
 
     def connectDetector(self):
         try: self.rfile.read()
@@ -303,6 +307,7 @@ def StreamReader(playback_url, cid):
           # trailer
           towrite += b'\r\n'
           data = towrite
+
        try: gevent.with_timeout(timeout, client.out.write, data)
        except gevent.Timeout: # Client did not read the data from socket for N sec - disconnect it
           logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
