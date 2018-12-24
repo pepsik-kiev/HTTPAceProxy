@@ -154,8 +154,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
             if self.reqtype not in ('direct_url', 'efile_url'):
                CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-        except Exception as e:
+        except aceclient.AceException as e:
             self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+            AceProxy.clientcounter.idleAce = None
             return
 
         self.connectionTime = gevent.time.time()
