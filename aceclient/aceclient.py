@@ -189,76 +189,76 @@ class AceClient(object):
         Data receiver method for greenlet
         '''
         while 1:
-           try: self._recvbuffer = self._socket.read_until('\r\n', timeout).strip()
-           except gevent.socket.timeout: pass
-           except Exception as err:
-              logging.error('AceException:%s' % repr(err))
-              break
-           else:
-              # Parsing everything only if the string is not empty
-              logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
-              # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
-              if not self._recvbuffer: self.destroy()
-              # HELLOTS
-              elif self._recvbuffer.startswith('HELLOTS'):
-                  #version=engine_version version_code=version_code key=request_key http_port=http_port
-                  self._auth.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
-              # NOTREADY
-              elif self._recvbuffer.startswith('NOTREADY'): self._auth.set('NOTREADY')
-              # AUTH
-              elif self._recvbuffer.startswith('AUTH'): self._auth.set(self._recvbuffer.split()[1]) # user_auth_level
-              # START
-              elif self._recvbuffer.startswith('START'):
-                  # url [ad=1 [interruptable=1]] [stream=1] [pos=position]
-                  params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
-                  if not self._seekback or self._started_again.ready() or params.get('stream','') is not '1':
-                      # If seekback is disabled, we use link in first START command.
-                      # If seekback is enabled, we wait for first START command and
-                      # ignore it, then do seekback in first EVENT position command
-                      # AceStream sends us STOP and START again with new link.
-                      # We use only second link then.
-                      self._url.set(self._recvbuffer.split()[1]) # url for play
-              # LOADRESP
-              elif self._recvbuffer.startswith('LOADRESP'):
-                  self._loadasync.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
-              # STATE
-              elif self._recvbuffer.startswith('STATE'): self._state.set(self._recvbuffer.split()[1]) # STATE state_id
-              # STATUS
-              elif self._recvbuffer.startswith('STATUS'):
-                  self._tempstatus = self._recvbuffer.split()[1]
-                  if self._tempstatus.startswith('main:idle'): pass
-                  elif self._tempstatus.startswith('main:loading'): pass
-                  elif self._tempstatus.startswith('main:starting'): pass
-                  elif self._tempstatus.startswith('main:check'): pass
-                  elif self._tempstatus.startswith('main:wait'): pass
-                  elif self._tempstatus.startswith(('main:prebuf','main:buf')): pass #progress;time
-                     #values = list(map(int, self._tempstatus.split(';')[3:]))
-                     #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
-                  elif self._tempstatus.startswith('main:dl'): pass
-                     #values = list(map(int, self._tempstatus.split(';')[1:]))
-                     #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
-                  elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
-                     #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
-              # CID
-              elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
-              # INFO
-              elif self._recvbuffer.startswith('INFO'): pass
-              # EVENT
-              elif self._recvbuffer.startswith('EVENT'):
-                  self._tempevent = self._recvbuffer.split()
-                  if self._seekback and not self._started_again.ready() and 'livepos' in self._tempevent:
-                         params = { k:v for k,v in (x.split('=') for x in self._tempevent if '=' in x) }
-                         self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
-                         self._started_again.set()
-                  elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(self._gender, self._age))
-                  elif 'cansave' in self._tempevent: pass
-                  elif 'showurl' in self._tempevent: pass
-                  elif 'download_stopped' in self._tempevent: pass
-              # PAUSE
-              elif self._recvbuffer.startswith('PAUSE'): pass #self._write(AceMessage.request.EVENT('pause'))
-              # RESUME
-              elif self._recvbuffer.startswith('RESUME'): pass #self._write(AceMessage.request.EVENT('play'))
-              # STOP
-              elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
-              # SHUTDOWN
-              elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
+           with gevent.Timeout(timeout, False):
+              try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
+              except gevent.Timeout: self.destroy() # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
+              except gevent.socket.timeout: pass
+              except Exception as err:
+                 logging.error('AceException:%s' % repr(err))
+                 break
+              else:
+                 # Parsing everything only if the string is not empty
+                 logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+                 # HELLOTS
+                 if self._recvbuffer.startswith('HELLOTS'):
+                    #version=engine_version version_code=version_code key=request_key http_port=http_port
+                    self._auth.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
+                 # NOTREADY
+                 elif self._recvbuffer.startswith('NOTREADY'): self._auth.set('NOTREADY')
+                 # AUTH
+                 elif self._recvbuffer.startswith('AUTH'): self._auth.set(self._recvbuffer.split()[1]) # user_auth_level
+                 # START
+                 elif self._recvbuffer.startswith('START'):
+                    # url [ad=1 [interruptable=1]] [stream=1] [pos=position]
+                    params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
+                    if not self._seekback or self._started_again.ready() or params.get('stream','') is not '1':
+                       # If seekback is disabled, we use link in first START command.
+                       # If seekback is enabled, we wait for first START command and
+                       # ignore it, then do seekback in first EVENT position command
+                       # AceStream sends us STOP and START again with new link.
+                       # We use only second link then.
+                       self._url.set(self._recvbuffer.split()[1]) # url for play
+                 # LOADRESP
+                 elif self._recvbuffer.startswith('LOADRESP'):
+                    self._loadasync.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
+                 # STATE
+                 elif self._recvbuffer.startswith('STATE'): self._state.set(self._recvbuffer.split()[1]) # STATE state_id
+                 # STATUS
+                 elif self._recvbuffer.startswith('STATUS'):
+                    self._tempstatus = self._recvbuffer.split()[1]
+                    if self._tempstatus.startswith('main:idle'): pass
+                    elif self._tempstatus.startswith('main:loading'): pass
+                    elif self._tempstatus.startswith('main:starting'): pass
+                    elif self._tempstatus.startswith('main:check'): pass
+                    elif self._tempstatus.startswith('main:wait'): pass
+                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): pass #progress;time
+                       #values = list(map(int, self._tempstatus.split(';')[3:]))
+                       #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith('main:dl'): pass
+                       #values = list(map(int, self._tempstatus.split(';')[1:]))
+                       #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
+                       #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
+                 # CID
+                 elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
+                 # INFO
+                 elif self._recvbuffer.startswith('INFO'): pass
+                 # EVENT
+                 elif self._recvbuffer.startswith('EVENT'):
+                    self._tempevent = self._recvbuffer.split()
+                    if self._seekback and not self._started_again.ready() and 'livepos' in self._tempevent:
+                       params = { k:v for k,v in (x.split('=') for x in self._tempevent if '=' in x) }
+                       self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
+                       self._started_again.set()
+                    elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(self._gender, self._age))
+                    elif 'cansave' in self._tempevent: pass
+                    elif 'showurl' in self._tempevent: pass
+                    elif 'download_stopped' in self._tempevent: pass
+                 # PAUSE
+                 elif self._recvbuffer.startswith('PAUSE'): pass #self._write(AceMessage.request.EVENT('pause'))
+                 # RESUME
+                 elif self._recvbuffer.startswith('RESUME'): pass #self._write(AceMessage.request.EVENT('play'))
+                 # STOP
+                 elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
+                 # SHUTDOWN
+                 elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
