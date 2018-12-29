@@ -42,7 +42,6 @@ from aceconfig import AceConfig
 
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
-    protocol_version = 'HTTP/1.1'
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -71,6 +70,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         # Current greenlet
         self.handlerGreenlet = gevent.getcurrent()
+        self.protocol_version = 'HTTP/1.1' if self.request_version == 'HTTP/1.1' else 'HTTP/1.0'
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
@@ -196,10 +196,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
            # Sending videostream headers to client
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            drop_headers = []
-           proxy_headers = { 'Connection': 'Close', 'Accept-Ranges': 'none', 'Transfer-Encoding': 'chunked',
-                             'Content-Type': 'application/octet-stream' }
+           proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
+                             'Transfer-Encoding': 'chunked', 'Content-Type': 'application/octet-stream',
+                             'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache' }
 
-           if not self.response_use_chunked: drop_headers.extend(['Transfer-Encoding'])
+           if not self.response_use_chunked:
+                  proxy_headers['Connection'] = 'Close'
+                  drop_headers.extend(['Transfer-Encoding', 'Keep-Alive', 'Cache-Control'])
 
            response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
            self.send_response(200)
@@ -270,7 +273,7 @@ def spawnAce(cmd, delay=0.1):
           AceProxy.acedir = os.path.dirname(engine[0])
           cmd = engine[0].split()
     try:
-       logger.debug('AceEngine starts up .....')
+       logger.debug('AceEngine start up .....')
        AceProxy.ace = gevent.event.AsyncResult()
        gevent.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
        AceProxy.ace = AceProxy.ace.get(timeout=delay)
@@ -294,9 +297,8 @@ def checkAce():
 
 def StreamReader(playback_url, cid):
 
-    def write_chunk(client, data, timeout=10.0, _PY34_EXACTLY=(sys.version_info[:2] == (3, 4)),
+    def write_chunk(client, data, timeout=15.0, _PY34_EXACTLY=(sys.version_info[:2] == (3, 4)),
                      _bytearray=bytearray):
-       if not data: return
        if client.response_use_chunked:
           ## Write the chunked encoding
           # header
@@ -330,16 +332,15 @@ def StreamReader(playback_url, cid):
                    if not clients or url.startswith(b'download not found'): return
                    if url.startswith(b'http://') and url not in used_urls:
                       for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
-                         if chunk: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients])
+                         if chunk: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet])
                          else: break
                       used_urls.append(url)
                       if len(used_urls) > 15: used_urls.pop(0)
           else: # AceStream return link for HTTP stream
-             stream = s.get(playback_url, timeout=(5, AceConfig.videotimeout))
-             for chunk in stream.iter_content(chunk_size=1048576 if 'Content-Length' in stream.headers else None):
+             for chunk in s.get(playback_url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
                 clients = AceProxy.clientcounter.getClientsList(cid)
                 if not clients: break
-                gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients])
+                gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet and chunk])
 
        except Exception as err: # requests errors
           gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(cid)])
