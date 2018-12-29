@@ -200,10 +200,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
                              'Transfer-Encoding': 'chunked', 'Content-Type': 'application/octet-stream',
                              'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache' }
 
-           if not self.response_use_chunked or self.request_version == 'HTTP/1.0'
-                  self.protocol_version = 'HTTP/1.0'
-                  proxy_headers['Connection'] = 'Close'
-                  drop_headers.extend(['Transfer-Encoding', 'Keep-Alive', 'Cache-Control'])
+           if not self.response_use_chunked or self.request_version == 'HTTP/1.0':
+              self.protocol_version = 'HTTP/1.0'
+              proxy_headers['Connection'] = 'Close'
+              drop_headers.extend(['Transfer-Encoding', 'Keep-Alive', 'Cache-Control'])
 
            response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
            self.send_response(200)
