@@ -18,6 +18,7 @@ import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
+from gevent.pool import Pool
 from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
 import os, sys, glob
@@ -33,6 +34,7 @@ except: from http.server import BaseHTTPRequestHandler
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 from ipaddr import IPNetwork, IPAddress
+from uuid import uuid4
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
 from clientcounter import ClientCounter
@@ -144,18 +146,33 @@ class HTTPHandler(BaseHTTPRequestHandler):
            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-
-        try:
-           if not AceProxy.clientcounter.idleAce:
-              logger.debug('Create connection to AceEngine.....')
-              AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-              AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+        if not AceConfig.new_api:
+           try:
+              if not AceProxy.clientcounter.idleAce:
+                 logger.debug('Create connection to AceEngine.....')
+                 AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+                 AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+              if self.reqtype not in ('direct_url', 'efile_url'):
+                 CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
+           except aceclient.AceException as e:
+              self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+              AceProxy.clientcounter.idleAce = None
+              return
+        else:
            if self.reqtype not in ('direct_url', 'efile_url'):
-              CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-        except aceclient.AceException as e:
-           self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-           AceProxy.clientcounter.idleAce = None
-           return
+              try:
+                 with requests.session() as s:
+                    s.stream = s.verify = False
+                    url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
+                    params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
+                    self.cmd = s.get(url, params=params, timeout = 5).json()['response']
+                    CID = self.cmd['infohash']
+                    url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
+                    params = { 'method': 'get_media_files', 'infohash': CID }
+                    NAME = s.get(url, params=params, timeout = 5).json()['result'][paramsdict['file_indexes']]
+              except:
+                 self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+                 return
 
         self.connectionTime = gevent.time.time()
         self.channelName = NAME if not channelName else channelName
@@ -188,7 +205,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            if AceProxy.clientcounter.addClient(CID, self) == 1:
               # If there is no existing broadcast we create it
-              playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
+              playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype) if not AceConfig.new_api else self.cmd['playback_url']
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
                  playback_url = requests.compat.urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
               gevent.spawn(StreamReader, playback_url, CID)
@@ -223,6 +240,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if self.transcoder:
               self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
+              if AceConfig.new_api:
+                 with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=5) as r:
+                    pass
               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 
     def connectDetector(self):
@@ -315,11 +335,14 @@ def StreamReader(playback_url, cid):
           towrite += b'\r\n'
        else: towrite = data
 
-       try: gevent.with_timeout(timeout, client.out.write, towrite)
-       except gevent.Timeout as ex:  # Client did not read the data from socket for N sec - disconnect it
-          logging.warning('Client %s does not read data until %s' % (client.clientip, ex))
+       try:
+          client.connection.settimeout(timeout)
+          client.out.write(towrite)
+       except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
+          logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
           client.connectGreenlet.kill()
        except: pass # The client unexpectedly disconnected while writing data to socket
+       finally: client.connection.settimeout(None)
 
     with requests.session() as s:
        s.verify = False
@@ -520,7 +543,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
    AceProxy.pluginlist.append(plugininstance)
 
 # Server setup
-server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler)
+server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler, spawn=Pool())
 # Setting signal handlers
 gevent.signal(signal.SIGTERM, shutdown)
 gevent.signal(signal.SIGINT, shutdown)

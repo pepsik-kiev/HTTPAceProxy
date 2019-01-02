@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+x# -*- coding: utf-8 -*-
 '''
 Torrent-tv.ru Playlist Downloader Plugin configuration file
 '''
@@ -15,6 +15,7 @@ url=''
 
 # TV Guide URL
 tvgurl = 'https://goo.gl/ajGuLS'
+
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 
@@ -163,7 +164,10 @@ logomap = {
     u'Aurora TV': logobase + 'uMQrMUdm0ZLvmH2n72kXEQqf8Kysj4.png',
     u'Aurora Visual': logobase + 'K1ZhYXoruwAUzSwqL8KFCEhgKJiznb.png',
     u'Az TV': logobase + 'FB2qxgNm8xTU6YiR2fY1jH4PIRR2SF.png',
+    u'A HBO HD': logobase + 'RHVjB7DgHFz1pW7SQZs2dHrIgBGghS.png',
+    u'A+ (Mexico)': logobase + 'k3aMo7TivhwqsO0nHMKN8uXkiGZGXJ.png',
     u'Babestation': logobase + 'DbvHMminWOobAbD3IliRECsG8RH6uL.png',
+    u'Babestation 24': logobase + 'a9T4H470lmzWYOEkdYY9kvojGJlkLu.png',
     u'Baby TV': logobase + 'IV1Puqsxki1WGIxut4QLpRUZ7yPR8c.png',
     u'Baden TV': logobase + 'n6isIjMCHNS8wc5RlA1krB3mwsIu43.png',
     u'BalkanMusicTV HD': logobase + 'oVTIP7kyW3ZWGrN4vdDNdtifv5Y803.png',
@@ -202,6 +206,8 @@ logomap = {
     u'Brain TV HD': logobase + '2tc8t3vKfw1wxJ3wRG7QIEaMeF3fI6.png',
     u'BRAVO TV (Moldova)': logobase + 'i4ZEZAmsEsbabWt9gAzHTntRTyKOCd.png',
     u'Brazzers TV': logobase + 'VPCmFsMfpnB0pg9VBzvUG5TkRcHTsR.png',
+    u'Brazzers TV Europe': logobase + 'HZ1XJ21E4FcioFH2LtPDx9erlu3wDs.png',
+    u'Brics TVHD': logobase + '9iBgmp9P7BwwDaATeI2qfCGsfIRMvc.png',
     u'Bridge HD': logobase + 'P7JEo7cGv1dtk6X69SkfEQeiVrQvXj.png',
     u'Bridge TV': logobase + 'dPhBiaViIznwjeWU3pTbIXFmS3iJkU.png',
     u'Bridge TV Classic': logobase + 'NCuKRKNU2rwc8DkpF555fINSz5xaIc.png',
@@ -278,6 +284,7 @@ logomap = {
     u'Discovery Science': logobase + 'GAaO3EfDwMuHAIelG4gYW6TDEYbLnS.png',
     u'Discovery Science HD': logobase + 'lyo9uHELb4es3DBo5p0ztPw0JnLaEf.png',
     u'Discovery Showcase HD': logobase + 'O9SOWEudw1cs6vkxAwbzsN0f9kKE21.png',
+    u'Discovery Showcase Europe HD': logobase + 'XAHxkkrYx2ixx7b1KJWtSEXBBda0bj.png',
     u'Discovery Turbo Xtra HD': logobase + 'nF2E8OKZHLP7f1WsW7ZL163NAkjPQn.png',
     u'Disney Channel': logobase + 'JxEjTeXwExjnxutQGKJBmMI85tpNqK.png',
     u'Disney Channel (+2)': logobase + 'nn6LfV3ROFIiPztSN76lNa1OSkPFzp.png',
@@ -286,6 +293,7 @@ logomap = {
     u'Disney XD (England)': logobase + 'qcQ0LA89xUZ9XSzOk9SuqQiQzcuGXt.png',
     u'Divinity TV': logobase + 'q2S5vg5C0z4RE5O37rrVnqpQ3Svnm8.png',
     u'DMAX Austria': logobase + '2IJzdBpGH5lY60LJz95mreaKtrGCUu.png',
+    u'DocuBox': logobase + 'gT2nrR8TRzqOF9SN00dIB90CursTDi.png',
     u'DocuBox HD': logobase + 'md48U7CLoQ7gUeUynpHj2No5VPXV3m.png',
     u'Dog TV': logobase + 'NblfllG2mrqX3Zrb36rv7hLUe2sG1R.png',
     u'Donau TV': logobase + 'TWEwF3lvq4MEUsSdAsRpvMLptwvysQ.png',
@@ -319,6 +327,7 @@ logomap = {
     u'EPOQUЕ HD': logobase + 'EKfkYWRSkYiN76MxCZCjawxewjBOYY.png',
     u'Erox HD': logobase + '0ynzts5PDTu5hUxEWWHprupdiILjxO.png',
     u'Eska TV Extra': logobase + '4NZw34ITXBGy0jBfhfXhwp2LR0q1cL.png',
+    u'Evropa TV Bulgaria': logobase + '7kBSmEyoFK3QQqTmq0OoIezdIM9vky.png',
     u'ET NOW': logobase + 'xaWtEEIRB8sp2jwx5iHPT6lRyVu84n.png',
     u'ETHNO CHANNEL HD': logobase + '62f9lJMKh6DLbYxD7DCydPKNLiJilO.png',
     u'ETV': logobase + 'EXXEf0i7yGRDFttKSwBq4CLoGiuxbW.png',
@@ -345,7 +354,7 @@ logomap = {
     u'Extreme Sports': logobase + '21FhIqWK82JDPNuLTEIC9hSO2EHfks.png',
     u'EТV+': logobase + '64BTq8C5ZglQeKE9Ckv8OvnxFrjyGH.png',
     u'Face TV HD': logobase + 'IRj3tr6MMPUMlgwcBqOoQVCfdUzNrP.png',
-    u'Fantastic Animation HD (Тест)': logobase + '19cxHmEwy3g5JIlp1VrmFuNaxDS6X2.png',
+    u'Fantastic Animation HD': logobase + '19cxHmEwy3g5JIlp1VrmFuNaxDS6X2.png',
     u'Family Friendly (USA)': logobase + 'O9nvz3x6AYFBI3GVIblawqqn8CD4Tr.png',
     u'FAP TV 2': logobase + 'YVmUBY8cBPO8IoL4djlyeKCDbs6f0p.png',
     u'FAP TV 2 HD': logobase + 'KqVXT8GPTPuPEM87hZSqDwajqcBBgY.png',
@@ -866,6 +875,7 @@ logomap = {
     u'Turkmenistan TV': logobase + 'L2iPhOsYZYIqmvkkStarXPStt5tu5w.png',
     u'TV 1000': logobase + 'WJMEvVafVakrm7BUMy1lzku7VQCx25.png',
     u'TV 1000 Action East': logobase + 'GblbxkDGXZyW5oWt9W8wuERQAiZ7ZT.png',
+    u'TV 1000 HD': logobase + 'PdLVebOybUviNHdmslg5QYkbHtnpua.png',
     u'TV 1000 World Kino': logobase + 'CQfnaO6lQvA178UDr2HfQjZVvFdgJc.png',
     u'TV 1000 Русское кино': logobase + 'ch5DX6f8hxDnmyzrjotUoKHNGzcw9P.png',
     u'TV 1000 Русское кино HD': logobase + 'Os7dMOOgiQGT05GLqNpovRenApt1ci.png',
@@ -1108,6 +1118,7 @@ logomap = {
     u'Ингушетия 24': logobase + 'EkF7CR2dTqpBPz9JlGNRxc8NATTcus.png',
     u'Индиго': logobase + 'dFIp5shmC5DbfWIDVaFh7coAofmLON.png',
     u'Индийское кино': logobase + 'y8wvb5nc77vn5c4x8kinv85c7mv6n875c84.png',
+    u'Интер': logobase + 'frjd3J6O1RJ6ki9JooQOmLKCb4VuSZ.png',
     u'Интер+': logobase + 'frjd3J6O1RJ6ki9JooQOmLKCb4VuSZ.png',
     u'История': logobase + 'PNRaeOUFzOPFtrclFBBRTckj6Lvo0u.png',
     u'К1': logobase + 'mk2mYb28HFIxkFIiMNQWmKUdn1Y8hD.png',
@@ -1259,6 +1270,7 @@ logomap = {
     u'НСТ': logobase + 'fKYzdlWRz68qd9mRZnWuxMY73EyaSz.png',
     u'НТВ': logobase + 'B5GA1cfgmn8EsxrdwfNUIrEbdqarXf.png',
     u'НТВ  Молдова': logobase + 'WsntXIkTDI5jlYhDhFNJkt9NlpCzja.png',
+    u'НТВ Молдова': logobase + 'WsntXIkTDI5jlYhDhFNJkt9NlpCzja.png',
     u'НТВ (+2)': logobase + 'B5GA1cfgmn8EsxrdwfNUIrEbdqarXf.png',
     u'НТВ (+4)': logobase + '8rbGj74wrvyI5KtdmnTpGyPaFZcyFM.png',
     u'НТВ (Беларусь)': logobase + 'kF0n5BZzggqrBd2rPSyQKuGtC5YuCR.png',
