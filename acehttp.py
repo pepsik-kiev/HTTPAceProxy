@@ -165,11 +165,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     s.stream = s.verify = False
                     url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
                     params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
-                    self.cmd = s.get(url, params=params, timeout = 5).json()['response']
-                    CID = self.cmd['infohash']
+                    self.cmd = s.get(url, params=params, timeout=5).json()['response']
+                    CID = requests.compat.urlparse(self.cmd['playback_url']).path.split('/')[3]
                     url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
                     params = { 'method': 'get_media_files', 'infohash': CID }
-                    NAME = s.get(url, params=params, timeout = 5).json()['result'][paramsdict['file_indexes']]
+                    NAME = s.get(url, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
               except Exception as e:
                  self.dieWithError(503, '%s' % repr(e), logging.ERROR)
                  return
