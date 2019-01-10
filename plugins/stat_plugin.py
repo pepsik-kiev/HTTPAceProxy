@@ -118,9 +118,9 @@ class Stat(AceProxyPlugin):
 
                if self.config.new_api:
                   with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
-                     status = r.json()['response']
+                     stat = r.json()['response']
                else:
-                  status = c.ace._status.get(timeout=2)
+                  stat = c.ace._status.get(timeout=2)
 
                client_data = {
                     'channelIcon': c.channelIcon,
@@ -129,12 +129,13 @@ class Stat(AceProxyPlugin):
                     'clientLocation': clientInfo,
                     'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
                     'durationTime': time.strftime("%H:%M:%S", time.gmtime(time.time()-c.connectionTime)),
-                    'streamSpeedDL': status['speed_down'],
-                    'streamSpeedUL': status['speed_up'],
-                    'streamPeers': status['peers']
+                    'streamSpeedDL': stat['speed_down'],
+                    'streamSpeedUL': stat['speed_up'],
+                    'streamPeers': stat['peers'],
+                    'status': stat['status']
                      }
-
                response['clients_data'].append(client_data)
+
             exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
             connection.send_response(200)
             connection.send_header('Content-type', 'application/json')

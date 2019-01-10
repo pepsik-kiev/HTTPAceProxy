@@ -226,19 +226,21 @@ class AceClient(object):
                  # STATUS
                  elif self._recvbuffer.startswith('STATUS'):
                     self._tempstatus = self._recvbuffer.split()[1]
+                    stat = [self._tempstatus.split(';')[0].split(':')[1]] # main:????
                     if self._tempstatus.startswith('main:idle'): pass
                     elif self._tempstatus.startswith('main:loading'): pass
                     elif self._tempstatus.startswith('main:starting'): pass
                     elif self._tempstatus.startswith('main:check'): pass
-                    elif self._tempstatus.startswith('main:wait'): pass
-                    elif self._tempstatus.startswith(('main:prebuf','main:buf')):  #progress;time
-                       values = list(map(int, self._tempstatus.split(';')[3:]))
-                       self._status.set({k:v for k,v in zip(AceConst.STATUS, values)})
-                    elif self._tempstatus.startswith('main:dl'):
-                       values = list(map(int, self._tempstatus.split(';')[1:]))
-                       self._status.set({k:v for k,v in zip(AceConst.STATUS, values)})
                     elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
                        #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
+                    elif self._tempstatus.startswith('main:dl'):
+                       stat.extend(list(map(int, self._tempstatus.split(';')[1:])))
+                    elif self._tempstatus.startswith('main:wait'): #;time
+                       stat.extend(list(map(int, self._tempstatus.split(';')[2:])))
+                    elif self._tempstatus.startswith(('main:prebuf','main:buf')):  #progress;time
+                       stat.extend(list(map(int, self._tempstatus.split(';')[3:])))
+                    if len(stat) == len(AceConst.STATUS):
+                       self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)})
                  # CID
                  elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
                  # INFO
