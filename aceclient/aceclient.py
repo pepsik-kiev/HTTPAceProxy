@@ -88,10 +88,10 @@ class AceClient(object):
 
     def _write(self, message):
         try:
-            self._socket.write('%s\r\n' % message)
-            logging.debug('>>> %s' % message)
+           self._socket.write('%s\r\n' % message)
+           logging.debug('>>> %s' % message)
         except gevent.socket.error:
-            raise AceException('Error writing data to AceEngine API port')
+           raise AceException('Error writing data to AceEngine API port')
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
@@ -107,22 +107,22 @@ class AceClient(object):
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try: params = self._auth.get(timeout=self._resulttimeout)
         except gevent.Timeout as t:
-            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
-            raise AceException(errmsg)
+           errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
+           raise AceException(errmsg)
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
         try:
-            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
-               errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
-               raise AceException(errmsg)
+           if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
+              errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
+              raise AceException(errmsg)
         except gevent.Timeout as t:
-            errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
-            raise AceException(errmsg)
+           errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
+           raise AceException(errmsg)
 
         if int(params.get('version_code', 0)) >= 3003600: # Display download_stopped massage
-            params_dict = {'use_stop_notifications': '1'}
-            self._write(AceMessage.request.SETOPTIONS(params_dict))
+           params_dict = {'use_stop_notifications': '1'}
+           self._write(AceMessage.request.SETOPTIONS(params_dict))
 
     def START(self, command, paramsdict, acestreamtype):
         '''
@@ -133,8 +133,8 @@ class AceClient(object):
         self._write(AceMessage.request.START(command.upper(), paramsdict))
         try: return self._url.get(timeout=self._videotimeout)
         except gevent.Timeout as t:
-            errmsg = 'START URL not resived! Engine response time %s exceeded' % t
-            raise AceException(errmsg)
+           errmsg = 'START URL not resived! Engine response time %s exceeded' % t
+           raise AceException(errmsg)
 
     def STOP(self):
         '''
@@ -144,16 +144,16 @@ class AceClient(object):
         self._write(AceMessage.request.STOP)
         try: self._state.get(timeout=self._resulttimeout)
         except gevent.Timeout as t:
-            errmsg = 'Engine response time %s exceeded. STATE 0 (IDLE) not resived!' % t
-            raise AceException(errmsg)
+           errmsg = 'Engine response time %s exceeded. STATE 0 (IDLE) not resived!' % t
+           raise AceException(errmsg)
 
     def LOADASYNC(self, command, params):
         self._loadasync = AsyncResult()
         self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1, 100000), params))
         try: return self._loadasync.get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout as t:
-            errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
-            raise AceException(errmsg)
+           errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
+           raise AceException(errmsg)
 
     def GETCONTENTINFO(self, command, value):
         paramsdict = { command:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
@@ -162,21 +162,21 @@ class AceClient(object):
     def GETCID(self, command, value):
         contentinfo = self.GETCONTENTINFO(command, value)
         if contentinfo['status'] in (1, 2):
-            paramsdict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
-            self._cid = AsyncResult()
-            self._write(AceMessage.request.GETCID(paramsdict))
-            try: return self._cid.get(timeout=self._resulttimeout)[2:] # ##CID
-            except gevent.Timeout as t:
-                 errmsg = 'Engine response time %s exceeded. CID not resived!' % t
-                 raise AceException(errmsg)
+           paramsdict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
+           self._cid = AsyncResult()
+           self._write(AceMessage.request.GETCID(paramsdict))
+           try: return self._cid.get(timeout=self._resulttimeout)[2:] # ##CID
+           except gevent.Timeout as t:
+              errmsg = 'Engine response time %s exceeded. CID not resived!' % t
+              raise AceException(errmsg)
         else:
-            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
-            raise AceException(errmsg)
+           errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
+           raise AceException(errmsg)
 
     def GETINFOHASH(self, command, value, idx=0):
         contentinfo = self.GETCONTENTINFO(command, value)
         if contentinfo['status'] in (1, 2):
-            return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
+           return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
         elif contentinfo['status'] == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
            raise AceException(errmsg)
@@ -189,16 +189,16 @@ class AceClient(object):
         Data receiver method for greenlet
         '''
         while 1:
-           with gevent.Timeout(timeout, False):
+           with gevent.Timeout(timeout, False): # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
-              except gevent.Timeout: self.destroy() # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
+              except gevent.Timeout: self.destroy()
               except gevent.socket.timeout: pass
               except Exception as err:
                  logging.error('AceException:%s' % repr(err))
                  break
               else:
-                 # Parsing everything only if the string is not empty
                  logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+                 # Parsing everything only if the string is not empty
                  # HELLOTS
                  if self._recvbuffer.startswith('HELLOTS'):
                     #version=engine_version version_code=version_code key=request_key http_port=http_port
@@ -231,12 +231,12 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:starting'): pass
                     elif self._tempstatus.startswith('main:check'): pass
                     elif self._tempstatus.startswith('main:wait'): pass
-                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): pass #progress;time
-                       #values = list(map(int, self._tempstatus.split(';')[3:]))
-                       #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
-                    elif self._tempstatus.startswith('main:dl'): pass
-                       #values = list(map(int, self._tempstatus.split(';')[1:]))
-                       #self._status.set({k: v for k, v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith(('main:prebuf','main:buf')):  #progress;time
+                       values = list(map(int, self._tempstatus.split(';')[3:]))
+                       self._status.set({k:v for k,v in zip(AceConst.STATUS, values)})
+                    elif self._tempstatus.startswith('main:dl'):
+                       values = list(map(int, self._tempstatus.split(';')[1:]))
+                       self._status.set({k:v for k,v in zip(AceConst.STATUS, values)})
                     elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
                        #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
                  # CID

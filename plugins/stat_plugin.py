@@ -75,8 +75,6 @@ class Stat(AceProxyPlugin):
 
         if self.get_param('action') == 'get_status':
 
-            current_time = time.time()
-
             if headers_only:
                connection.send_response(200)
                connection.send_header('Content-type', 'application/json')
@@ -118,13 +116,22 @@ class Stat(AceProxyPlugin):
                   except: r = {}
                   clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('countryCode','n/a').lower(), r.get('countryName','n/a'), r.get('city', 'n/a'))
 
+               if self.config.new_api:
+                  with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
+                     status = r.json()['response']
+               else:
+                  status = c.ace._status.get(timeout=2)
+
                client_data = {
                     'channelIcon': c.channelIcon,
                     'channelName': c.channelName,
                     'clientIP': c.clientip,
                     'clientLocation': clientInfo,
                     'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
-                    'durationTime': time.strftime("%H:%M:%S", time.gmtime(current_time-c.connectionTime))
+                    'durationTime': time.strftime("%H:%M:%S", time.gmtime(time.time()-c.connectionTime)),
+                    'streamSpeedDL': status['speed_down'],
+                    'streamSpeedUL': status['speed_up'],
+                    'streamPeers': status['peers']
                      }
 
                response['clients_data'].append(client_data)
@@ -155,9 +162,10 @@ html_template = b"""
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
     <link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
     <style>
         .header {height: 150px; background-color: #0a0351 !important; background-size: 100%;background-image: url(http://i.piccy.info/i9/32afd3631fc0032bbfc7bed47d8fec11/1530666765/66668/1254756/space_2294795_1280.jpg);}
-        .header-block {position: relative; color:aliceblue; width: 100%; height: 100%;}
+        .header-block {position: relative; color: aliceblue; width: 100%; height: 100%;}
         .info-block {position: absolute; left: 15px; bottom:5px; text-shadow: 1px 1px 3px black;}
         .info-block > h6 {margin-bottom: 3px; font-weight: bold}
         .info-block > p {font-size: 0.7em; margin: 0;}
@@ -167,6 +175,7 @@ html_template = b"""
         .home-link {text-decoration: none; color: aliceblue; font-size: 0.7em;}
         .home-link:hover{color: #b6dcfe; text-decoration: none; font-size: 0.8em;}
         H1 > small {font-size: 0.4em;}
+        .table img {max-width: 80px; height: 20px;}
         .table .thead-light th {color: #495057; background-color: #e9e9e9; border: 3px ridge #4b4b4b;}
         .table-bordered td {border: 3px ridge #4b4b4b;}
         th > small {font-weight: bold}
@@ -210,10 +219,15 @@ html_template = b"""
                                        "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
             if (clients_data.length) {
                 clients_data.forEach(function(item, i, arr) {
-                    clients_content += '<tr><td><img src="' + item.channelIcon +
-                                       '" width="40" height="20"/>&nbsp;&nbsp;' + item.channelName +
-                                        '</td><td>' + item.clientIP + '</td><td>' + item.clientLocation + '</td>' +
-                                        '<td>' + item.startTime + '</td><td class="text-center">' + item.durationTime + '</td></tr>';
+                    clients_content += '<tr><td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
+                                        '<td>' + item.clientIP + '</td>'+
+                                        '<td>' + item.clientLocation + '</td>' +
+                                        '<td>' + item.startTime + '</td>' +
+                                        '<td class="text-center">' + item.durationTime + '</td>' +
+                                        '<td class="text-center">'+
+                                            item.streamSpeedDL +'<i class="fas fa-arrow-alt-circle-down"></i>&nbsp;&nbsp;' +
+                                            item.streamSpeedUL + '<i class="fas fa-arrow-alt-circle-up"></i></td>' +
+                                        '<td class="text-center">'+ item.streamPeers +'</td></tr>';
                 });
                 $('tbody').html(clients_content);
             } else {
@@ -249,6 +263,8 @@ html_template = b"""
                         <th scope="col">Client/Location</th>
                         <th scope="col">Start time</th>
                         <th scope="col">Duration</th>
+                        <th scope="col">Speed kB/s</th>
+                        <th scope="col">Peers</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -45,6 +45,7 @@ from aceconfig import AceConfig
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
+    handlerGreenlet = None
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
@@ -165,7 +166,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     s.stream = s.verify = False
                     url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
                     params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
-                    self.cmd = s.get(url, params=params, timeout=5).json()['response']
+                    self.cmd = s.get(url, params=params, timeout=(5,AceConfig.videotimeout)).json()['response']
                     CID = requests.compat.urlparse(self.cmd['playback_url']).path.split('/')[3]
                     url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
                     params = { 'method': 'get_media_files', 'infohash': CID }
@@ -205,7 +206,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            if AceProxy.clientcounter.addClient(CID, self) == 1:
               # If there is no existing broadcast we create it
-              playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype) if not AceConfig.new_api else self.cmd['playback_url']
+              playback_url = self.cmd['playback_url'] if AceConfig.new_api else self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
                  playback_url = requests.compat.urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
               gevent.spawn(StreamReader, playback_url, CID)
@@ -242,8 +243,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
               if AceConfig.new_api:
                  with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=5) as r:
-                    pass
-              logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+                    logging.debug('Stop broadcast: %s' % r.json())
+              logging.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
 
     def connectDetector(self):
         try: self.rfile.read()
@@ -552,4 +553,3 @@ server.start()
 logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (server.server_host, server.server_port))
 # Start complite. Wating for requests
 gevent.wait()
-
