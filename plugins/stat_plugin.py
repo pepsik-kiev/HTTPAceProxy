@@ -4,6 +4,9 @@ Simple statistics plugin
 
 To use it, go to http://acehttp_proxy_ip:port/stat
 '''
+
+__author__ = 'Dorik1972, !Joy!'
+
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
 import time
@@ -26,13 +29,7 @@ class Stat(AceProxyPlugin):
         self.stuff = AceProxy
         self.params = None
 
-    def geo_ip_lookup(self, ip_address):
-        Stat.logger.debug('Obtain geoip info for IP:%s' % ip_address)
-        headers = {'User-Agent':'API Browser'}
-        return requests.get('http://api.db-ip.com/v2/free/%s' % ip_address, headers=headers, stream=False, timeout=10).json()
-
     def mac_lookup(self,ip_address):
-
         mac_address = None
         if ip_address == self.config.httphost:
            from uuid import getnode
@@ -60,27 +57,24 @@ class Stat(AceProxyPlugin):
            p1.stdout.close(); p2.stdout.close()
 
         if mac_address:
-           headers = {'User-Agent':'API Browser'}
-           try: response = requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5).json()['result']['company']
+           try:
+              headers = {'User-Agent':'API Browser'}
+              with requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5) as r:
+                return r.json()['result']['company']
            except: Stat.logger.debug("Can't obtain vendor for MAC address %s" % mac_address)
-           else: return response
         else: Stat.logger.debug("Can't obtain MAC address for local IP %s" % ip_address)
         return 'Local IP address '
 
-    def get_param(self, key):
-        return self.params[key][0] if key in self.params else None
-
     def handle(self, connection, headers_only=False):
         self.params = parse_qs(connection.query)
-        test_file_extension = re.search(r'\.js$|\.css$|\.html$|\.png$|\.jpg$|\.jpeg$', connection.path)
+        test_file_extension = re.search(r'\.js$|\.css$|\.html$|\.png$|\.jpg$|\.jpeg$|\.svg$', connection.path)
+
+        if headers_only:
+           self.setHeaders(200, 'json', 0, connection)
+           return
 
         if connection.path == '/stat':
-
-            if self.get_param('action') == 'get_status':
-
-                if headers_only:
-                   self.setHeaders(200, 'json', 0, connection)
-                   return
+            if self.params.get('action', [''])[0] == 'get_status':
 
                 # Sys Info
                 max_mem = psutil.virtual_memory()
@@ -112,9 +106,13 @@ class Stat(AceProxyPlugin):
                    if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
                       clientInfo = self.mac_lookup(c.clientip)
                    else:
-                      try: r = self.geo_ip_lookup(c.clientip)
+                      try:
+                         headers = {'User-Agent':'API Browser'}
+                         with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
+                            if r.encoding is None: r.encoding = 'utf-8'
+                            r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
                       except: r = {}
-                      clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('countryCode','n/a').lower(), r.get('countryName','n/a'), r.get('city', 'n/a'))
+                      clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
 
                    if self.config.new_api:
                       with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
@@ -127,12 +125,14 @@ class Stat(AceProxyPlugin):
                         'channelName': c.channelName,
                         'clientIP': c.clientip,
                         'clientLocation': clientInfo,
-                        'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
-                        'durationTime': time.strftime("%H:%M:%S", time.gmtime(time.time()-c.connectionTime)),
+                        'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
+                        'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                         'streamSpeedDL': stat['speed_down'],
                         'streamSpeedUL': stat['speed_up'],
                         'streamPeers': stat['peers'],
-                        'status': stat['status']
+                        'status': stat['status'],
+                        'downloaded': self.config.bytes2human(stat['downloaded']),
+                        'uploaded': self.config.bytes2human(stat['uploaded'])
                          }
                    response['clients_data'].append(client_data)
 
@@ -159,13 +159,11 @@ class Stat(AceProxyPlugin):
         else:
             connection.dieWithError(404, 'Not Found')
 
-
     def getReqFileContent(self, path):
-        root_dir = "http"
-        with open(root_dir + "/" + path, "rb") as handle:
+        root_dir = 'http'
+        with open(root_dir + '/' + path, 'rb') as handle:
            file_content = handle.read()
         return file_content
-
 
     def setHeaders(self, status_code, type, len_content, connection):
         content_type = {
@@ -176,12 +174,10 @@ class Stat(AceProxyPlugin):
             'png': r'image/png',
             'jpg': r'image/jpeg',
             'jpeg': r'image/jpeg',
-        }
+            'svg': r'image/svg+xml'
+             }
         connection.send_response(status_code)
         connection.send_header('Content-type', content_type[type])
         connection.send_header('Connection', 'close')
         connection.send_header('Content-Length', len_content)
         connection.end_headers()
-
-
-
