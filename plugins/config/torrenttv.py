@@ -11,7 +11,7 @@ Torrent-tv.ru Playlist Downloader Plugin configuration file
 proxies = None
 
 # Insert your Torrent-tv.ru playlist URL here
-url=''
+url='http://ttv.pp.ua/CID-TTV.m3u'
 
 # TV Guide URL
 tvgurl = 'https://goo.gl/ajGuLS'
@@ -34,7 +34,7 @@ m3uchanneltemplate = '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-
 # torrent-tv tracker forgetting us.
 #
 # 0 = disabled
-updateevery = 0
+updateevery = 30
 
 logobase = 'http://1ttv.org/uploads/'
 logomap = {

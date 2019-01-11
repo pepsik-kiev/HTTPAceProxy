@@ -72,207 +72,117 @@ class Stat(AceProxyPlugin):
 
     def handle(self, connection, headers_only=False):
         self.params = parse_qs(connection.query)
+        test_file_extension = re.search(r'\.js$|\.css$|\.html$|\.png$|\.jpg$|\.jpeg$', connection.path)
 
-        if self.get_param('action') == 'get_status':
+        if connection.path == '/stat':
 
-            if headers_only:
-               connection.send_response(200)
-               connection.send_header('Content-type', 'application/json')
-               connection.send_header('Connection', 'close')
-               connection.end_headers()
-               return
+            if self.get_param('action') == 'get_status':
 
-            # Sys Info
-            max_mem = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
+                if headers_only:
+                   self.setHeaders(200, 'json', 0, connection)
+                   return
 
-            response = {}
-            response['status'] = 'success'
-            response['sys_info'] = {
-                 'os_platform': self.config.osplatform,
-                 'cpu_nums': psutil.cpu_count(),
-                 'cpu_percent': psutil.cpu_percent(interval=1),
-                 'total_ram': self.config.bytes2human(max_mem.total),
-                 'used_ram': self.config.bytes2human(max_mem.used),
-                 'free_ram': self.config.bytes2human(max_mem.available),
-                 'total_disk': self.config.bytes2human(disk.total),
-                 'used_disk': self.config.bytes2human(disk.used),
-                 'free_disk': self.config.bytes2human(disk.free),
-                  }
+                # Sys Info
+                max_mem = psutil.virtual_memory()
+                disk = psutil.disk_usage('/')
 
-            response['connection_info'] = {
-                 'max_clients': self.config.maxconns,
-                 'total_clients': self.stuff.clientcounter.totalClients(),
-                }
+                response = {}
+                response['status'] = 'success'
+                response['sys_info'] = {
+                     'os_platform': self.config.osplatform,
+                     'cpu_nums': psutil.cpu_count(),
+                     'cpu_percent': psutil.cpu_percent(interval=1),
+                     'total_ram': self.config.bytes2human(max_mem.total),
+                     'used_ram': self.config.bytes2human(max_mem.used),
+                     'free_ram': self.config.bytes2human(max_mem.available),
+                     'total_disk': self.config.bytes2human(disk.total),
+                     'used_disk': self.config.bytes2human(disk.used),
+                     'free_disk': self.config.bytes2human(disk.free),
+                      }
 
-            response['clients_data'] = []
-            # Dict {'CID': [client1, client2,....]} to list of values
-            clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
-            for c in clients:
-               if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                  clientInfo = self.mac_lookup(c.clientip)
-               else:
-                  try: r = self.geo_ip_lookup(c.clientip)
-                  except: r = {}
-                  clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('countryCode','n/a').lower(), r.get('countryName','n/a'), r.get('city', 'n/a'))
-
-               if self.config.new_api:
-                  with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
-                     stat = r.json()['response']
-               else:
-                  stat = c.ace._status.get(timeout=2)
-
-               client_data = {
-                    'channelIcon': c.channelIcon,
-                    'channelName': c.channelName,
-                    'clientIP': c.clientip,
-                    'clientLocation': clientInfo,
-                    'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
-                    'durationTime': time.strftime("%H:%M:%S", time.gmtime(time.time()-c.connectionTime)),
-                    'streamSpeedDL': stat['speed_down'],
-                    'streamSpeedUL': stat['speed_up'],
-                    'streamPeers': stat['peers'],
-                    'status': stat['status']
-                     }
-               response['clients_data'].append(client_data)
-
-            exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
-            connection.send_response(200)
-            connection.send_header('Content-type', 'application/json')
-            connection.send_header('Connection', 'close')
-            connection.send_header('Content-Length', len(exported))
-            connection.end_headers()
-            connection.wfile.write(exported)
-        else:
-            connection.send_response(200)
-            connection.send_header('Content-type', 'text/html; charset=utf-8')
-            connection.send_header('Connection', 'close')
-            connection.send_header('Content-Length', len(html_template))
-            connection.end_headers()
-            connection.wfile.write(html_template)
-
-html_template = b"""
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8"/>
-    <meta name="description" content="HTTP AceProxy state panel">
-<link rel="shortcut icon" href="http://i.piccy.info/i9/699484caf086b9c6b5c6cf2cf48f3624/1530371843/19958/1254756/shesterenka.png" type="image/png">
-    <title>AceProxy stat info</title>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
-    <link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
-    <style>
-        .header {height: 150px; background-color: #0a0351 !important; background-size: 100%;background-image: url(http://i.piccy.info/i9/32afd3631fc0032bbfc7bed47d8fec11/1530666765/66668/1254756/space_2294795_1280.jpg);}
-        .header-block {position: relative; color: aliceblue; width: 100%; height: 100%;}
-        .info-block {position: absolute; left: 15px; bottom:5px; text-shadow: 1px 1px 3px black;}
-        .info-block > h6 {margin-bottom: 3px; font-weight: bold}
-        .info-block > p {font-size: 0.7em; margin: 0;}
-        .status-connection > p {position: absolute; right: 15px; bottom:5px; margin: 0;text-shadow: 1px 1px 1px black;}
-        .heder-title {color:aliceblue; padding-top:35px; font-weight: bold; text-shadow: 2px 2px 1px black, 0 0 0.9em #008aff;}
-        .heder-title > h1 {font-weight: bold; margin-bottom: 0px}
-        .home-link {text-decoration: none; color: aliceblue; font-size: 0.7em;}
-        .home-link:hover{color: #b6dcfe; text-decoration: none; font-size: 0.8em;}
-        H1 > small {font-size: 0.4em;}
-        .table img {max-width: 80px; height: 20px;}
-        .table .thead-light th {color: #495057; background-color: #e9e9e9; border: 3px ridge #4b4b4b;}
-        .table-bordered td {border: 3px ridge #4b4b4b;}
-        th > small {font-weight: bold}
-    </style>
-    <script type="text/javascript">
-        getStatus();
-        function getStatus() {
-            $.ajax({
-                url: 'stat/?action=get_status',
-                type: 'get',
-                success: function(resp) {
-                    if(resp.status === 'success') {
-                        renderPage(resp);
-                    } else {
-                        console.error('Error! getStatus() Response not returning status success');
+                response['connection_info'] = {
+                     'max_clients': self.config.maxconns,
+                     'total_clients': self.stuff.clientcounter.totalClients(),
                     }
-                    setTimeout(getStatus, 5000);
-                },
-                error: function(resp, textStatus, errorThrown) {
-                    console.error("getStatus() Unknown error!." +
-                        " ResponseCode: " + resp.status +
-                        " | textStatus: " + textStatus +
-                        " | errorThrown: " + errorThrown);
-                    $('tbody').html("");
-                    $('main').append('<h1 class="text-center" style="color:red; font-weight: bold;">Server not responding! Refresh page!!!</h1>')
-                },
-            });
+
+                response['clients_data'] = []
+                # Dict {'CID': [client1, client2,....]} to list of values
+                clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
+                for c in clients:
+                   if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
+                      clientInfo = self.mac_lookup(c.clientip)
+                   else:
+                      try: r = self.geo_ip_lookup(c.clientip)
+                      except: r = {}
+                      clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('countryCode','n/a').lower(), r.get('countryName','n/a'), r.get('city', 'n/a'))
+
+                   if self.config.new_api:
+                      with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
+                         stat = r.json()['response']
+                   else:
+                      stat = c.ace._status.get(timeout=2)
+
+                   client_data = {
+                        'channelIcon': c.channelIcon,
+                        'channelName': c.channelName,
+                        'clientIP': c.clientip,
+                        'clientLocation': clientInfo,
+                        'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
+                        'durationTime': time.strftime("%H:%M:%S", time.gmtime(time.time()-c.connectionTime)),
+                        'streamSpeedDL': stat['speed_down'],
+                        'streamSpeedUL': stat['speed_up'],
+                        'streamPeers': stat['peers'],
+                        'status': stat['status']
+                         }
+                   response['clients_data'].append(client_data)
+
+                exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
+                self.setHeaders(200, 'json', len(exported), connection)
+                connection.wfile.write(exported)
+            else:
+                file_content = self.getReqFileContent("index.html")
+                self.setHeaders(200, 'html', len(file_content), connection)
+                connection.wfile.write(file_content)
+
+        elif test_file_extension:
+            path_file_ext = test_file_extension.group(0).replace(r'.', '')
+            path = connection.path
+
+            try:
+                file_content = self.getReqFileContent(path.replace(r'/stat', ''))
+            except:
+                connection.dieWithError(404, 'Not Found')
+                return
+
+            self.setHeaders(200, path_file_ext, len(file_content), connection)
+            connection.wfile.write(file_content)
+        else:
+            connection.dieWithError(404, 'Not Found')
+
+
+    def getReqFileContent(self, path):
+        root_dir = "http"
+        handle = open(root_dir + "/" + path, "rb")
+        file_content = handle.read()
+        handle.close()
+        return file_content
+
+
+    def setHeaders(self, status_code, type, len_content, connection):
+        content_type = {
+            'js': r'text/javascript; charset=utf-8',
+            'json': r'application/json',
+            'css': r'text/css; charset=utf-8',
+            'html': r'text/html; charset=utf-8',
+            'png': r'image/png',
+            'jpg': r'image/jpeg',
+            'jpeg': r'image/jpeg',
         }
-        function renderPage(data) {
-            var sys_info = data.sys_info;
-            var connection_info = data.connection_info;
-            var clients_data = data.clients_data;
-            var clients_content = "";
-            $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
-                                " used: " + sys_info.cpu_percent + "%</br>"+
-                                "RAM &nbsp;total: " + sys_info.total_ram +
-                                " &nbsp;used: " + sys_info.used_ram +
-                                "&nbsp;free: " + sys_info.free_ram + "</br>DISK &nbsp;total: " + sys_info.total_disk +
-                                "&nbsp;used: " + sys_info.used_disk + "&nbsp;free: " + sys_info.free_disk);
-            $('#connection_info').html("Connections limit: " + connection_info.max_clients +
-                                       "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
-            if (clients_data.length) {
-                clients_data.forEach(function(item, i, arr) {
-                    clients_content += '<tr><td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
-                                        '<td>' + item.clientIP + '</td>'+
-                                        '<td>' + item.clientLocation + '</td>' +
-                                        '<td>' + item.startTime + '</td>' +
-                                        '<td class="text-center">' + item.durationTime + '</td>' +
-                                        '<td class="text-center">'+
-                                            item.streamSpeedDL +'<i class="fas fa-arrow-alt-circle-down"></i>&nbsp;&nbsp;' +
-                                            item.streamSpeedUL + '<i class="fas fa-arrow-alt-circle-up"></i></td>' +
-                                        '<td class="text-center">'+ item.streamPeers +'</td></tr>';
-                });
-                $('tbody').html(clients_content);
-            } else {
-                $('tbody').html('');
-            }
-        }
-    </script>
-  </head>
-  <body>
-    <nav class="header">
-        <div class="header-block">
-            <div class="info-block">
-                <h6>SYSTEM INFO :</h6>
-                <p id="sys_info"></p>
-            </div>
-            <div class="status-connection">
-                <p id="connection_info"></p>
-            </div>
-            <div class="heder-title">
-                <h1 class="text-center">HTTP AceProxy</h1>
-                <p class="text-center"><a class="home-link" href="https://github.com/pepsik-kiev/HTTPAceProxy" target="_blank">Project home page on GitHub</a></p>
-                <p class="text-center"><a class="home-link" href="http://mytalks.ru/index.php?topic=4506.0" target="_blank">Forum HTTPAceProxy</a></p>
-            </div>
-        </div>
-    </nav>
-    <main role="main" class="container" style="margin-top: 30px">
-        <div class="f16 container container-fluid">
-            <table class="table table-sm table-bordered">
-                <thead class="thead-light text-center">
-                    <tr>
-                        <th scope="col">Channel name</th>
-                        <th scope="col">Client IP</th>
-                        <th scope="col">Client/Location</th>
-                        <th scope="col">Start time</th>
-                        <th scope="col">Duration</th>
-                        <th scope="col">Speed kB/s</th>
-                        <th scope="col">Peers</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-    </main>
-  </body>
-</html>
-"""
+        connection.send_response(status_code)
+        connection.send_header('Content-type', content_type[type])
+        connection.send_header('Connection', 'close')
+        connection.send_header('Content-Length', len_content)
+        connection.end_headers()
+
+
+
