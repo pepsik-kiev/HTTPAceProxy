@@ -4,6 +4,9 @@ Simple statistics plugin
 
 To use it, go to http://acehttp_proxy_ip:port/stat
 '''
+
+__author__ = 'Dorik1972, !Joy!'
+
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
 import time
@@ -121,12 +124,14 @@ class Stat(AceProxyPlugin):
                         'channelName': c.channelName,
                         'clientIP': c.clientip,
                         'clientLocation': clientInfo,
-                        'startTime': time.strftime('%c', time.localtime(c.connectionTime)),
-                        'durationTime': time.strftime("%H:%M:%S", time.gmtime(time.time()-c.connectionTime)),
+                        'startTime': time.strftime('%D %H:%M:%S', time.localtime(c.connectionTime)),
+                        'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                         'streamSpeedDL': stat['speed_down'],
                         'streamSpeedUL': stat['speed_up'],
                         'streamPeers': stat['peers'],
-                        'status': stat['status']
+                        'status': stat['status'],
+                        'downloaded': self.config.bytes2human(stat['downloaded']),
+                        'uploaded': self.config.bytes2human(stat['uploaded'])
                          }
                    response['clients_data'].append(client_data)
 
