@@ -104,8 +104,7 @@ class Stat(AceProxyPlugin):
                    else:
                       try:
                          headers = {'User-Agent':'API Browser'}
-                         #c.clientip
-                         with requests.get('https://geoip-db.com/jsonp/95.67.84.157', headers=headers, stream=False, timeout=5) as r:
+                         with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
                             if r.encoding is None: r.encoding = 'utf-8'
                             r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
                       except: r = {}
@@ -154,13 +153,11 @@ class Stat(AceProxyPlugin):
         else:
             connection.dieWithError(404, 'Not Found')
 
-
     def getReqFileContent(self, path):
         root_dir = 'http'
         with open(root_dir + '/' + path, 'rb') as handle:
            file_content = handle.read()
         return file_content
-
 
     def setHeaders(self, status_code, type, len_content, connection):
         content_type = {
@@ -172,7 +169,7 @@ class Stat(AceProxyPlugin):
             'jpg': r'image/jpeg',
             'jpeg': r'image/jpeg',
             'svg': r'image/svg+xml'
-        }
+             }
         connection.send_response(status_code)
         connection.send_header('Content-type', content_type[type])
         connection.send_header('Connection', 'close')
