@@ -69,12 +69,12 @@ class Stat(AceProxyPlugin):
         self.params = parse_qs(connection.query)
         test_file_extension = re.search(r'\.js$|\.css$|\.html$|\.png$|\.jpg$|\.jpeg$|\.svg$', connection.path)
 
+        if headers_only:
+           self.setHeaders(200, 'json', 0, connection)
+           return
+
         if connection.path == '/stat':
             if self.params.get('action', [''])[0] == 'get_status':
-                if headers_only:
-                   self.setHeaders(200, 'json', 0, connection)
-                   return
-
                 # Sys Info
                 max_mem = psutil.virtual_memory()
                 disk = psutil.disk_usage('/')
@@ -124,7 +124,7 @@ class Stat(AceProxyPlugin):
                         'channelName': c.channelName,
                         'clientIP': c.clientip,
                         'clientLocation': clientInfo,
-                        'startTime': time.strftime('%D %H:%M:%S', time.localtime(c.connectionTime)),
+                        'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                         'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                         'streamSpeedDL': stat['speed_down'],
                         'streamSpeedUL': stat['speed_up'],
@@ -180,6 +180,3 @@ class Stat(AceProxyPlugin):
         connection.send_header('Connection', 'close')
         connection.send_header('Content-Length', len_content)
         connection.end_headers()
-
-
-

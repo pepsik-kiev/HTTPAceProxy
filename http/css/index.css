@@ -66,3 +66,14 @@ H1 > small {
 .table-bordered td {
     border: 3px ridge #4b4b4b;
 }
+.digit-speed {
+    width: 2.5em;
+    display: inline-block;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+.bage-fixsize {
+    min-width:3em;
+    margin-left: 4px;
+    margin-right: 4px;
+}

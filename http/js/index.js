@@ -52,16 +52,18 @@ function renderPage(data) {
                 badgeCss = "danger";
             }
 
-            clients_content += '<tr><td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
+            clients_content += '<tr title="Downloaded: ' + item.downloaded + ' Uploaded: ' + item.uploaded + '">'+
+                                '<td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
                                 '<td>' + item.clientIP + '</td>'+
                                 '<td>' + item.clientLocation + '</td>' +
-                                '<td>' + item.startTime + '</td>' +
+                                '<td class="text-center">' + item.startTime + '</td>' +
                                 '<td class="text-center">' + item.durationTime + '</td>' +
-                                '<td class="text-center" title="buffering">'+
-                                    item.streamSpeedDL +'<i class="fas fa-arrow-alt-circle-down"></i>&nbsp;&nbsp;' +
-                                    item.streamSpeedUL + '<i class="fas fa-arrow-alt-circle-up"></i></td>' +
+                                '<td class="text-center">' +
+                                    '<div class="digit-speed text-right">'+ item.streamSpeedDL + '</div>' +
+                                    '<img src="/stat/img/arrow-down.svg"/><img src="/stat/img/arrow-up.svg"/>' +
+                                    '<div class="digit-speed text-left">' + item.streamSpeedUL + '</div></td>' +
                                 '<td class="text-center">'+ item.streamPeers +
-                                '&nbsp;&nbsp;<span class="badge badge-pill badge-'+ badgeCss +'">' + item.status +'</span></td></tr>';
+                                '<span class="badge badge-pill badge-'+ badgeCss +' bage-fixsize">' + item.status +'</span></td></tr>';
         });
         $('tbody').html(clients_content);
     } else {
