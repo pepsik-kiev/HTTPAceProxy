@@ -75,7 +75,6 @@ class Stat(AceProxyPlugin):
 
         if connection.path == '/stat':
             if self.params.get('action', [''])[0] == 'get_status':
-
                 # Sys Info
                 max_mem = psutil.virtual_memory()
                 disk = psutil.disk_usage('/')
