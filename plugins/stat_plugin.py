@@ -103,15 +103,16 @@ class Stat(AceProxyPlugin):
               clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
               for c in clients:
                  if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                    clientInfo = self.mac_lookup(c.clientip)
+                    if not c.clientInfo: c.clientInfo = self.mac_lookup(c.clientip)
                  else:
-                    try:
-                       headers = {'User-Agent':'API Browser'}
-                       with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
-                          if r.encoding is None: r.encoding = 'utf-8'
-                          r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
-                    except: r = {}
-                    clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
+                    if not c.clientInfo:
+                       try:
+                          headers = {'User-Agent':'API Browser'}
+                          with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
+                             if r.encoding is None: r.encoding = 'utf-8'
+                             r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
+                       except: r = {}
+                       c.clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
 
                  if self.config.new_api:
                     with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
@@ -123,7 +124,7 @@ class Stat(AceProxyPlugin):
                       'channelIcon': c.channelIcon,
                       'channelName': c.channelName,
                       'clientIP': c.clientip,
-                      'clientLocation': clientInfo,
+                      'clientLocation': c.clientInfo,
                       'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                       'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                       'streamSpeedDL': stat['speed_down'],

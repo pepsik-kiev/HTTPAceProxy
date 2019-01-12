@@ -178,9 +178,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.connectionTime = gevent.time.time()
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
+        self.clientInfo = self.transcoder = None
         try:
            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
-           self.transcoder = None
            self.out = self.wfile
            # If &fmt transcode key present in request
            fmt = self.reqparams.get('fmt', [''])[0]
@@ -244,7 +244,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               if AceConfig.new_api:
                  with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=5) as r:
                     logging.debug('Stop broadcast: %s' % r.json())
-              logging.warning('Broadcast "%s" stoped. Last client disconnected' % self.channelName)
+              logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 
     def connectDetector(self):
         try: self.rfile.read()
