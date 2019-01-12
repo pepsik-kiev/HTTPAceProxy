@@ -6,13 +6,13 @@ $(function () {
         html: true,
         title: 'Status description.',
         content: '<span class="badge badge-pill badge-success bage-help">dl</span>' +
-                    ' - AceEngine generates a stream and sends data to the client.<br>' +
+                    ' - Streaming data to the client<br>' +
                  '<span class="badge badge-pill badge-warning bage-help">buf</span>' +
-                    ' - AceEngine buffers data and does not give it to the client.<br>' +
+                    ' - Data buffering. Client plays data from its buffer<br>' +
                  '<span class="badge badge-pill badge-danger bage-help">prebuf</span>' +
-                    ' - AceEngine buffers data before issuing a link to a stream.<br>' +
+                    ' - Data buffering before issuing the stream url to the client<br>' +
                  '<span class="badge badge-pill badge-danger bage-help">wait</span>' +
-                    ' - AceEngine expects sufficient connection speed.'
+                    ' - Expect sufficient connection speed.'
     })
 })
 
