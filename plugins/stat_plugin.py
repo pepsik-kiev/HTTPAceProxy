@@ -29,7 +29,7 @@ class Stat(AceProxyPlugin):
         self.stuff = AceProxy
         self.params = None
 
-    def mac_lookup(self,ip_address):
+    def mac_lookup(self, ip_address):
         mac_address = None
         if ip_address == self.config.httphost:
            from uuid import getnode
@@ -67,102 +67,97 @@ class Stat(AceProxyPlugin):
 
     def handle(self, connection, headers_only=False):
         self.params = parse_qs(connection.query)
-        test_file_extension = re.search(r'\.js$|\.css$|\.html$|\.png$|\.jpg$|\.jpeg$|\.svg$', connection.path)
+        path_file_ext = re.search(r'.js$|.css$|.html$|.png$|.jpg$|.jpeg$|.svg$', connection.path)
 
         if headers_only:
            self.setHeaders(200, 'json', 0, connection)
            return
 
-        if connection.path == '/stat':
-            if self.params.get('action', [''])[0] == 'get_status':
-                # Sys Info
-                max_mem = psutil.virtual_memory()
-                disk = psutil.disk_usage('/')
+        if connection.path.startswith('/stat') and not path_file_ext:
+           if self.params.get('action', [''])[0] == 'get_status':
+              # Sys Info
+              max_mem = psutil.virtual_memory()
+              disk = psutil.disk_usage('/')
 
-                response = {}
-                response['status'] = 'success'
-                response['sys_info'] = {
-                     'os_platform': self.config.osplatform,
-                     'cpu_nums': psutil.cpu_count(),
-                     'cpu_percent': psutil.cpu_percent(interval=1),
-                     'total_ram': self.config.bytes2human(max_mem.total),
-                     'used_ram': self.config.bytes2human(max_mem.used),
-                     'free_ram': self.config.bytes2human(max_mem.available),
-                     'total_disk': self.config.bytes2human(disk.total),
-                     'used_disk': self.config.bytes2human(disk.used),
-                     'free_disk': self.config.bytes2human(disk.free),
-                      }
-
-                response['connection_info'] = {
-                     'max_clients': self.config.maxconns,
-                     'total_clients': self.stuff.clientcounter.totalClients(),
+              response = {}
+              response['status'] = 'success'
+              response['sys_info'] = {
+                   'os_platform': self.config.osplatform,
+                   'cpu_nums': psutil.cpu_count(),
+                   'cpu_percent': psutil.cpu_percent(interval=1),
+                   'total_ram': self.config.bytes2human(max_mem.total),
+                   'used_ram': self.config.bytes2human(max_mem.used),
+                   'free_ram': self.config.bytes2human(max_mem.available),
+                   'total_disk': self.config.bytes2human(disk.total),
+                   'used_disk': self.config.bytes2human(disk.used),
+                   'free_disk': self.config.bytes2human(disk.free),
                     }
 
-                response['clients_data'] = []
-                # Dict {'CID': [client1, client2,....]} to list of values
-                clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
-                for c in clients:
-                   if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                      clientInfo = self.mac_lookup(c.clientip)
-                   else:
-                      try:
-                         headers = {'User-Agent':'API Browser'}
-                         with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
-                            if r.encoding is None: r.encoding = 'utf-8'
-                            r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
-                      except: r = {}
-                      clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
+              response['connection_info'] = {
+                   'max_clients': self.config.maxconns,
+                   'total_clients': self.stuff.clientcounter.totalClients(),
+                    }
 
-                   if self.config.new_api:
-                      with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
-                         stat = r.json()['response']
-                   else:
-                      stat = c.ace._status.get(timeout=2)
+              response['clients_data'] = []
+              # Dict {'CID': [client1, client2,....]} to list of values
+              clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
+              for c in clients:
+                 if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
+                    clientInfo = self.mac_lookup(c.clientip)
+                 else:
+                    try:
+                       headers = {'User-Agent':'API Browser'}
+                       with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
+                          if r.encoding is None: r.encoding = 'utf-8'
+                          r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
+                    except: r = {}
+                    clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
 
-                   client_data = {
-                        'channelIcon': c.channelIcon,
-                        'channelName': c.channelName,
-                        'clientIP': c.clientip,
-                        'clientLocation': clientInfo,
-                        'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
-                        'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
-                        'streamSpeedDL': stat['speed_down'],
-                        'streamSpeedUL': stat['speed_up'],
-                        'streamPeers': stat['peers'],
-                        'status': stat['status'],
-                        'downloaded': self.config.bytes2human(stat['downloaded']),
-                        'uploaded': self.config.bytes2human(stat['uploaded'])
-                         }
-                   response['clients_data'].append(client_data)
+                 if self.config.new_api:
+                    with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
+                       stat = r.json()['response']
+                 else:
+                    stat = c.ace._status.get(timeout=2)
 
-                exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
-                self.setHeaders(200, 'json', len(exported), connection)
-                connection.wfile.write(exported)
-            else:
-                file_content = self.getReqFileContent("index.html")
-                self.setHeaders(200, 'html', len(file_content), connection)
-                connection.wfile.write(file_content)
+                 client_data = {
+                      'channelIcon': c.channelIcon,
+                      'channelName': c.channelName,
+                      'clientIP': c.clientip,
+                      'clientLocation': clientInfo,
+                      'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
+                      'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
+                      'streamSpeedDL': stat['speed_down'],
+                      'streamSpeedUL': stat['speed_up'],
+                      'streamPeers': stat['peers'],
+                      'status': stat['status'],
+                      'downloaded': self.config.bytes2human(stat['downloaded']),
+                      'uploaded': self.config.bytes2human(stat['uploaded'])
+                       }
+                 response['clients_data'].append(client_data)
 
-        elif test_file_extension:
-            path_file_ext = test_file_extension.group(0).replace(r'.', '')
-            path = connection.path
+              exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
+              self.setHeaders(200, 'json', len(exported), connection)
+              connection.wfile.write(exported)
+           else:
+              file_content = self.getReqFileContent('index.html')
+              self.setHeaders(200, 'html', len(file_content), connection)
+              connection.wfile.write(file_content)
 
-            try:
-                file_content = self.getReqFileContent(path.replace(r'/stat', ''))
-            except:
-                connection.dieWithError(404, 'Not Found')
-                return
+        elif path_file_ext:
 
-            self.setHeaders(200, path_file_ext, len(file_content), connection)
-            connection.wfile.write(file_content)
+           try: file_content = self.getReqFileContent(connection.path.replace(r'/stat', ''))
+           except:
+              connection.dieWithError(404, 'Not Found')
+              return
+
+           self.setHeaders(200, path_file_ext.group(0)[1:], len(file_content), connection)
+           connection.wfile.write(file_content)
         else:
-            connection.dieWithError(404, 'Not Found')
+           connection.dieWithError(404, 'Not Found')
 
     def getReqFileContent(self, path):
-        root_dir = 'http'
-        with open(root_dir + '/' + path, 'rb') as handle:
-           file_content = handle.read()
-        return file_content
+        with open('http/%s' % path, 'rb') as handle:
+           return handle.read()
 
     def setHeaders(self, status_code, type, len_content, connection):
         content_type = {
