@@ -53,8 +53,7 @@ class Stat(AceProxyPlugin):
 
            try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', p2.stdout.read().decode('utf-8')).group(0)
            except: pass
-
-           p1.stdout.close(); p2.stdout.close()
+           finally: p1.stdout.close(); p2.stdout.close()
 
         if mac_address:
            try:
@@ -84,7 +83,7 @@ class Stat(AceProxyPlugin):
               response['sys_info'] = {
                    'os_platform': self.config.osplatform,
                    'cpu_nums': psutil.cpu_count(),
-                   'cpu_percent': psutil.cpu_percent(interval=1),
+                   'cpu_percent': psutil.cpu_percent(),
                    'total_ram': self.config.bytes2human(max_mem.total),
                    'used_ram': self.config.bytes2human(max_mem.used),
                    'free_ram': self.config.bytes2human(max_mem.available),
@@ -102,10 +101,10 @@ class Stat(AceProxyPlugin):
               # Dict {'CID': [client1, client2,....]} to list of values
               clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
               for c in clients:
-                 if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                    if not c.clientInfo: c.clientInfo = self.mac_lookup(c.clientip)
-                 else:
-                    if not c.clientInfo:
+                 if not c.clientInfo:
+                    if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
+                       c.clientInfo = self.mac_lookup(c.clientip)
+                    else:
                        try:
                           headers = {'User-Agent':'API Browser'}
                           with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
@@ -136,8 +135,7 @@ class Stat(AceProxyPlugin):
                        }
                  response['clients_data'].append(client_data)
 
-              exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
-              self.WriteContent(200, 'json', exported, connection)
+              self.WriteContent(200, 'json', requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8'), connection)
            else:
               try: self.WriteContent(200, 'html', self.getReqFileContent('index.html'), connection)
               except:
