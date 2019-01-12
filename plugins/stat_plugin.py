@@ -9,7 +9,7 @@ __author__ = 'Dorik1972, !Joy!'
 
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
-import time
+import time, zlib
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
 import psutil
@@ -70,7 +70,7 @@ class Stat(AceProxyPlugin):
         path_file_ext = re.search(r'.js$|.css$|.html$|.png$|.jpg$|.jpeg$|.svg$', connection.path)
 
         if headers_only:
-           self.setHeaders(200, 'json', 0, connection)
+           self.WriteContent(200, 'json', '', connection)
            return
 
         if connection.path.startswith('/stat') and not path_file_ext:
@@ -136,22 +136,19 @@ class Stat(AceProxyPlugin):
                  response['clients_data'].append(client_data)
 
               exported = requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8')
-              self.setHeaders(200, 'json', len(exported), connection)
-              connection.wfile.write(exported)
+              self.WriteContent(200, 'json', exported, connection)
            else:
-              file_content = self.getReqFileContent('index.html')
-              self.setHeaders(200, 'html', len(file_content), connection)
-              connection.wfile.write(file_content)
+              try: self.WriteContent(200, 'html', self.getReqFileContent('index.html'), connection)
+              except:
+                 connection.dieWithError(404, 'Not Found')
+                 return
 
         elif path_file_ext:
 
-           try: file_content = self.getReqFileContent(connection.path.replace(r'/stat', ''))
+           try: self.WriteContent(200, path_file_ext.group(0)[1:], self.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
            except:
               connection.dieWithError(404, 'Not Found')
               return
-
-           self.setHeaders(200, path_file_ext.group(0)[1:], len(file_content), connection)
-           connection.wfile.write(file_content)
         else:
            connection.dieWithError(404, 'Not Found')
 
@@ -159,7 +156,7 @@ class Stat(AceProxyPlugin):
         with open('http/%s' % path, 'rb') as handle:
            return handle.read()
 
-    def setHeaders(self, status_code, type, len_content, connection):
+    def WriteContent(self, status_code, type, content, connection):
         content_type = {
             'js': r'text/javascript; charset=utf-8',
             'json': r'application/json',
@@ -173,5 +170,14 @@ class Stat(AceProxyPlugin):
         connection.send_response(status_code)
         connection.send_header('Content-type', content_type[type])
         connection.send_header('Connection', 'close')
-        connection.send_header('Content-Length', len_content)
+        try:
+           h = connection.headers.get('Accept-Encoding').split(',')[0]
+           compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
+                               'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
+                               'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
+           content = compress_method[h].compress(content) + compress_method[h].flush()
+           connection.send_header('Content-Encoding', h)
+        except: pass
+        connection.send_header('Content-Length', len(content))
         connection.end_headers()
+        connection.wfile.write(content)
