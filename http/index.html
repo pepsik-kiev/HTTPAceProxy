@@ -6,11 +6,12 @@
 
         <title>AceProxy stat info</title>
         <script src="/stat/js/jquery_v3.3.1.min.js"></script>
+        <script src="/stat/js/popper_v1.14.6.min.js"></script>
         <script src="/stat/js/bootstrap_v4.1.1.min.js"></script>
         <link rel="shortcut icon" href="/stat/img/shesterenka.png" type="image/png">
         <link rel="stylesheet" href="/stat/css/bootstrap_v4.1.1.min.css">
         <link rel="stylesheet" type="text/css" href="http://github.com/downloads/lafeber/world-flags-sprite/flags16.css"/>
-        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+        <!--link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous"-->
         <link rel="stylesheet" href="/stat/css/index.css">
         <script src="/stat/js/index.js"></script>
     </head>
@@ -43,13 +44,14 @@
                             <th scope="col">Start time</th>
                             <th scope="col">Duration</th>
                             <th scope="col">Speed kB/s</th>
-                            <th scope="col">Peers</th>
+                            <th scope="col">Peers<button type="button" class="btn btn-help btn-primary" data-toggle="popover">?</button></th>
                         </tr>
                     </thead>
                     <tbody>
                     </tbody>
                 </table>
             </div>
+            <h1 id="error_resp_mess" class="text-center">Server not responding! Refresh page!!!</h1>
         </main>
     </body>
 </html>
