@@ -1,6 +1,21 @@
 getStatus();
 
 
+$(function () {
+    $('[data-toggle="popover"]').popover({
+        html: true,
+        title: 'Status description.',
+        content: '<span class="badge badge-pill badge-success bage-help">dl</span>' +
+                    ' - Download. AceEngine generates a stream and sends data to the client.<br>' +
+                 '<span class="badge badge-pill badge-warning bage-help">buf</span>' +
+                    ' - Buffering. AceEngine buffers data and does not give it to the client.<br>' +
+                 '<span class="badge badge-pill badge-danger bage-help">prebuf</span>' +
+                    ' - Prebuffering. AceEngine buffers data before issuing a link to a stream.<br>' +
+                 '<span class="badge badge-pill badge-danger bage-help">wait</span>' +
+                    ' - Waiting. AceEngine expects sufficient connection speed.'
+    })
+})
+
 function getStatus() {
     $.ajax({
         url: 'http://' + window.location.host + '/stat/?action=get_status',
@@ -19,7 +34,7 @@ function getStatus() {
                 " | textStatus: " + textStatus +
                 " | errorThrown: " + errorThrown);
             $('tbody').html("");
-            $('main').append('<h1 class="text-center" style="color:red; font-weight: bold;">Server not responding! Refresh page!!!</h1>')
+            $('#error_resp_mess').css('display', "block")
         },
     });
 }
@@ -30,27 +45,27 @@ function renderPage(data) {
     var connection_info = data.connection_info;
     var clients_data = data.clients_data;
     var clients_content = "";
+    var cpu_temp = sys_info.cpu_temp ? "CPU Temperature: " + sys_info.cpu_temp + "&#176; C</br>" : "";
+
     $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
-                        " used: " + sys_info.cpu_percent + "%</br>"+
+                        " used: " + sys_info.cpu_percent + "%</br>"+cpu_temp +
                         "RAM &nbsp;total: " + sys_info.total_ram +
                         " &nbsp;used: " + sys_info.used_ram +
                         "&nbsp;free: " + sys_info.free_ram + "</br>DISK &nbsp;total: " + sys_info.total_disk +
                         "&nbsp;used: " + sys_info.used_disk + "&nbsp;free: " + sys_info.free_disk);
     $('#connection_info').html("Connections limit: " + connection_info.max_clients +
                                "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
+
     if (clients_data.length) {
         clients_data.forEach(function(item, i, arr) {
-            var badgeCss = "info";
 
-            if (item.status === "buf") {
-                badgeCss = "warning";
-            } else if (item.status === "prebuf") {
-                badgeCss = "danger";
-            } else if (item.status === "dl") {
-                badgeCss = "success";
-            } else {
-                badgeCss = "danger";
-            }
+            var statusColorCss = {
+                buf: 'warning',
+                prebuf: 'danger',
+                dl: 'success',
+            };
+
+            var badgeCss = statusColorCss[item.status] || 'danger';
 
             clients_content += '<tr title="Downloaded: ' + item.downloaded + ' Uploaded: ' + item.uploaded + '">'+
                                 '<td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
@@ -63,10 +78,12 @@ function renderPage(data) {
                                     '<img src="/stat/img/arrow-down.svg"/><img src="/stat/img/arrow-up.svg"/>' +
                                     '<div class="digit-speed text-left">' + item.streamSpeedUL + '</div></td>' +
                                 '<td class="text-center">'+ item.streamPeers +
-                                '<span class="badge badge-pill badge-'+ badgeCss +' bage-fixsize">' + item.status +'</span></td></tr>';
+                                '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.status + '</span></td></tr>';
         });
+
         $('tbody').html(clients_content);
     } else {
+
         $('tbody').html('');
     }
 }

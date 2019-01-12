@@ -77,3 +77,24 @@ H1 > small {
     margin-left: 4px;
     margin-right: 4px;
 }
+.bage-help {
+    min-width:5em;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+.btn-help {
+    height: 15px;
+    font-size: 0.7em;
+    line-height: 0;
+    margin-left: 5px;
+    padding: 5px;
+}
+.popover {
+    max-width: 60%;
+    box-shadow: 0 0 10px rgba(0,0,0,0.6);
+}
+#error_resp_mess {
+    color:red;
+    font-weight: bold;
+    display: none;
+}
