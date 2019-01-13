@@ -45,17 +45,6 @@ class AceDefConfig(object):
     logfile = None
 
     @staticmethod
-    def bytes2human(n):
-        # http://code.activestate.com/recipes/578019
-        symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
-        prefix = { s:(1 << (i + 1)*10) for i,s in enumerate(symbols) }
-        for s in reversed(symbols):
-            if n >= prefix[s]:
-                value = float(n) / prefix[s]
-                return '%.1f%s' % (value, s)
-        return '%sB' % n
-
-    @staticmethod
     def isFakeRequest(path, params, headers):
         useragent = headers.get('User-Agent')
 

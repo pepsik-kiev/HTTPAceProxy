@@ -81,8 +81,8 @@ class Stat(AceProxyPlugin):
                    'os_platform': self.config.osplatform,
                    'cpu_nums': psutil.cpu_count(),
                    'cpu_percent': psutil.cpu_percent(),
-                   'mem_info': {k:self.config.bytes2human(v) for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
-                   'disk_info': {k:self.config.bytes2human(v) for k,v in psutil.disk_usage('/')._asdict().items() if k in ('total','used','free')}
+                   'mem_info': {k:v for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
+                   'disk_info': {k:v for k,v in psutil.disk_usage('/')._asdict().items() if k in ('total','used','free')}
                     }
 
               response['connection_info'] = {

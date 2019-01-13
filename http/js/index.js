@@ -49,10 +49,11 @@ function renderPage(data) {
 
     $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
                         " used: " + sys_info.cpu_percent + "%</br>"+cpu_temp +
-                        "RAM &nbsp;total: " + sys_info.mem_info['total'] +
-                        " &nbsp;used: " + sys_info.mem_info['used'] +
-                        "&nbsp;free: " + sys_info.mem_info['available'] + "</br>DISK &nbsp;total: " + sys_info.disk_info['total'] +
-                        "&nbsp;used: " + sys_info.disk_info['used'] + "&nbsp;free: " + sys_info.disk_info['free']);
+                        "RAM &nbsp;total: " + bytes2human(sys_info.mem_info['total']) +
+                        " &nbsp;used: " + bytes2human(sys_info.mem_info['used']) +
+                        "&nbsp;free: " + bytes2human(sys_info.mem_info['available']) +
+                        "</br>DISK &nbsp;total: " + bytes2human(sys_info.disk_info['total']) +
+                        "&nbsp;used: " + bytes2human(sys_info.disk_info['used']) + "&nbsp;free: " + bytes2human(sys_info.disk_info['free']));
     $('#connection_info').html("Connections limit: " + connection_info.max_clients +
                                "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
 
