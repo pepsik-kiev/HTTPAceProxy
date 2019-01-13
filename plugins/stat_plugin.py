@@ -75,21 +75,14 @@ class Stat(AceProxyPlugin):
         if connection.path.startswith('/stat') and not path_file_ext:
            if self.params.get('action', [''])[0] == 'get_status':
               # Sys Info
-              max_mem = psutil.virtual_memory()
-              disk = psutil.disk_usage('/')
-
               response = {}
               response['status'] = 'success'
               response['sys_info'] = {
                    'os_platform': self.config.osplatform,
                    'cpu_nums': psutil.cpu_count(),
                    'cpu_percent': psutil.cpu_percent(),
-                   'total_ram': self.config.bytes2human(max_mem.total),
-                   'used_ram': self.config.bytes2human(max_mem.used),
-                   'free_ram': self.config.bytes2human(max_mem.available),
-                   'total_disk': self.config.bytes2human(disk.total),
-                   'used_disk': self.config.bytes2human(disk.used),
-                   'free_disk': self.config.bytes2human(disk.free),
+                   'mem_info': {k:self.config.bytes2human(v) for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
+                   'disk_info': {k:self.config.bytes2human(v) for k,v in psutil.disk_usage('/')._asdict().items() if k in ('total','used','free')}
                     }
 
               response['connection_info'] = {
@@ -113,12 +106,6 @@ class Stat(AceProxyPlugin):
                        except: r = {}
                        c.clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
 
-                 if self.config.new_api:
-                    with requests.get(c.cmd['stat_url'], timeout=2, stream=False) as r:
-                       stat = r.json()['response']
-                 else:
-                    stat = c.ace._status.get(timeout=2)
-
                  client_data = {
                       'channelIcon': c.channelIcon,
                       'channelName': c.channelName,
@@ -126,12 +113,7 @@ class Stat(AceProxyPlugin):
                       'clientLocation': c.clientInfo,
                       'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                       'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
-                      'streamSpeedDL': stat['speed_down'],
-                      'streamSpeedUL': stat['speed_up'],
-                      'streamPeers': stat['peers'],
-                      'status': stat['status'],
-                      'downloaded': self.config.bytes2human(stat['downloaded']),
-                      'uploaded': self.config.bytes2human(stat['uploaded'])
+                      'stat': requests.get(c.cmd['stat_url'], timeout=2, stream=False).json()['response'] if self.config.new_api else c.ace._status.get(timeout=2)
                        }
                  response['clients_data'].append(client_data)
 

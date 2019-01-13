@@ -49,10 +49,10 @@ function renderPage(data) {
 
     $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
                         " used: " + sys_info.cpu_percent + "%</br>"+cpu_temp +
-                        "RAM &nbsp;total: " + sys_info.total_ram +
-                        " &nbsp;used: " + sys_info.used_ram +
-                        "&nbsp;free: " + sys_info.free_ram + "</br>DISK &nbsp;total: " + sys_info.total_disk +
-                        "&nbsp;used: " + sys_info.used_disk + "&nbsp;free: " + sys_info.free_disk);
+                        "RAM &nbsp;total: " + sys_info.mem_info['total'] +
+                        " &nbsp;used: " + sys_info.mem_info['used'] +
+                        "&nbsp;free: " + sys_info.mem_info['available'] + "</br>DISK &nbsp;total: " + sys_info.disk_info['total'] +
+                        "&nbsp;used: " + sys_info.disk_info['used'] + "&nbsp;free: " + sys_info.disk_info['free']);
     $('#connection_info').html("Connections limit: " + connection_info.max_clients +
                                "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
 
@@ -60,25 +60,27 @@ function renderPage(data) {
         clients_data.forEach(function(item, i, arr) {
 
             var statusColorCss = {
+                wait: 'warning',
                 buf: 'warning',
                 prebuf: 'danger',
                 dl: 'success',
             };
 
-            var badgeCss = statusColorCss[item.status] || 'danger';
+            var badgeCss = statusColorCss[item.stat['status']] || 'danger';
 
-            clients_content += '<tr title="Downloaded: ' + item.downloaded + ' Uploaded: ' + item.uploaded + '">'+
+            clients_content += '<tr title="Downloaded: ' + bytes2human(item.stat['downloaded']) + ' Uploaded: ' + bytes2human(item.stat['uploaded']) + '">'+
                                 '<td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
                                 '<td>' + item.clientIP + '</td>'+
                                 '<td>' + item.clientLocation + '</td>' +
                                 '<td class="text-center">' + item.startTime + '</td>' +
                                 '<td class="text-center">' + item.durationTime + '</td>' +
                                 '<td class="text-center">' +
-                                    '<div class="digit-speed text-right">'+ item.streamSpeedDL + '</div>' +
+                                    '<div class="digit-speed text-right">'+ item.stat['speed_down'] + '</div>' +
                                     '<img src="/stat/img/arrow-down.svg"/><img src="/stat/img/arrow-up.svg"/>' +
-                                    '<div class="digit-speed text-left">' + item.streamSpeedUL + '</div></td>' +
-                                '<td class="text-center">'+ item.streamPeers +
-                                '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.status + '</span></td></tr>';
+                                    '<div class="digit-speed text-left">' + item.stat['speed_up'] + '</div></td>' +
+                                '<td class="text-center">'+ item.stat['peers'] +
+                                '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span></td></tr>';
+
         });
 
         $('tbody').html(clients_content);
@@ -86,4 +88,9 @@ function renderPage(data) {
 
         $('tbody').html('');
     }
+}
+
+function bytes2human(size) {
+    var i = Math.floor( Math.log(size) / Math.log(1024) );
+    return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i];
 }
