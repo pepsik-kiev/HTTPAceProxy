@@ -48,14 +48,18 @@ function renderPage(data) {
     var cpu_temp = sys_info.cpu_temp ? "CPU Temperature: " + sys_info.cpu_temp + "&#176; C</br>" : "";
 
     $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
-                        " used: " + sys_info.cpu_percent + "%</br>"+cpu_temp +
+                        " used: " + sys_info.cpu_percent + "%</br>"+
+                        cpu_temp +
                         "RAM &nbsp;total: " + bytes2human(sys_info.mem_info['total']) +
                         " &nbsp;used: " + bytes2human(sys_info.mem_info['used']) +
                         "&nbsp;free: " + bytes2human(sys_info.mem_info['available']) +
-                        "</br>DISK &nbsp;total: " + bytes2human(sys_info.disk_info['total']) +
-                        "&nbsp;used: " + bytes2human(sys_info.disk_info['used']) + "&nbsp;free: " + bytes2human(sys_info.disk_info['free']));
-    $('#connection_info').html("Connections limit: " + connection_info.max_clients +
-                               "&nbsp;&nbsp;&nbsp;Connected clients: " + connection_info.total_clients);
+                        "</br>" +
+                        "DISK &nbsp;total: " + bytes2human(sys_info.disk_info['total']) +
+                        "&nbsp;used: " + bytes2human(sys_info.disk_info['used']) +
+                        "&nbsp;free: " + bytes2human(sys_info.disk_info['free']));
+
+    $('#connection_info_lim').text(connection_info.max_clients);
+    $('#connection_info_cli').text(connection_info.total_clients);
 
     if (clients_data.length) {
         clients_data.forEach(function(item, i, arr) {
@@ -69,10 +73,14 @@ function renderPage(data) {
 
             var badgeCss = statusColorCss[item.stat['status']] || 'danger';
 
+            var clientInfo = item.clientInfo.vendor ? item.clientInfo.vendor :
+                '<i class="flag ' + (item.clientInfo.country_code || 'n/a') + '"></i>&nbsp;&nbsp;' +
+                (item.clientInfo.country_name || 'n/a') +', ' + (item.clientInfo.city || 'n/a');
+
             clients_content += '<tr title="Downloaded: ' + bytes2human(item.stat['downloaded']) + ' Uploaded: ' + bytes2human(item.stat['uploaded']) + '">'+
                                 '<td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
                                 '<td>' + item.clientIP + '</td>'+
-                                '<td>' + item.clientLocation + '</td>' +
+                                '<td>' + clientInfo + '</td>' +
                                 '<td class="text-center">' + item.startTime + '</td>' +
                                 '<td class="text-center">' + item.durationTime + '</td>' +
                                 '<td class="text-center">' +

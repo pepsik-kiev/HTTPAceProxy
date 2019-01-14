@@ -1,39 +1,33 @@
 .header {
-    height: 150px;
     background-color: #0a0351 !important;
     background-size: 100%;
     background-image: url(/stat/img/space_2294795_1280.jpg);
 }
-.header-block {
-    position: relative;
+.header-block > div{
     color: aliceblue;
-    width: 100%;
-    height: 100%;
+    margin: 0;
 }
 .info-block {
-    position: absolute;
-    left: 15px;
-    bottom:5px;
     text-shadow: 1px 1px 3px black;
+
+}
+.status-connection-col {
+    display: inline-block;
+    margin-left: 10px;
+    text-shadow: 1px 1px 1px black;
 }
 .info-block > h6 {
-    margin-bottom: 3px;
-    font-weight: bold
+    /*margin-bottom: 3px;*/
+    font-weight: bold;
 }
 .info-block > p {
     font-size: 0.7em;
-    margin: 0;
-}
-.status-connection > p {
-    position: absolute;
-    right: 15px;
-    bottom:5px;
-    margin: 0;
-    text-shadow: 1px 1px 1px black;
+    margin-bottom: 0;
+
 }
 .heder-title {
     color:aliceblue;
-    padding-top:35px;
+    padding-top:21px;
     font-weight: bold;
     text-shadow: 2px 2px 1px black, 0 0 0.9em #008aff;
 }
