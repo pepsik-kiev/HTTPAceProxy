@@ -103,6 +103,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
            except Exception as e:
+              import traceback
+              logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
            finally: return
         self.handleRequest(headers_only)
@@ -466,8 +468,13 @@ def check_compatibility(gevent_version, psutil_version):
 
 logging.basicConfig(level=AceConfig.loglevel, filename=AceConfig.logfile, format=AceConfig.logfmt, datefmt=AceConfig.logdatefmt)
 logger = logging.getLogger('HTTPServer')
+
 ### Initial settings for devnull
-if AceConfig.acespawn or AceConfig.transcodecmd: DEVNULL = open(os.devnull, 'wb')
+if AceConfig.acespawn or AceConfig.transcodecmd:
+   try:
+      from gevent.subprocess import DEVNULL  # Py3
+   except ImportError:
+      DEVNULL = open(os.devnull, 'wb')  # Py2
 
 logger.info('Ace Stream HTTP Proxy server on Python %s starting .....' % sys.version.split()[0])
 logger.debug('Using: gevent %s, psutil %s' % (gevent.__version__, psutil.__version__))
