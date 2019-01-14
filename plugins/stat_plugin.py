@@ -9,6 +9,7 @@ __author__ = 'Dorik1972, !Joy!'
 
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
+from getmac import get_mac_address
 import time, zlib
 try: from urlparse import parse_qs
 except: from urllib.parse import parse_qs
@@ -29,40 +30,14 @@ class Stat(AceProxyPlugin):
         self.stuff = AceProxy
         self.params = None
 
-    def mac_lookup(self, ip_address):
-        mac_address = None
-        if ip_address == self.config.httphost:
-           from uuid import getnode
-           try: mac_address = ':'.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6))))
-           except: pass
-        else:
-           try:
-              if self.config.osplatform != 'Windows':
-                 p1 = Popen(['ping', '-c', '1', ip_address], stdout = PIPE, shell=False)
-                 p2 = Popen(['arp', '-n', ip_address], stdout = PIPE, shell=False)
-              else:
-                 popen_params = { 'stdout' : PIPE,
-                                  'shell'  : False }
-                 CREATE_NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
-                 CREATE_NEW_PROCESS_GROUP = 0x00000200  # note: could get it from subprocess
-                 DETACHED_PROCESS = 0x00000008          # 0x8 | 0x200 == 0x208
-                 popen_params.update(creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |  DETACHED_PROCESS)
-                 p1 = Popen(['ping', '-n', '1', ip_address], **popen_params)
-                 p2 = Popen(['arp', '-a', ip_address], **popen_params)
-           except: Stat.logger.error('Check if arp util is installed!'); return 'Local IP address '
-
-           try: mac_address = re.search(r'(([a-f\d]{1,2}(\:|\-)){5}[a-f\d]{1,2})', p2.stdout.read().decode('utf-8')).group(0)
-           except: pass
-           finally: p1.stdout.close(); p2.stdout.close()
-
-        if mac_address:
-           try:
-              headers = {'User-Agent':'API Browser'}
-              with requests.get('http://macvendors.co/api/%s/json' % mac_address, headers=headers, timeout=5) as r:
-                return r.json()['result']['company']
-           except: Stat.logger.debug("Can't obtain vendor for MAC address %s" % mac_address)
-        else: Stat.logger.debug("Can't obtain MAC address for local IP %s" % ip_address)
-        return 'Local IP address '
+    def get_vendor_Info(self, ip_address):
+        try:
+           headers = {'User-Agent':'API Browser'}
+           with requests.get('http://macvendors.co/api/%s/json' % get_mac_address(ip=ip_address), headers=headers, timeout=5) as r:
+              return r.json()['result']['company']
+        except:
+           Stat.logger.debug("Can't obtain vendor for %s address" % ip_address)
+           return 'Local IP address'
 
     def handle(self, connection, headers_only=False):
         self.params = parse_qs(connection.query)
@@ -96,7 +71,7 @@ class Stat(AceProxyPlugin):
               for c in clients:
                  if not c.clientInfo:
                     if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                       c.clientInfo = {'vendor': self.mac_lookup(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
+                       c.clientInfo = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
                     else:
                        try:
                           headers = {'User-Agent':'API Browser'}
