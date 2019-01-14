@@ -74,7 +74,7 @@ function renderPage(data) {
             var badgeCss = statusColorCss[item.stat['status']] || 'danger';
 
             var clientInfo = item.clientInfo.vendor ? item.clientInfo.vendor :
-                '<i class="flag ' + (item.clientInfo.country_code || 'n/a') + '"></i>&nbsp;&nbsp;' +
+                '<i class="flag ' + (item.clientInfo.country_code.toLowerCase() || 'n/a') + '"></i>&nbsp;&nbsp;' +
                 (item.clientInfo.country_name || 'n/a') +', ' + (item.clientInfo.city || 'n/a');
 
             clients_content += '<tr title="Downloaded: ' + bytes2human(item.stat['downloaded']) + ' Uploaded: ' + bytes2human(item.stat['uploaded']) + '">'+
