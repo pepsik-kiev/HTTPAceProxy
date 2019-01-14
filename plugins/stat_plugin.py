@@ -96,21 +96,21 @@ class Stat(AceProxyPlugin):
               for c in clients:
                  if not c.clientInfo:
                     if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                       c.clientInfo = self.mac_lookup(c.clientip)
+                       c.clientInfo = {'vendor': self.mac_lookup(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
                     else:
                        try:
                           headers = {'User-Agent':'API Browser'}
                           with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
                              if r.encoding is None: r.encoding = 'utf-8'
-                             r = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
-                       except: r = {}
-                       c.clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
+                             c.clientInfo = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
+                             c.clientInfo['vendor'] = ''
+                       except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 
                  response['clients_data'].append({
                       'channelIcon': c.channelIcon,
                       'channelName': c.channelName,
                       'clientIP': c.clientip,
-                      'clientLocation': c.clientInfo,
+                      'clientInfo': c.clientInfo,
                       'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                       'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                       'stat': requests.get(c.cmd['stat_url'], timeout=2, stream=False).json()['response'] if self.config.new_api else c.ace._status.get(timeout=2)
