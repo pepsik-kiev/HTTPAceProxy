@@ -92,3 +92,6 @@ H1 > small {
     font-weight: bold;
     display: none;
 }
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 199, 40, 0.1);
+}
