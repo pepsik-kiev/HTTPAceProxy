@@ -106,7 +106,7 @@ class Stat(AceProxyPlugin):
                        except: r = {}
                        c.clientInfo = u'<i class="flag {}"></i>&nbsp;&nbsp;{}, {}'.format(r.get('country_code','n/a').lower(), r.get('country_name','n/a'), r.get('city', 'n/a'))
 
-                 client_data = {
+                 response['clients_data'].append({
                       'channelIcon': c.channelIcon,
                       'channelName': c.channelName,
                       'clientIP': c.clientip,
@@ -114,8 +114,7 @@ class Stat(AceProxyPlugin):
                       'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                       'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                       'stat': requests.get(c.cmd['stat_url'], timeout=2, stream=False).json()['response'] if self.config.new_api else c.ace._status.get(timeout=2)
-                       }
-                 response['clients_data'].append(client_data)
+                       })
 
               self.WriteContent(200, 'json', requests.compat.json.dumps(response, ensure_ascii=False).encode('utf-8'), connection)
            else:
