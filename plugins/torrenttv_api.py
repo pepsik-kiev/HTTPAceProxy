@@ -9,6 +9,7 @@ __author__ = 'miltador, Dorik1972'
 import logging, requests
 import xml.dom.minidom as dom
 from urllib3.packages.six.moves.configparser import RawConfigParser
+from urllib3.packages.six.moves import range
 
 requests.adapters.DEFAULT_RETRIES = 5
 
@@ -62,7 +63,7 @@ class TorrentTvApi(object):
         except:
             from uuid import getnode
             self.session = None
-            self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(list(range(6)))) # get device mac address
+            self.guid = ''.join('%02x' % ((getnode() >> 8*i) & 0xff) for i in reversed(range(6))) # get device mac address
 
         if self.session is None or self.session == '':
             self.log.debug('Creating new session')

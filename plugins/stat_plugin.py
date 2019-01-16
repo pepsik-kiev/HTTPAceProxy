@@ -11,6 +11,7 @@ from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
+from urllib3.packages.six.moves import getcwdb
 from requests.compat import json
 import os, time, zlib
 import psutil
@@ -49,7 +50,7 @@ class Stat(AceProxyPlugin):
 
         if connection.path == '/stat':
            if self.params.get('action', [''])[0] == 'get_status':
-              self.SendResponse(200, 'json', requests.compat.json.dumps(self.getSystemInfo(), ensure_ascii=False).encode('utf-8'), connection)
+              self.SendResponse(200, 'json', json.dumps(self.getSystemInfo(), ensure_ascii=False).encode('utf-8'), connection)
            else:
               try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
               except:
@@ -104,7 +105,7 @@ class Stat(AceProxyPlugin):
             'cpu_percent': psutil.cpu_percent(),
             'cpu_freq': {k:v for k,v in psutil.cpu_freq()._asdict().items() if k in ('current','min','max')},
             'mem_info': {k:v for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
-            'disk_info': {k:v for k,v in psutil.disk_usage('/')._asdict().items() if k in ('total','used','free')}
+            'disk_info': {k:v for k,v in psutil.disk_usage(getcwdb())._asdict().items() if k in ('total','used','free')}
             }
 
         jsonSystemInfo['connection_info'] = {
@@ -124,7 +125,7 @@ class Stat(AceProxyPlugin):
                         headers = {'User-Agent':'API Browser'}
                         with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
                             if r.encoding is None: r.encoding = 'utf-8'
-                            c.clientInfo = requests.compat.json.loads(r.text.split('(', 1)[1].strip(')'))
+                            c.clientInfo = json.loads(r.text.split('(', 1)[1].strip(')'))
                             c.clientInfo['vendor'] = ''
                     except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 

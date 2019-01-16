@@ -7,7 +7,7 @@ import logging, random
 from gevent.event import AsyncResult, Event
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import unquote
-from urllib3.packages.six.moves import zip
+from urllib3.packages.six.moves import zip, map
 from urllib3.packages.six import PY3
 from .acemessages import *
 
@@ -236,11 +236,11 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
                        #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
                     elif self._tempstatus.startswith('main:dl'):
-                       stat.extend(list(map(int, self._tempstatus.split(';')[1:])))
+                       stat.extend(map(int, self._tempstatus.split(';')[1:]))
                     elif self._tempstatus.startswith('main:wait'): #;time
-                       stat.extend(list(map(int, self._tempstatus.split(';')[2:])))
+                       stat.extend(map(int, self._tempstatus.split(';')[2:]))
                     elif self._tempstatus.startswith(('main:prebuf','main:buf')):  #progress;time
-                       stat.extend(list(map(int, self._tempstatus.split(';')[3:])))
+                       stat.extend(map(int, self._tempstatus.split(';')[3:]))
                     if len(stat) == len(AceConst.STATUS):
                        self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)})
                  # CID

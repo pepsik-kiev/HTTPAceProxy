@@ -138,7 +138,7 @@ class Torrenttv(AceProxyPlugin):
             except: pass
 
             connection.send_response(200)
-            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in list(response_headers.items())])
+            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
             connection.end_headers()
 
         if play: connection.handleRequest(headers_only, name, self.logomap.get(name), fmt=params.get('fmt', [''])[0])
