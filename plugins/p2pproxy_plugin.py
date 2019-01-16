@@ -21,6 +21,7 @@ import logging, zlib
 from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
 from urllib3.packages.six.moves.urllib.parse import parse_qs, quote, unquote
+from urllib3.packages.six.moves import range
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
@@ -55,7 +56,7 @@ class P2pproxy(AceProxyPlugin):
                         response_headers = {'Content-Type': 'text/plain;charset=utf-8', 'Server': 'P2pProxy/1.0.4.4 HTTPAceProxy',
                                             'Access-Control-Allow-Origin': '*', 'Connection': 'close'}
                         connection.send_response(200)
-                        for k,v in list(response_headers.items()): connection.send_header(k,v)
+                        for k,v in response_headers.items(): connection.send_header(k,v)
                         connection.wfile.write('\r\n')
                         return
                     else:
@@ -152,7 +153,7 @@ class P2pproxy(AceProxyPlugin):
                 except: pass
                 response_headers['Content-Length'] = len(translations_list)
                 connection.send_response(200)
-                for k,v in list(response_headers.items()): connection.send_header(k,v)
+                for k,v in response_headers.items(): connection.send_header(k,v)
                 connection.end_headers()
                 connection.wfile.write(translations_list)
 
@@ -206,7 +207,7 @@ class P2pproxy(AceProxyPlugin):
                 return
 
             elif connection.path.endswith(('playlist', 'playlist.m3u')):  # /archive/playlist.m3u
-                dates = list()
+                dates = []
 
                 if 'date' in self.params:
                     for d in self.params['date']:
@@ -400,15 +401,15 @@ class P2pproxy(AceProxyPlugin):
             connection.send_header('Content-Type', 'text/plain;charset=utf-8')
             connection.end_headers()
             connection.wfile.write("logobase = '" + P2pproxy.TTVU + "'\n")
-            connection.wfile.write("logomap = {\n")
+            connection.wfile.write('logomap = {\n')
 
             for channel in translations_list:
                 name = channel.getAttribute('name').encode('utf-8')
                 logo = channel.getAttribute('logo').encode('utf-8')
                 connection.wfile.write("    u'%s': logobase + '%s'" % (name, logo))
-                connection.wfile.write(",\n") if not channel == last else connection.wfile.write("\n")
+                connection.wfile.write(',\n') if not channel == last else connection.wfile.write('\n')
 
-            connection.wfile.write("}\n")
+            connection.wfile.write('}\n')
 
     def get_date_param(self):
         d = self.params.get('date', [''])[0]
