@@ -1,18 +1,18 @@
 <!doctype html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8"/>
-        <meta name="description" content="HTTP AceProxy state panel">
+        <meta charset="UTF-8" />
+        <meta name="description" content="HTTP AceProxy state panel" />
 
         <title>AceProxy stat info</title>
         <script src="/stat/js/jquery_v3.3.1.min.js"></script>
         <script src="/stat/js/popper_v1.14.6.min.js"></script>
         <script src="/stat/js/bootstrap_v4.1.1.min.js"></script>
-        <link rel="shortcut icon" href="/stat/img/shesterenka.png" type="image/png">
+        <link rel="shortcut icon" href="/stat/img/shesterenka.png" type="image/png" />
         <link rel="stylesheet" href="/stat/css/bootstrap_v4.1.1.min.css" type="text/css" />
+        <link rel="stylesheet" href="/stat/css/index.css" type="text/css" />
         <link rel="stylesheet" href="/stat/css/flags16.css" type="text/css" />
         <!--link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous"-->
-        <link rel="stylesheet" href="/stat/css/index.css" type="text/css">
         <script src="/stat/js/index.js"></script>
     </head>
 
@@ -21,9 +21,17 @@
             <div class="header-block">
                 <div class="row align-items-end">
 
-                    <div class="info-block col-4">
+                    <div class="info-block col-4 invisible transparent">
                         <h6>SYSTEM INFO :</h6>
-                        <p id="sys_info"></p>
+                        <div class="sys-info">
+                            <div class="d-inline-block">OS <span id="inf_os">n/a</span></div>
+                            <div class="d-inline-block">CPU cores: <span id="inf_cpu_cores">n/a</span>&nbsp;&nbsp;used: <span id="inf_cpu_used">n/a</span>&nbsp;&nbsp;freq: <span id="inf_cpu_freq">n/a</span></div>
+                            <div class="d-none" id="inf_temp_div">CPU Temperature: <span id="inf_temp">n/a</span></div>
+                            <div class="d-inline-block">RAM&nbsp;&nbsp;total: <span id="inf_ram_total">n/a</span> </div>
+                            <div class="d-inline-block">used: <span id="inf_ram_used">n/a</span>&nbsp;&nbsp;free: <span id="inf_ram_free">n/a</span></div></br>
+                            <div class="d-inline-block">DISK&nbsp;&nbsp;total: <span id="inf_disk_total">n/a</span> </div>
+                            <div class="d-inline-block">used: <span id="inf_disk_used">n/a</span>&nbsp;&nbsp;free: <span id="inf_disk_free">n/a</span></div>
+                        </div>
                     </div>
 
                     <div class="heder-title col-4">
@@ -36,7 +44,7 @@
                         </p>
                     </div>
 
-                    <div class="status-connection col-4 text-right">
+                    <div class="status-connection col-4 text-right invisible transparent">
                         <div class="status-connection-col">Connections limit: <span id="connection_info_lim">-</span></div>
                         <div class="status-connection-col">Connected clients: <span id="connection_info_cli">-</span></div>
                     </div>

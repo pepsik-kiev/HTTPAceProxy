@@ -49,7 +49,7 @@ class Stat(AceProxyPlugin):
 
         if connection.path == '/stat':
            if self.params.get('action', [''])[0] == 'get_status':
-              self.SendResponse(200, 'json', requests.compat.json.dumps(self.getSystemInfo(), ensure_ascii=False).encode('utf-8'), connection)
+              self.SendResponse(200, 'json', requests.compat.json.dumps(self.getStatusJSON(), ensure_ascii=False).encode('utf-8'), connection)
            else:
               try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
               except:
@@ -94,11 +94,11 @@ class Stat(AceProxyPlugin):
         connection.end_headers()
         connection.wfile.write(content)
 
-    def getSystemInfo(self):
+    def getStatusJSON(self):
         # Sys Info
-        jsonSystemInfo = {}
-        jsonSystemInfo['status'] = 'success'
-        jsonSystemInfo['sys_info'] = {
+        statusJSON = {}
+        statusJSON['status'] = 'success'
+        statusJSON['sys_info'] = {
             'os_platform': self.config.osplatform,
             'cpu_nums': psutil.cpu_count(),
             'cpu_percent': psutil.cpu_percent(),
@@ -107,12 +107,12 @@ class Stat(AceProxyPlugin):
             'disk_info': {k:v for k,v in psutil.disk_usage('/')._asdict().items() if k in ('total','used','free')}
             }
 
-        jsonSystemInfo['connection_info'] = {
+        statusJSON['connection_info'] = {
             'max_clients': self.config.maxconns,
             'total_clients': self.stuff.clientcounter.totalClients(),
             }
 
-        jsonSystemInfo['clients_data'] = []
+        statusJSON['clients_data'] = []
         # Dict {'CID': [client1, client2,....]} to list of values
         clients = [item for sublist in list(self.stuff.clientcounter.streams.values()) for item in sublist]
         for c in clients:
@@ -128,7 +128,7 @@ class Stat(AceProxyPlugin):
                             c.clientInfo['vendor'] = ''
                     except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 
-            jsonSystemInfo['clients_data'].append({
+            statusJSON['clients_data'].append({
                 'channelIcon': c.channelIcon,
                 'channelName': c.channelName,
                 'clientIP': c.clientip,
@@ -137,4 +137,4 @@ class Stat(AceProxyPlugin):
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                 'stat': requests.get(c.cmd['stat_url'], timeout=2, stream=False).json()['response'] if self.config.new_api else c.ace._status.get(timeout=2)
                 })
-        return jsonSystemInfo
+        return statusJSON
