@@ -7,11 +7,8 @@ http://ip:port/allfon
 __author__ = 'miltador, Dorik1972'
 
 import logging
-import requests
-import time
-import zlib
-try: from urlparse import parse_qs
-except: from urllib.parse import parse_qs
+import requests, time, zlib
+from urllib3.packages.six.moves.urllib.parse import parse_qs
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.allfon as config
@@ -34,7 +31,7 @@ class Allfon(AceProxyPlugin):
             if Allfon.playlist.encoding is None: Allfon.playlist.encoding = 'utf-8'
             Allfon.logger.debug('AllFon playlist %s downloaded !' % config.url)
             Allfon.playlisttime = int(time.time())
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.RequestException:
             Allfon.logger.error("Can't download AllFonTV playlist!")
             return False
         else: return True

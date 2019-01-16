@@ -12,10 +12,8 @@ import logging
 import bencode, hashlib
 import gevent
 import zlib
-from requests.compat import unquote
+from urllib3.packages.six.moves.urllib.parse import parse_qs
 from PluginInterface import AceProxyPlugin
-try: from urlparse import parse_qs
-except: from urllib.parse import parse_qs
 import config.torrentfilms as config
 
 class Torrentfilms(AceProxyPlugin):

@@ -48,7 +48,7 @@ function renderPage(data) {
     var cpu_temp = sys_info.cpu_temp ? "CPU Temperature: " + sys_info.cpu_temp + "&#176; C</br>" : "";
 
     $('#sys_info').html("OS " + sys_info.os_platform + "&nbsp;CPU cores: " + sys_info.cpu_nums +
-                        " used: " + sys_info.cpu_percent + "%</br>"+
+                        " used: " + sys_info.cpu_percent + "% freq: " + sys_info.cpu_freq['current'] + " Mhz</br>"+
                         cpu_temp +
                         "RAM &nbsp;total: " + bytes2human(sys_info.mem_info['total']) +
                         " &nbsp;used: " + bytes2human(sys_info.mem_info['used']) +

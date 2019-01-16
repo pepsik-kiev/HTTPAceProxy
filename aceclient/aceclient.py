@@ -2,11 +2,13 @@
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
-from gevent.event import AsyncResult, Event
 import telnetlib
-import logging
-import requests
-import random
+import logging, random
+from gevent.event import AsyncResult, Event
+from requests.compat import json
+from urllib3.packages.six.moves.urllib.parse import unquote
+from urllib3.packages.six.moves import zip
+from urllib3.packages.six import PY3
 from .acemessages import *
 
 class AceException(Exception):
@@ -16,12 +18,12 @@ class AceException(Exception):
     pass
 
 class Telnet(telnetlib.Telnet, object):
-    if requests.compat.is_py3:
-        def read_until(self, expected, timeout=None):
-           return super(Telnet, self).read_until(expected.encode(), timeout).decode()
+    if PY3:
+       def read_until(self, expected, timeout=None, _bytearray=bytearray):
+           return super(Telnet, self).read_until(_bytearray(expected, 'ascii'), timeout).decode()
 
-        def write(self, buffer):
-            super(Telnet, self).write(buffer.encode())
+       def write(self, buffer, _bytearray=bytearray):
+           super(Telnet, self).write(_bytearray(buffer, 'ascii'))
 
 class AceClient(object):
 
@@ -86,7 +88,7 @@ class AceClient(object):
         self._loadasync.set()
         self._cid.set()
 
-    def _write(self, message):
+    def _write(self, message, _bytearray=bytearray):
         try:
            self._socket.write('%s\r\n' % message)
            logging.debug('>>> %s' % message)
@@ -197,7 +199,7 @@ class AceClient(object):
                  logging.error('AceException:%s' % repr(err))
                  break
               else:
-                 logging.debug('<<< %s' % requests.compat.unquote(self._recvbuffer))
+                 logging.debug('<<< %s' % unquote(self._recvbuffer))
                  # Parsing everything only if the string is not empty
                  # HELLOTS
                  if self._recvbuffer.startswith('HELLOTS'):
@@ -220,7 +222,7 @@ class AceClient(object):
                        self._url.set(self._recvbuffer.split()[1]) # url for play
                  # LOADRESP
                  elif self._recvbuffer.startswith('LOADRESP'):
-                    self._loadasync.set(requests.compat.json.loads(requests.compat.unquote(''.join(self._recvbuffer.split()[2:]))))
+                    self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
                  # STATE
                  elif self._recvbuffer.startswith('STATE'): self._state.set(self._recvbuffer.split()[1]) # STATE state_id
                  # STATUS

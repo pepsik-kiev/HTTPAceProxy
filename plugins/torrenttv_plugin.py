@@ -8,12 +8,10 @@ __author__ = 'AndreyPavlenko, Dorik1972'
 
 import traceback
 import gevent
-import logging
-import zlib
+import logging, zlib
 import requests
-try: from urlparse import parse_qs
-except: from urllib.parse import parse_qs
-
+from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
+from urllib3.packages.six import PY3
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -74,7 +72,7 @@ class Torrenttv(AceProxyPlugin):
                    if url.startswith(('acestream://', 'infohash://')) \
                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                        self.channels[name] = url
-                       itemdict['url'] = requests.compat.quote(name.encode('utf-8'),'') + '.ts'
+                       itemdict['url'] = quote(name.encode('utf-8'),'') + '.ts'
 
                    self.playlist.addItem(itemdict)
                    m.update(name.encode('utf-8'))
@@ -82,7 +80,7 @@ class Torrenttv(AceProxyPlugin):
                 self.etag = '"' + m.hexdigest() + '"'
                 self.logger.debug('Requested m3u playlist generated')
 
-        except requests.exceptions.ConnectionError: self.logger.error("Can't download TTV playlist!"); return False
+        except requests.exceptions.RequestException: self.logger.error("Can't download TTV playlist!"); return False
         except: self.logger.error(traceback.format_exc()); return False
 
         return True
@@ -94,16 +92,16 @@ class Torrenttv(AceProxyPlugin):
             self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
             if not self.downloadPlaylist(): connection.dieWithError(); return
 
-        url = requests.compat.urlparse(connection.path)
+        url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
         params = parse_qs(connection.query)
 
         if path.startswith('/torrenttv/channel/'):
             if not path.endswith('.ts'):
-                connection.dieWithError(404, 'Invalid path: %s' % requests.compat.unquote(path), logging.ERROR)
+                connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
                 return
             name = path.rsplit('/', 1)[1][:-3]
-            name = requests.compat.unquote(name) if requests.compat.is_py3 else requests.compat.unquote(name).decode('utf-8')
+            name = unquote(name) if PY3 else unquote(name).decode('utf-8')
             url = self.channels.get(name, None)
             if url is None:
                 connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
@@ -112,7 +110,7 @@ class Torrenttv(AceProxyPlugin):
             elif url.startswith('infohash://'):
                 connection.path = '/infohash/%s/stream.ts' % url.split('/')[2]
             elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                connection.path = '/url/%s/stream.ts' % requests.compat.quote(url,'')
+                connection.path = '/url/%s/stream.ts' % quote(url,'')
             connection.splittedpath = connection.path.split('/')
             connection.reqtype = connection.splittedpath[1].lower()
             play = True
@@ -123,7 +121,6 @@ class Torrenttv(AceProxyPlugin):
             connection.end_headers()
             return
         else:
-            self.logger.debug('Exporting m3u playlist')
             hostport = connection.headers['Host']
             path = '' if len(self.channels) == 0 else '/torrenttv/channel'
             add_ts = True if path.endswith('/ts') else False
@@ -145,4 +142,6 @@ class Torrenttv(AceProxyPlugin):
             connection.end_headers()
 
         if play: connection.handleRequest(headers_only, name, self.logomap.get(name), fmt=params.get('fmt', [''])[0])
-        elif not headers_only: connection.wfile.write(exported)
+        elif not headers_only:
+            self.logger.debug('Exporting m3u playlist')
+            connection.wfile.write(exported)

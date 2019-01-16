@@ -18,12 +18,10 @@ __author__ = 'miltador, Dorik1972'
 
 import logging
 import requests
-import time
+import time, zlib
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
-import zlib
-try: from urlparse import parse_qs
-except: from urllib.parse import parse_qs
+from urllib3.packages.six.moves.urllib.parse import parse_qs
 import config.torrenttelik as config
 
 class Torrenttelik(AceProxyPlugin):
@@ -40,7 +38,7 @@ class Torrenttelik(AceProxyPlugin):
             Torrenttelik.playlist = requests.get(url, headers=headers, proxies=config.proxies, timeout=30)
             Torrenttelik.playlisttime = int(time.time())
             Torrenttelik.logger.info('Torrent-telik playlist %s downloaded' % url)
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.RequestException:
             Torrenttelik.logger.error("Can't download Torrent-telik playlist!")
             return False
         else: return True

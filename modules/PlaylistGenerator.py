@@ -6,7 +6,7 @@ and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-from requests.compat import quote
+from urllib3.packages.six.moves.urllib.parse import quote
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):

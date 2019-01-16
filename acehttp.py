@@ -29,10 +29,9 @@ for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys
 
 import logging
 import psutil, requests, signal
-try: from BaseHTTPServer import BaseHTTPRequestHandler
-except: from http.server import BaseHTTPRequestHandler
-try: from urlparse import parse_qs
-except: from urllib.parse import parse_qs
+from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
+from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
+from urllib3.packages.six.moves import range, map
 from ipaddr import IPNetwork, IPAddress
 from uuid import uuid4
 from modules.PluginInterface import AceProxyPlugin
@@ -48,10 +47,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
     handlerGreenlet = None
 
     def log_message(self, format, *args): pass
-        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, requests.compat.unquote(self.path).decode('utf8')))
+        #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, unquote(self.path).decode('utf8')))
 
     def log_request(self, code='-', size='-'): pass
-        #logger.debug('"%s" %s %s', requests.compat.unquote(self.requestline).decode('utf8'), str(code), str(size))
+        #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
         if self.handlerGreenlet: self.handlerGreenlet.kill()
@@ -76,9 +75,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.handlerGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
-        logging.info('Accepted connection from %s path %s' % (self.clientip, requests.compat.unquote(self.path)))
+        logging.info('Accepted connection from %s path %s' % (self.clientip, unquote(self.path)))
         logging.debug('Client headers: %s' % dict(self.headers))
-        params = requests.compat.urlparse(self.path)
+        params = urlparse(self.path)
         self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
@@ -147,7 +146,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict = {}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')
         for i in range(3, len(self.splittedpath)):
            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
-        paramsdict[self.reqtype] = requests.compat.unquote(self.splittedpath[2]) #self.path_unquoted
+        paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
         if not AceConfig.new_api:
            try:
@@ -169,7 +168,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
                     params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
                     self.cmd = s.get(url, params=params, timeout=(5,AceConfig.videotimeout)).json()['response']
-                    CID = requests.compat.urlparse(self.cmd['playback_url']).path.split('/')[3]
+                    CID = urlparse(self.cmd['playback_url']).path.split('/')[3]
                     url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
                     params = { 'method': 'get_media_files', 'infohash': CID }
                     NAME = s.get(url, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
@@ -210,7 +209,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               # If there is no existing broadcast we create it
               playback_url = self.cmd['playback_url'] if AceConfig.new_api else self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
-                 playback_url = requests.compat.urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
+                 playback_url = urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
               gevent.spawn(StreamReader, playback_url, CID)
 
            # Sending videostream headers to client
@@ -453,14 +452,14 @@ def get_ip_address():
 def check_compatibility(gevent_version, psutil_version):
 
     # Check gevent for compatibility.
-    major, minor, patch = list(map(int, gevent_version.split('.')[:3]))
+    major, minor, patch = map(int, gevent_version.split('.')[:3])
     # gevent >= 1.2.2
     assert major == 1
     assert minor >= 2
     assert minor >= 2
 
     # Check psutil for compatibility.
-    major, minor, patch = list(map(int, psutil_version.split('.')[:3]))
+    major, minor, patch = map(int, psutil_version.split('.')[:3])
     # psutil >= 5.3.0
     assert major == 5
     assert minor >= 3

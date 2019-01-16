@@ -17,16 +17,12 @@ What is this plugin for?
 """
 __author__ = 'miltador, Dorik1972'
 
-import logging
-from requests.compat import quote, unquote
+import logging, zlib
 from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
-import zlib
-
+from urllib3.packages.six.moves.urllib.parse import parse_qs, quote, unquote
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
-try: from urlparse import parse_qs
-except: from urllib.parse import parse_qs
 import config.p2pproxy as config
 
 class P2pproxy(AceProxyPlugin):

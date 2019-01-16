@@ -4,7 +4,7 @@ Minimal Ace Stream client library to use with HTTP Proxy
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import hashlib, requests
+import hashlib
 
 class AceConst(object):
     APIVERSION = 3
@@ -27,8 +27,7 @@ class AceConst(object):
              3: 'BUFFERING',
              4: 'COMPLETED',
              5: 'CHECKING',
-             6: 'ERROR'
-             }
+             6: 'ERROR'}
 
     STATUS = ('status',
               'total_progress',
@@ -41,6 +40,15 @@ class AceConst(object):
               'downloaded',
               'http_downloaded',
               'uploaded')
+
+    LIVEPOS = ('last',
+               'live_first',
+               'pos',
+               'first_ts',
+               'last_ts',
+               'is_live',
+               'live_last',
+               'buffer_pieces')
 
     START_PARAMS = ('file_indexes',
                     'developer_id',
