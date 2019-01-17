@@ -50,7 +50,7 @@ class Stat(AceProxyPlugin):
 
         if connection.path == '/stat':
            if self.params.get('action', [''])[0] == 'get_status':
-              self.SendResponse(200, 'json', json.dumps(self.getSystemInfo(), ensure_ascii=False).encode('utf-8'), connection)
+              self.SendResponse(200, 'json', json.dumps(self.getStatusJSON(), ensure_ascii=False).encode('utf-8'), connection)
            else:
               try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
               except:
