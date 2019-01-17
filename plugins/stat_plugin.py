@@ -96,6 +96,11 @@ class Stat(AceProxyPlugin):
         connection.wfile.write(content)
 
     def getStatusJSON(self):
+        try:
+            cpu_freq = {k:v for k,v in psutil.cpu_freq()._asdict().items() if k in ('current','min','max')}
+        except:
+            cpu_freq = None
+
         # Sys Info
         statusJSON = {}
         statusJSON['status'] = 'success'
@@ -103,6 +108,7 @@ class Stat(AceProxyPlugin):
             'os_platform': self.config.osplatform,
             'cpu_nums': psutil.cpu_count(),
             'cpu_percent': psutil.cpu_percent(),
+            'cpu_freq': cpu_freq,
             'mem_info': {k:v for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
             'disk_info': {k:v for k,v in psutil.disk_usage(getcwdb())._asdict().items() if k in ('total','used','free')}
             }
