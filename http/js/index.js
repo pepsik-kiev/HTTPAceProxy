@@ -5,7 +5,6 @@ $(document).ready(function() {
         $inf_os = $('#inf_os'),
         $inf_cpu_cores = $('#inf_cpu_cores'),
         $inf_cpu_used = $('#inf_cpu_used'),
-        $inf_cpu_freq = $('#inf_cpu_freq'),
         $inf_temp = $('#inf_temp'),
         $inf_temp_div = $('#inf_temp_div'),
         $inf_ram_total = $('#inf_ram_total'),
@@ -72,7 +71,6 @@ $(document).ready(function() {
         $inf_os.text(sys_info.os_platform);
         $inf_cpu_cores.text(sys_info.cpu_nums);
         $inf_cpu_used.text(sys_info.cpu_percent + "%");
-        $inf_cpu_freq.text(sys_info.cpu_freq['current'] + " Mhz");
         $inf_ram_total.text(bytes2human(sys_info.mem_info['total']));
         $inf_ram_used.text(bytes2human(sys_info.mem_info['used']));
         $inf_ram_free.text(bytes2human(sys_info.mem_info['available']));
