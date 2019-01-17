@@ -29,8 +29,10 @@
     font-size: 0.7em;
     margin-bottom: 0;
 }
-.sys-info > div{
-    margin-right: 0.3em;
+.sys-info span {
+    margin-right: 0.4em;
+}
+.sys-info > div {
     white-space: nowrap;
 }
 .heder-title {

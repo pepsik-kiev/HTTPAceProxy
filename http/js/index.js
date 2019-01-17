@@ -7,14 +7,12 @@ $(document).ready(function() {
         $inf_cpu_used = $('#inf_cpu_used'),
         $inf_cpu_freq = $('#inf_cpu_freq'),
         $inf_temp = $('#inf_temp'),
-        $inf_temp_div = $('#inf_temp_div'),
         $inf_ram_total = $('#inf_ram_total'),
         $inf_ram_used = $('#inf_ram_used'),
         $inf_ram_free = $('#inf_ram_free'),
         $inf_disk_total = $('#inf_disk_total'),
         $inf_disk_used = $('#inf_disk_used'),
         $inf_disk_free = $('#inf_disk_free'),
-        $header_invisible_obj = $('.header .invisible'),
         init_header = false;
 
 
@@ -68,32 +66,35 @@ $(document).ready(function() {
         var clients_data = data.clients_data;
         var clients_content = "";
 
+
         // Header System Info
         $inf_os.text(sys_info.os_platform);
-        $inf_cpu_cores.text(sys_info.cpu_nums);
-        $inf_cpu_used.text(sys_info.cpu_percent + "%");
-        $inf_cpu_freq.text(sys_info.cpu_freq['current'] + " Mhz");
-        $inf_ram_total.text(bytes2human(sys_info.mem_info['total']));
-        $inf_ram_used.text(bytes2human(sys_info.mem_info['used']));
-        $inf_ram_free.text(bytes2human(sys_info.mem_info['available']));
-        $inf_disk_total.text(bytes2human(sys_info.disk_info['total']));
-        $inf_disk_used.text(bytes2human(sys_info.disk_info['used']));
-        $inf_disk_free.text(bytes2human(sys_info.disk_info['free']));
+        $inf_cpu_cores.text("cores: " + sys_info.cpu_nums);
+        $inf_cpu_used.text("used: " + sys_info.cpu_percent + "%");
+        $inf_ram_total.text("total: " + bytes2human(sys_info.mem_info['total']));
+        $inf_ram_used.text("used: " + bytes2human(sys_info.mem_info['used']));
+        $inf_ram_free.text("free: " + bytes2human(sys_info.mem_info['available']));
+        $inf_disk_total.text("total: " + bytes2human(sys_info.disk_info['total']));
+        $inf_disk_used.text("used: " + bytes2human(sys_info.disk_info['used']));
+        $inf_disk_free.text("free: " + bytes2human(sys_info.disk_info['free']));
+
+        if (sys_info.cpu_freq) {
+            $inf_cpu_freq.text("freq: " + sys_info.cpu_freq['current'] + " Mhz");
+        };
 
         if (sys_info.cpu_temp) {
-            $inf_temp.text(sys_info.cpu_temp + "° C");
-
-            if (!init_header) {
-                $inf_temp_div.removeClass('d-none');
-            }
-        }
+            $inf_temp.text("CPU Temperature: " + sys_info.cpu_temp + "° C");
+        };
 
         // Header Connection Info
         $connection_info_lim.text(connection_info.max_clients);
         $connection_info_cli.text(connection_info.total_clients);
 
+        // Display Header System Info
         if (!init_header) {
-            $header_invisible_obj.removeClass('invisible').removeClass('transparent');
+            if (sys_info.cpu_freq) $inf_cpu_freq.removeClass('d-none');
+            if (sys_info.cpu_temp) $inf_temp.removeClass('d-none');
+            $('.header .invisible').removeClass('invisible').removeClass('transparent');
             init_header = true;
         }
 
