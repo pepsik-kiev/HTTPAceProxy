@@ -8,8 +8,14 @@
     margin: 0;
 }
 .info-block {
+    transition: all 0.5s linear;
     text-shadow: 1px 1px 3px black;
-
+}
+.status-connection {
+    transition: all 0.5s linear;
+}
+.transparent {
+    opacity: 0;
 }
 .status-connection-col {
     display: inline-block;
@@ -17,13 +23,15 @@
     text-shadow: 1px 1px 1px black;
 }
 .info-block > h6 {
-    /*margin-bottom: 3px;*/
     font-weight: bold;
 }
-.info-block > p {
+.info-block > div {
     font-size: 0.7em;
     margin-bottom: 0;
-
+}
+.sys-info > div{
+    margin-right: 0.3em;
+    white-space: nowrap;
 }
 .heder-title {
     color:aliceblue;
