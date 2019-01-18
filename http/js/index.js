@@ -78,7 +78,7 @@ $(document).ready(function() {
         $inf_disk_used.text("used: " + bytes2human(sys_info.disk_info['used']));
         $inf_disk_free.text("free: " + bytes2human(sys_info.disk_info['free']));
 
-        if (sys_info.cpu_freq.current) {
+        if (sys_info.cpu_freq) {
             $inf_cpu_freq.text("freq: " + sys_info.cpu_freq['current'] + " Mhz");
         };
 
@@ -92,7 +92,7 @@ $(document).ready(function() {
 
         // Display Header System Info
         if (!init_header) {
-            if (sys_info.cpu_freq.current) $inf_cpu_freq.removeClass('d-none');
+            if (sys_info.cpu_freq) $inf_cpu_freq.removeClass('d-none');
             if (sys_info.cpu_temp) $inf_temp.removeClass('d-none');
             $('.header .invisible').removeClass('invisible').removeClass('transparent');
             init_header = true;
