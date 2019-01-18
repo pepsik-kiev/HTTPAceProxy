@@ -166,11 +166,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  with requests.session() as s:
                     s.stream = s.verify = False
                     url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
-                    params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
+                    params = {'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes']}
                     self.cmd = s.get(url, params=params, timeout=(5,AceConfig.videotimeout)).json()['response']
                     CID = urlparse(self.cmd['playback_url']).path.split('/')[3]
                     url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
-                    params = { 'method': 'get_media_files', 'infohash': CID }
+                    params = {'method': 'get_media_files', self.reqtype if self.reqtype in ('content_id', 'infohash') else 'url': paramsdict[self.reqtype]}
                     NAME = s.get(url, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
               except Exception as e:
                  self.dieWithError(503, '%s' % repr(e), logging.ERROR)
@@ -414,7 +414,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceProxy.ace):
        if AceProxy.clientcounter.idleAce:
-           AceProxy.clientcounter.idleAce.destroy(); gevent.sleep(1)
+          AceProxy.clientcounter.idleAce.destroy(); gevent.sleep(1)
        AceProxy.ace.terminate()
        if AceConfig.osplatform == 'Windows' and os.path.isfile(AceProxy.acedir + '\\acestream.port'):
           try:

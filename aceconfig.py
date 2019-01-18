@@ -108,8 +108,8 @@ class AceConfig(acedefconfig.AceDefConfig):
     #-----------------------------------------------------
     # Using VLC (if cvlc is not installed use 'vlc -I dummy' instead)
     #-----------------------------------------------------
-    #transcodecmd['mp4'] = 'cvlc --rc-fake-tty - --sout-all --sout=#transcode{vcodec=h264,vb=1024,acodec=mp4a,ab=192,channels=2,deinterlace}:std{access=file,mux=ts,dst=-}'.split()
-    #transcodecmd['default'] = 'cvlc --rc-fake-tty - --sout-all --sout=#std{access=file,mux=ts,dst=-}'.split()
+    #transcodecmd['mp4'] = 'cvlc --rc-fake-tty - --sout-all --sout=#transcode{vcodec=h264,vb=1024,acodec=mp4a,ab=192,channels=2,deinterlace}:std{access=file,mux=ts{use-key-frames},dst=-}'.split()
+    #transcodecmd['default'] = 'cvlc --rc-fake-tty - --sout-all --sout=#std{access=file,mux=ts{use-key-frames},dst=-}'.split()
     #
     # ----------------------------------------------------
     # Other settings
