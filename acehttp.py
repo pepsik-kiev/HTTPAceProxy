@@ -195,13 +195,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
                     self.transcoder = self.transcoder.get(timeout=2.0)
                     self.out = self.transcoder.stdin
-                    logger.info('Ffmpeg transcoding for %s started' % self.clientip)
+                    logger.info('Transcoding for %s started' % self.clientip)
                  except:
-                    logger.error('Error starting ffmpeg! Is ffmpeg installed?')
+                    logger.error('Error starting transcoding! Is Ffmpeg or VLC installed?')
                     self.transcoder = None
                     self.out = self.wfile
               else:
-                 logger.error("Can't found fmt key. Ffmpeg transcoding not started!")
+                 logger.error("Can't found fmt key. Transcoding not started!")
 
            self.response_use_chunked = False if self.transcoder is not None else AceConfig.use_chunked
 
@@ -240,7 +240,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         finally:
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
-              self.transcoder.kill(); logging.info('Ffmpeg transcoding for %s stoped' % self.clientip)
+              try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
+              except: pass
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
               if AceConfig.new_api:
                  with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=5) as r:
