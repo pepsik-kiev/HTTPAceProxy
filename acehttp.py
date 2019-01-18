@@ -148,29 +148,28 @@ class HTTPHandler(BaseHTTPRequestHandler):
            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        if not AceConfig.new_api:
-           try:
-              if not AceProxy.clientcounter.idleAce:
-                 logger.debug('Create connection to AceEngine.....')
-                 AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-                 AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-              if self.reqtype not in ('direct_url', 'efile_url'):
-                 CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-           except aceclient.AceException as e:
-              self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-              AceProxy.clientcounter.idleAce = None
-              return
-        else:
-           if self.reqtype not in ('direct_url', 'efile_url'):
+        if self.reqtype not in ('direct_url', 'efile_url'):
+           if not AceConfig.new_api:
+              try:
+                 if not AceProxy.clientcounter.idleAce:
+                    logger.debug('Create connection to AceEngine.....')
+                    AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+                    AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+                    CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
+              except aceclient.AceException as e:
+                 self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+                 AceProxy.clientcounter.idleAce = None
+                 return
+           else:
               try:
                  with requests.session() as s:
                     s.stream = s.verify = False
                     url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
-                    params = {'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes']}
+                    params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
                     self.cmd = s.get(url, params=params, timeout=(5,AceConfig.videotimeout)).json()['response']
                     CID = urlparse(self.cmd['playback_url']).path.split('/')[3]
                     url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
-                    params = {'method': 'get_media_files', self.reqtype if self.reqtype in ('content_id', 'infohash') else 'url': paramsdict[self.reqtype]}
+                    params = { 'method': 'get_media_files', self.reqtype if self.reqtype in ('content_id', 'infohash') else 'url': paramsdict[self.reqtype] }
                     NAME = s.get(url, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
               except Exception as e:
                  self.dieWithError(503, '%s' % repr(e), logging.ERROR)
