@@ -187,7 +187,7 @@ class P2pproxy(AceProxyPlugin):
                 playlistgen = PlaylistGenerator()
                 hostport = connection.headers['Host']
                 days = int(self.params.get('days', ['7'])[0])
-                suffix = '&suffix=%s' % self.params.get('suffix', [''])[0]
+                suffix = '&suffix=%s' % self.params.get('suffix')[0] if 'suffix' in self.params else ''
                 for i in range(days):
                     dfmt = d.strftime('%d-%m-%Y')
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
@@ -230,8 +230,7 @@ class P2pproxy(AceProxyPlugin):
                 channels_list = TorrentTvApi(config.email, config.password).archive_channels()
                 hostport = connection.headers['Host']
                 playlistgen = PlaylistGenerator()
-                suffix = '&suffix=%s' % self.params.get('suffix', [''])[0]
-
+                suffix = '&suffix=%s' % self.params.get('suffix')[0] if 'suffix' in self.params else ''
                 for channel in channels_list:
                         epg_id = channel.getAttribute('epg_id')
                         name = channel.getAttribute('name')
