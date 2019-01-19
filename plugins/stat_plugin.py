@@ -13,9 +13,9 @@ from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
 from requests.compat import json
-import os, time, zlib
+import time, zlib
 import psutil
-import logging, re
+import logging
 import requests
 
 localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
@@ -42,7 +42,7 @@ class Stat(AceProxyPlugin):
 
     def handle(self, connection, headers_only=False):
         self.params = parse_qs(connection.query)
-        path_file_ext = re.search(r'.js$|.css$|.html$|.png$|.jpg$|.jpeg$|.svg$', connection.path)
+        path_file_ext = ''.join(connection.path.split('.')[-1:])
 
         if headers_only:
            self.SendResponse(200, 'json', '', connection)
@@ -58,7 +58,7 @@ class Stat(AceProxyPlugin):
                  return
 
         elif path_file_ext:
-           try: self.SendResponse(200, path_file_ext.group(0)[1:], self.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
+           try: self.SendResponse(200, path_file_ext, self.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
            except:
               connection.dieWithError(404, 'Not Found')
               return
@@ -69,8 +69,8 @@ class Stat(AceProxyPlugin):
         with open('http/%s' % path, 'rb') as handle:
            return handle.read()
 
-    def SendResponse(self, status_code, type, content, connection):
-        content_type = {
+    def SendResponse(self, status_code, f_ext, content, connection):
+        mimetype = {
             'js': r'text/javascript; charset=utf-8',
             'json': r'application/json',
             'css': r'text/css; charset=utf-8',
@@ -80,8 +80,12 @@ class Stat(AceProxyPlugin):
             'jpeg': r'image/jpeg',
             'svg': r'image/svg+xml'
              }
+        if f_ext not in mimetype:
+           connection.dieWithError(404, 'Not Found')
+           return
+
         connection.send_response(status_code)
-        connection.send_header('Content-type', content_type[type])
+        connection.send_header('Content-type', mimetype[f_ext])
         connection.send_header('Connection', 'close')
         try:
            h = connection.headers.get('Accept-Encoding').split(',')[0]
@@ -118,16 +122,16 @@ class Stat(AceProxyPlugin):
         clients = [item for sublist in self.stuff.clientcounter.streams.values() for item in sublist]
         for c in clients:
             if not c.clientInfo:
-                if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
-                    c.clientInfo = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
-                else:
-                    try:
-                        headers = {'User-Agent':'API Browser'}
-                        with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
-                            if r.encoding is None: r.encoding = 'utf-8'
-                            c.clientInfo = json.loads(r.text.split('(', 1)[1].strip(')'))
-                            c.clientInfo['vendor'] = ''
-                    except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
+               if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
+                  c.clientInfo = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
+               else:
+                  try:
+                     headers = {'User-Agent':'API Browser'}
+                     with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
+                        if r.encoding is None: r.encoding = 'utf-8'
+                        c.clientInfo = json.loads(r.text.split('(', 1)[1].strip(')'))
+                        c.clientInfo['vendor'] = ''
+                  except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 
             statusJSON['clients_data'].append({
                 'channelIcon': c.channelIcon,
