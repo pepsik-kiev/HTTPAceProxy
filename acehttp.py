@@ -23,9 +23,9 @@ from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
-base_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, os.path.join(base_dir, 'modules'))
-for wheel in glob.glob(os.path.join(base_dir, 'modules/wheels/') + '*.whl'): sys.path.insert(0, wheel)
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(ROOT_DIR, 'modules'))
+for wheel in glob.glob(os.path.join(ROOT_DIR, 'modules', 'wheels', '*.whl')): sys.path.insert(0, wheel)
 
 import logging
 import psutil, requests, signal
@@ -165,6 +165,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  s.stream = s.verify = False
                  url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
                  params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
+                 if AceConfig.acestreamtype['output_format']=='hls':
+                    params.update(AceConfig.acestreamtype)
+                    del params['output_format']
                  self.cmd = s.get(url, params=params, timeout=(5,AceConfig.videotimeout)).json()['response']
                  CID = urlparse(self.cmd['playback_url']).path.split('/')[3]
                  url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
@@ -527,7 +530,7 @@ else:
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
-try: os.chdir(os.path.dirname(os.path.realpath(__file__)))
+try: os.chdir(ROOT_DIR)
 except: pass
 # Creating dict of handlers
 AceProxy.pluginshandlers = {}
@@ -540,7 +543,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
    plugname = i.split('_')[0].capitalize()
    try: plugininstance = getattr(plugin, plugname)(AceConfig, AceProxy)
    except Exception as e:
-       logger.error("Cannot load plugin %s: %s" % (plugname, repr(e)))
+       logger.error("Can't load plugin %s: %s" % (plugname, repr(e)))
        continue
    logger.debug('Plugin loaded: %s' % plugname)
    for j in plugininstance.handlers: AceProxy.pluginshandlers[j] = plugininstance

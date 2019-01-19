@@ -27,8 +27,6 @@ from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
 
 class P2pproxy(AceProxyPlugin):
-    TTV = 'http://1ttv.org/'
-    TTVU = TTV + 'uploads/'
     handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logos')
     logger = logging.getLogger('plugin_p2pproxy')
     compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
@@ -76,7 +74,7 @@ class P2pproxy(AceProxyPlugin):
                     if channel.getAttribute('id') == channel_id:
                         name = channel.getAttribute('name')
                         logo = channel.getAttribute('logo')
-                        if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
+                        if logo != '' and config.fullpathlogo: logo = config.logobase + logo
                         break
 
                 if stream_type not in (b'torrent', b'contentid'):
@@ -111,7 +109,7 @@ class P2pproxy(AceProxyPlugin):
                     group = TorrentTvApi.CATEGORIES[int(group_id)]
                     cid = channel.getAttribute('id')
                     logo = channel.getAttribute('logo')
-                    if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
+                    if logo != '' and config.fullpathlogo: logo = config.logobase + logo
 
                     fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo}
                     if channel.getAttribute('epg_id') != '0': fields['tvgid'] = config.tvgid % fields
@@ -235,7 +233,7 @@ class P2pproxy(AceProxyPlugin):
                         epg_id = channel.getAttribute('epg_id')
                         name = channel.getAttribute('name')
                         logo = channel.getAttribute('logo')
-                        if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
+                        if logo != '' and config.fullpathlogo: logo = config.logobase + logo
                         for d in dates:
                             n = name + ' (' + d + ')' if len(dates) > 1 else name
                             url = 'http://%s/archive/?type=m3u&date=%s&channel_id=%s%s' % (hostport, d, epg_id, suffix)
@@ -317,7 +315,7 @@ class P2pproxy(AceProxyPlugin):
                                 records_list = TorrentTvApi(config.email, config.password).records(channel_id, d)
                                 channel_name = channel.getAttribute('name')
                                 logo = channel.getAttribute('logo')
-                                if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
+                                if logo != '' and config.fullpathlogo: logo = config.logobase + logo
 
                                 for record in records_list:
                                     name = record.getAttribute('name')
@@ -344,7 +342,7 @@ class P2pproxy(AceProxyPlugin):
                                 logo = channel.getAttribute('logo')
 
                         if channel_name != '': name = '(' + channel_name + ') ' + name
-                        if logo != '' and config.fullpathlogo: logo = P2pproxy.TTVU + logo
+                        if logo != '' and config.fullpathlogo: logo = config.logobase + logo
 
                         playlistgen.addItem({'group': channel_name, 'name': n, 'url': record_id, 'logo': logo, 'tvg': ''})
 
@@ -399,7 +397,7 @@ class P2pproxy(AceProxyPlugin):
             connection.send_response(200)
             connection.send_header('Content-Type', 'text/plain;charset=utf-8')
             connection.end_headers()
-            connection.wfile.write("logobase = '" + P2pproxy.TTVU + "'\n")
+            connection.wfile.write("logobase = '" + config.logobase + "'\n")
             connection.wfile.write('logomap = {\n')
 
             for channel in translations_list:
