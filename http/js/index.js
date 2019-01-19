@@ -13,12 +13,12 @@ $(document).ready(function() {
         $inf_disk_used = $('#inf_disk_used'),
         $inf_disk_free = $('#inf_disk_free'),
         $inf_cpu_freq = $('#inf_cpu_freq'),
-        init_header = false;
+        visible_header = false;
 
 
     getStatus();
 
-
+    //Help popover
     $(function () {
         $('[data-toggle="popover"]').popover({
             html: true,
@@ -34,7 +34,7 @@ $(document).ready(function() {
         });
     });
 
-
+    // AJAX request for get status
     function getStatus() {
         $.ajax({
             url: 'http://' + window.location.host + '/stat/?action=get_status',
@@ -59,13 +59,19 @@ $(document).ready(function() {
         });
     }
 
-
+    // Render response data
     function renderPage(data) {
-        var sys_info = data.sys_info;
-        var connection_info = data.connection_info;
-        var clients_data = data.clients_data;
+        renderHederPage(data.sys_info, data.connection_info);
 
-        // Header System Info
+        if (data.clients_data.length) {
+            renderClientsTable(data.clients_data);
+        } else {
+            $('tbody').html('');
+        }
+    }
+
+    // Render Header System Info
+    function renderHederPage(sys_info, connection_info) {
         $inf_os.text(sys_info.os_platform);
         $inf_cpu_cores.text("cores: " + sys_info.cpu_nums);
         $inf_cpu_used.text("used: " + sys_info.cpu_percent + "%");
@@ -89,105 +95,85 @@ $(document).ready(function() {
         $connection_info_cli.text(connection_info.total_clients);
 
         // Display Header System Info
-        if (!init_header) {
+        if (!visible_header) {
             if (sys_info.cpu_freq.current) $inf_cpu_freq.removeClass('d-none');
             if (sys_info.cpu_temp) $inf_temp.removeClass('d-none');
             $('.header .invisible').removeClass('invisible').removeClass('transparent');
-            init_header = true;
+            visible_header = true;
         }
-
-        // Table body
-        if (clients_data.length) {
-
-            clients_data.forEach(function(item, i, arr) {
-
-                var rowID = createID(item);
-                var $tbody = $('tbody');
-                var $row = $('#' + rowID);
-
-                var statusColorCss = {
-                    wait: 'warning',
-                    buf: 'warning',
-                    prebuf: 'danger',
-                    dl: 'success',
-                };
-
-                var badgeCss = statusColorCss[item.stat['status']] || 'danger';
-
-                if (!$row.length) {
-
-                    var clientInfo = item.clientInfo.vendor ? item.clientInfo.vendor :
-                        '<i class="flag ' + (item.clientInfo.country_code.toLowerCase() || 'n/a') + '"></i>&nbsp;&nbsp;' +
-                        (item.clientInfo.country_name || 'n/a') +', ' + (item.clientInfo.city || 'n/a');
-
-                    var peers = typeof item.stat['peers'] == "undefined" ? "n/a" :
-                        item.stat['peers'] + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>';
-
-                    var speed_down = typeof item.stat['speed_down'] == "undefined" ? "n/a" : item.stat['speed_down'];
-                    var speed_up = typeof item.stat['speed_up'] == "undefined" ? "n/a" : item.stat['speed_up'];
-
-                    var row  =  '<tr id="' + rowID + '">' +
-                                '<td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
-                                '<td>' + item.clientIP + '</td>'+
-                                '<td>' + clientInfo + '</td>' +
-                                '<td class="text-center">' + item.startTime + '</td>' +
-                                '<td class="text-center duration-time">' + item.durationTime + '</td>' +
-                                '<td class="text-center">' +
-                                    '<div class="digit-speed text-right speed-down">'+ speed_down + '</div>' +
-                                    '<img src="/stat/img/arrow-down.svg"/><img src="/stat/img/arrow-up.svg"/>' +
-                                    '<div class="digit-speed text-left speed-up">' + speed_up + '</div></td>' +
-                                '<td class="text-center peers">'+ peers + '</td></tr>';
-
-                    $tbody.append(row);
-                    $('#' + rowID).data('update', true)
-                        .attr('title', 'Downloaded: ' + bytes2human(item.stat['downloaded']) + ' Uploaded: ' + bytes2human(item.stat['uploaded']));
-
-                } else {
-                    $row.attr('title', 'Downloaded: ' + bytes2human(item.stat['downloaded']) + ' Uploaded: ' + bytes2human(item.stat['uploaded']));
-                    $row.find('.duration-time').text(item.durationTime);
-                    $row.find('.speed-down').text(item.stat['speed_down']);
-                    $row.find('.speed-up').text(item.stat['speed_up']);
-                    $row.find('.peers').html(item.stat['peers'] + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>');
-                    $row.data('update', true);
-                }
-
-                $('tbody tr').each(function(index) {
-                    if (!$(this).data('update')) {
-                        $(this).remove();
-                    };
-                });
-            });
-
-        } else {
-
-            $('tbody').html('');
-        }
-
-        $('tbody tr').data('update', false);
     }
 
+    // Render Table Body
+    function renderClientsTable(clients_data) {
+        var $tbody = $('tbody'),
+            statusColorCss = {
+                wait: 'warning',
+                buf: 'warning',
+                prebuf: 'danger',
+                dl: 'success',
+            };
+
+        clients_data.forEach(function(item, i, arr) {
+            var badgeCss = typeof item.stat['status'] == "undefined" ? 'danger': statusColorCss[item.stat['status']] || 'danger',
+
+                title_attr = 'Downloaded: ' + bytes2human((item.stat['downloaded'] || 0)) + ' Uploaded: ' + bytes2human((item.stat['uploaded'] || 0)),
+
+                peers = typeof item.stat['peers'] == "undefined" ? "n/a" :
+                    item.stat['peers'] + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>',
+
+                speed_down = typeof item.stat['speed_down'] == "undefined" ? "n/a" : item.stat['speed_down'],
+
+                speed_up = typeof item.stat['speed_up'] == "undefined" ? "n/a" : item.stat['speed_up'],
+
+                rowID = "rowId" + (item.channelName + item.clientIP + item.startTime).hashCode(),
+
+                $row = $('#' + rowID);
+
+            if ($row.length === 0) {
+                var clientInfo = item.clientInfo.vendor ? item.clientInfo.vendor :
+                    '<i class="flag ' + (item.clientInfo.country_code.toLowerCase() || 'n/a') + '"></i>&nbsp;&nbsp;' +
+                    (item.clientInfo.country_name || 'n/a') +', ' + (item.clientInfo.city || 'n/a');
+
+                var $row = $('<tr id="' + rowID + '">' +
+                              '<td><img src="' + item.channelIcon + '"/>&nbsp;&nbsp;' + item.channelName + '</td>' +
+                              '<td>' + item.clientIP + '</td>'+
+                              '<td>' + clientInfo + '</td>' +
+                              '<td class="text-center">' + item.startTime + '</td>' +
+                              '<td class="text-center duration-time">' + item.durationTime + '</td>' +
+                              '<td class="text-center">' +
+                                  '<div class="digit-speed text-right speed-down">'+ speed_down + '</div>' +
+                                  '<img src="/stat/img/arrow-down.svg"/><img src="/stat/img/arrow-up.svg"/>' +
+                                  '<div class="digit-speed text-left speed-up">' + speed_up + '</div></td>' +
+                              '<td class="text-center peers">'+ peers + '</td>' +
+                          '</tr>').data('update', true).attr('title', title_attr);
+
+                $tbody.append($row);
+
+            } else {
+                $row.attr('title', title_attr);
+                $row.find('.duration-time').text(item.durationTime);
+                $row.find('.speed-down').text(item.stat['speed_down']);
+                $row.find('.speed-up').text(item.stat['speed_up']);
+                $row.find('.peers').html(peers);
+                $row.data('update', true);
+            }
+        });
+
+        $('tbody tr').each(function(index) {
+            if ($(this).data('update') === false) {
+                $(this).remove();
+            };
+        }).data('update', false);
+    }
+
+
+    // Convert byte format to kB, MB, GB, TB
     function bytes2human(size) {
         var i = size == 0 ? 0 : Math.floor( Math.log(size) / Math.log(1024) );
         return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i];
-    }
+    };
 
-    // function Row(client) {
-    //     var tr = document.createElement('tr');
-
-    //     this.td = document.createElement('td');
-    //     this.id = createID(client);
-    //     this.text = "TEST";
-    //     this.updateText = function(text) {
-    //         this.td.innerText = text;
-    //     }
-    // }
-
-    function createID(item) {
-        var client = item.channelName + item.clientIP + item.startTime;
-        var rowId = "rowId" + client.hashCode();
-        return rowId;
-    }
-
+    // Extend string type for hash generate
     String.prototype.hashCode = function() {
         var hash = 0, i, chr;
         if (this.length === 0) return hash;
