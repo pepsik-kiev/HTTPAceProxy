@@ -11,7 +11,6 @@ import gevent
 import logging, zlib
 import requests
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
-from urllib3.packages.six import PY3
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -53,7 +52,7 @@ class Torrenttv(AceProxyPlugin):
                         if not name in self.logomap:
                            self.logomap[name] = config.logobase + channel.getAttribute('logo')
 
-                    self.logger.debug("Logos updated")
+                    self.logger.debug('Logos updated')
                 finally: self.updatelogos = False # p2pproxy plugin not configured
 
             headers = {'User-Agent': 'Magic Browser'}
@@ -97,11 +96,12 @@ class Torrenttv(AceProxyPlugin):
         params = parse_qs(connection.query)
 
         if path.startswith('/torrenttv/channel/'):
-            if not path.endswith('.ts'):
+            name = path.rsplit('.', 1)
+            if not name[1]:
                 connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
                 return
-            name = path.rsplit('/', 1)[1][:-3]
-            name = unquote(name) if PY3 else unquote(name).decode('utf-8')
+            name = unquote(name[0].rsplit('/', 1)[1])
+            if isinstance(name, bytes): name = name.decode('utf-8') # PY2
             url = self.channels.get(name, None)
             if url is None:
                 connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return

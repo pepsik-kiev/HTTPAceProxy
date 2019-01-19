@@ -24,9 +24,9 @@ $(document).ready(function() {
             html: true,
             title: 'Status description.',
             content: '<span class="badge badge-pill badge-success bage-help">dl</span>' +
-                        ' - Streaming data to the client<br>' +
+                        ' - Streaming content to the client<br>' +
                      '<span class="badge badge-pill badge-warning bage-help">buf</span>' +
-                        ' - Data buffering. Client plays data from its buffer<br>' +
+                        ' - Data buffering. Client plays content from its buffer<br>' +
                      '<span class="badge badge-pill badge-danger bage-help">prebuf</span>' +
                         ' - Data buffering before issuing the stream url to the client<br>' +
                      '<span class="badge badge-pill badge-danger bage-help">wait</span>' +
