@@ -102,8 +102,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
            except Exception as e:
-              import traceback
-              logger.error(traceback.format_exc())
+              #import traceback
+              #logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
            finally: return
         self.handleRequest(headers_only)
@@ -148,6 +148,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
+        CID = NAME = None
         if not AceConfig.new_api:
            try:
               if not AceProxy.clientcounter.idleAce:
