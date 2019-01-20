@@ -102,8 +102,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
            except Exception as e:
-              #import traceback
-              #logger.error(traceback.format_exc())
+              import traceback
+              logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
            finally: return
         self.handleRequest(headers_only)
@@ -155,7 +155,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  logger.debug('Create connection to AceEngine.....')
                  AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
                  AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-                 CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
+              CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
            except aceclient.AceException as e:
               self.dieWithError(503, '%s' % repr(e), logging.ERROR)
               AceProxy.clientcounter.idleAce = None

@@ -151,7 +151,7 @@ class AceClient(object):
 
     def LOADASYNC(self, command, params):
         self._loadasync = AsyncResult()
-        self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1, 100000), params))
+        self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1000, 100000), params))
         try: return self._loadasync.get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
@@ -235,14 +235,15 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:check'): pass
                     elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
                        #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
-                    elif self._tempstatus.startswith('main:dl'):
+                    elif self._tempstatus.startswith('main:dl'): #dl;
                        stat.extend(map(int, self._tempstatus.split(';')[1:]))
-                    elif self._tempstatus.startswith('main:wait'): #;time
+                    elif self._tempstatus.startswith('main:wait'): #wait;time;
                        stat.extend(map(int, self._tempstatus.split(';')[2:]))
-                    elif self._tempstatus.startswith(('main:prebuf','main:buf')):  #progress;time
+                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): #buf;progress;time;
                        stat.extend(map(int, self._tempstatus.split(';')[3:]))
                     if len(stat) == len(AceConst.STATUS):
                        self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)})
+                    else: self._status.set({'status': stat[0]}) # idle, loading, starting, check, err
                  # CID
                  elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
                  # INFO

@@ -13,7 +13,7 @@ from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
 from requests.compat import json
-import time, zlib, os
+import time, zlib
 import psutil
 import logging
 import requests

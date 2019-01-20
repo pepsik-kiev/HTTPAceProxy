@@ -111,6 +111,10 @@ $(document).ready(function() {
                 buf: 'warning',
                 prebuf: 'danger',
                 dl: 'success',
+                loading: 'info',
+                starting: 'info',
+                idle: 'info',
+                check: 'info',
             };
 
         clients_data.forEach(function(item, i, arr) {
@@ -118,7 +122,7 @@ $(document).ready(function() {
 
                 title_attr = 'Downloaded: ' + bytes2human((item.stat['downloaded'] || 0)) + ' Uploaded: ' + bytes2human((item.stat['uploaded'] || 0)),
 
-                peers = typeof item.stat['peers'] == "undefined" ? "n/a" :
+                peers = typeof item.stat['peers'] == "undefined" ? "" + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>':
                     item.stat['peers'] + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>',
 
                 speed_down = typeof item.stat['speed_down'] == "undefined" ? "n/a" : item.stat['speed_down'],
