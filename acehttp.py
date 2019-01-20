@@ -173,7 +173,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  CID = urlparse(self.cmd['playback_url']).path.split('/')[3]
                  url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
                  params = { 'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype] }
-                 NAME = s.get(url, params=params, timeout=5).json()['result'][paramsdict['file_indexes']]
+                 NAME = s.get(url, params=params, timeout=(5, AceConfig.aceresulttimeout)).json()['result'][paramsdict['file_indexes']]
            except Exception as e:
               self.dieWithError(503, '%s' % repr(e), logging.ERROR)
               return

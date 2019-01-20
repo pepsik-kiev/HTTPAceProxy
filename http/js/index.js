@@ -74,7 +74,7 @@ $(document).ready(function() {
     function renderHederPage(sys_info, connection_info) {
         $inf_os.text(sys_info.os_platform);
         $inf_cpu_cores.text("cores: " + sys_info.cpu_nums);
-        $inf_cpu_used.text("used: " + sys_info.cpu_percent + "%");
+        $inf_cpu_used.text("used: " + ((sys_info.cpu_percent.reduce(function(a, b) { return a + b; }, 0)) / (sys_info.cpu_nums)).toFixed(2) + "%");
         $inf_ram_total.text("total: " + bytes2human(sys_info.mem_info['total']));
         $inf_ram_used.text("used: " + bytes2human(sys_info.mem_info['used']));
         $inf_ram_free.text("free: " + bytes2human(sys_info.mem_info['available']));

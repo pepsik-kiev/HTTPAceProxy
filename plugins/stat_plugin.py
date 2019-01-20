@@ -13,7 +13,7 @@ from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
 from requests.compat import json
-import time, zlib
+import time, zlib, os
 import psutil
 import logging
 import requests
@@ -106,7 +106,7 @@ class Stat(AceProxyPlugin):
         statusJSON['sys_info'] = {
             'os_platform': self.config.osplatform,
             'cpu_nums': psutil.cpu_count(),
-            'cpu_percent': psutil.cpu_percent(),
+            'cpu_percent': psutil.cpu_percent(interval=0, percpu=True),
             'cpu_freq': {k:v for k,v in psutil.cpu_freq()._asdict().items() if k in ('current','min','max')} if psutil.cpu_freq() else None,
             'mem_info': {k:v for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
             'disk_info': {k:v for k,v in psutil.disk_usage(getcwdb())._asdict().items() if k in ('total','used','free')}
