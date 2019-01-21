@@ -107,7 +107,7 @@ class Stat(AceProxyPlugin):
             'os_platform': self.config.osplatform,
             'cpu_nums': psutil.cpu_count(),
             'cpu_percent': psutil.cpu_percent(interval=0, percpu=True),
-            'cpu_freq': {k:v for k,v in psutil.cpu_freq()._asdict().items() if k in ('current','min','max')} if psutil.cpu_freq() else None,
+            'cpu_freq': {k:v for k,v in psutil.cpu_freq()._asdict().items() if k in ('current','min','max')} if psutil.cpu_freq() else {},
             'mem_info': {k:v for k,v in psutil.virtual_memory()._asdict().items() if k in ('total','used','available')},
             'disk_info': {k:v for k,v in psutil.disk_usage(getcwdb())._asdict().items() if k in ('total','used','free')}
             }
