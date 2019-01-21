@@ -54,19 +54,26 @@ $(document).ready(function() {
                     " | errorThrown: " + errorThrown);
 
                 $('tbody').html("");
-                $('#error_resp_mess').css('display', "block")
+                $('#error_resp_mess').css('display', "block");
             },
         });
     }
 
     // Render response data
     function renderPage(data) {
-        renderHederPage(data.sys_info, data.connection_info);
+        try {
+            renderHederPage(data.sys_info, data.connection_info);
 
-        if (data.clients_data.length) {
-            renderClientsTable(data.clients_data);
-        } else {
-            $('tbody').html('');
+            if (data.clients_data.length) {
+                renderClientsTable(data.clients_data);
+            } else {
+                $('tbody').html('');
+            }
+        }
+        catch(err) {
+            $('#error_resp_mess').css('display', "block").html('A critical error, contact the developers.</br>' + err.name + ': ' + err.message);
+
+            throw err;
         }
     }
 
@@ -74,7 +81,7 @@ $(document).ready(function() {
     function renderHederPage(sys_info, connection_info) {
         $inf_os.text(sys_info.os_platform);
         $inf_cpu_cores.text("cores: " + sys_info.cpu_nums);
-        $inf_cpu_used.text("used: " + ((sys_info.cpu_percent.reduce(function(a, b) { return a + b; }, 0)) / (sys_info.cpu_nums)).toFixed(2) + "%");
+        $inf_cpu_used.text("used: " + ((sys_info.cpu_percent.reduce(function(a, b) { return a + b; }, 0)) / (sys_info.cpu_nums)).toFixed() + "%");
         $inf_ram_total.text("total: " + bytes2human(sys_info.mem_info['total']));
         $inf_ram_used.text("used: " + bytes2human(sys_info.mem_info['used']));
         $inf_ram_free.text("free: " + bytes2human(sys_info.mem_info['available']));
@@ -82,7 +89,7 @@ $(document).ready(function() {
         $inf_disk_used.text("used: " + bytes2human(sys_info.disk_info['used']));
         $inf_disk_free.text("free: " + bytes2human(sys_info.disk_info['free']));
 
-        if (sys_info.cpu_freq.current) {
+        if (sys_info.cpu_freq && sys_info.cpu_freq.current) {
             $inf_cpu_freq.text("freq: " + sys_info.cpu_freq['current'] + " Mhz");
         };
 
@@ -96,7 +103,7 @@ $(document).ready(function() {
 
         // Display Header System Info
         if (!visible_header) {
-            if (sys_info.cpu_freq.current) $inf_cpu_freq.removeClass('d-none');
+            if (sys_info.cpu_freq && sys_info.cpu_freq.current) $inf_cpu_freq.removeClass('d-none');
             if (sys_info.cpu_temp) $inf_temp.removeClass('d-none');
             $('.header .invisible').removeClass('invisible').removeClass('transparent');
             visible_header = true;
@@ -122,8 +129,11 @@ $(document).ready(function() {
 
                 title_attr = 'Downloaded: ' + bytes2human((item.stat['downloaded'] || 0)) + ' Uploaded: ' + bytes2human((item.stat['uploaded'] || 0)),
 
-                peers = typeof item.stat['peers'] == "undefined" ? "" + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>':
-                    item.stat['peers'] + '<span class="badge badge-pill badge-'+ badgeCss + ' bage-fixsize">' + item.stat['status'] + '</span>',
+                stat_peers = typeof item.stat['peers'] == "undefined" ? "" : item.stat['peers'],
+
+                stat_status = typeof item.stat['status'] == "undefined" ? "n/a" : item.stat['status'],
+
+                peers_html = stat_peers + '<span class="badge badge-pill badge-' + badgeCss + ' bage-fixsize">' + stat_status + '</span>',
 
                 speed_down = typeof item.stat['speed_down'] == "undefined" ? "n/a" : item.stat['speed_down'],
 
@@ -134,6 +144,7 @@ $(document).ready(function() {
                 $row = $('#' + rowID);
 
             if ($row.length === 0) {
+
                 var clientInfo = item.clientInfo.vendor ? item.clientInfo.vendor :
                     '<i class="flag ' + (item.clientInfo.country_code.toLowerCase() || 'n/a') + '"></i>&nbsp;&nbsp;' +
                     (item.clientInfo.country_name || 'n/a') +', ' + (item.clientInfo.city || 'n/a');
@@ -148,7 +159,7 @@ $(document).ready(function() {
                                   '<div class="digit-speed text-right speed-down">'+ speed_down + '</div>' +
                                   '<img src="/stat/img/arrow-down.svg"/><img src="/stat/img/arrow-up.svg"/>' +
                                   '<div class="digit-speed text-left speed-up">' + speed_up + '</div></td>' +
-                              '<td class="text-center peers">'+ peers + '</td>' +
+                              '<td class="text-center peers">'+ peers_html + '</td>' +
                           '</tr>').data('update', true).attr('title', title_attr);
 
                 $tbody.append($row);
@@ -158,7 +169,7 @@ $(document).ready(function() {
                 $row.find('.duration-time').text(item.durationTime);
                 $row.find('.speed-down').text(item.stat['speed_down']);
                 $row.find('.speed-up').text(item.stat['speed_up']);
-                $row.find('.peers').html(peers);
+                $row.find('.peers').html(peers_html);
                 $row.data('update', true);
             }
         });
