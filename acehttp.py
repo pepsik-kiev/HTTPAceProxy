@@ -36,7 +36,7 @@ from ipaddr import IPNetwork, IPAddress
 from uuid import uuid4
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
-from clientcounter import ClientCounter
+from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
 
@@ -149,6 +149,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
         CID = NAME = None
+        self.sessionID = str(uuid4())
+        self.connectionTime = gevent.time.time()
         if not AceConfig.new_api:
            try:
               if not AceProxy.clientcounter.idleAce:
@@ -165,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               with requests.session() as s:
                  s.stream = s.verify = False
                  url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
-                 params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': str(uuid4()), '_idx': paramsdict['file_indexes'] }
+                 params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': self.sessionID, '_idx': paramsdict['file_indexes'] }
                  if AceConfig.acestreamtype['output_format']=='hls':
                     params.update(AceConfig.acestreamtype)
                     del params['output_format']
@@ -178,7 +180,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
               self.dieWithError(503, '%s' % repr(e), logging.ERROR)
               return
 
-        self.connectionTime = gevent.time.time()
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
         self.clientInfo = self.transcoder = None

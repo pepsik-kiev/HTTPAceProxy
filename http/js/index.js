@@ -139,7 +139,7 @@ $(document).ready(function() {
 
                 speed_up = typeof item.stat['speed_up'] == "undefined" ? "n/a" : item.stat['speed_up'],
 
-                rowID = "rowId" + (item.channelName + item.clientIP + item.startTime).hashCode(),
+                rowID = item.stat['sessionID'],
 
                 $row = $('#' + rowID);
 
@@ -181,23 +181,11 @@ $(document).ready(function() {
         }).data('update', false);
     }
 
-
     // Convert byte format to kB, MB, GB, TB
     function bytes2human(size) {
         var i = size == 0 ? 0 : Math.floor( Math.log(size) / Math.log(1024) );
         return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i];
     };
 
-    // Extend string type for hash generate
-    String.prototype.hashCode = function() {
-        var hash = 0, i, chr;
-        if (this.length === 0) return hash;
-        for (i = 0; i < this.length; i++) {
-            chr   = this.charCodeAt(i);
-            hash  = ((hash << 5) - hash) + chr;
-            hash |= 0; // Convert to 32bit integer
-        }
-        return hash;
-    };
 });
 

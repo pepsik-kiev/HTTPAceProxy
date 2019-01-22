@@ -134,6 +134,7 @@ class Stat(AceProxyPlugin):
                   except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 
             statusJSON['clients_data'].append({
+                'sessionID': c.sessionID,
                 'channelIcon': c.channelIcon,
                 'channelName': c.channelName,
                 'clientIP': c.clientip,
