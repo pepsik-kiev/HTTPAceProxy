@@ -21,13 +21,13 @@ class AceConst(object):
     SEX_MALE = 1
     SEX_FEMALE = 2
 
-    STATE = {0: 'IDLE',
-             1: 'PREBUFFERING',
-             2: 'DOWNLOADING',
-             3: 'BUFFERING',
-             4: 'COMPLETED',
-             5: 'CHECKING',
-             6: 'ERROR'}
+    STATE = {'0': 'IDLE',
+             '1': 'PREBUFFERING',
+             '2': 'DOWNLOADING',
+             '3': 'BUFFERING',
+             '4': 'COMPLETED',
+             '5': 'CHECKING',
+             '6': 'ERROR'}
 
     STATUS = ('status',
               'total_progress',
@@ -40,15 +40,6 @@ class AceConst(object):
               'downloaded',
               'http_downloaded',
               'uploaded')
-
-    LIVEPOS = ('last',
-               'live_first',
-               'pos',
-               'first_ts',
-               'last_ts',
-               'is_live',
-               'live_last',
-               'buffer_pieces')
 
     START_PARAMS = ('file_indexes',
                     'developer_id',

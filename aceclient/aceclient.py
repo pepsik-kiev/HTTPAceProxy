@@ -224,7 +224,8 @@ class AceClient(object):
                  elif self._recvbuffer.startswith('LOADRESP'):
                     self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
                  # STATE
-                 elif self._recvbuffer.startswith('STATE'): self._state.set(self._recvbuffer.split()[1]) # STATE state_id
+                 elif self._recvbuffer.startswith('STATE'):
+                    self._state.set(AceConst.STATE[self._recvbuffer.split()[1]]) # STATE state_id
                  # STATUS
                  elif self._recvbuffer.startswith('STATUS'):
                     self._tempstatus = self._recvbuffer.split()[1]
