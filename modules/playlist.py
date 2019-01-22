@@ -56,6 +56,32 @@ class PlaylistConfig():
     # Channel name to tvg name mappings.
     m3utvgnames = dict()
     # m3utvgnames['Channel name'] = 'Tvg_name'
+    m3utvgnames['A1'] = 'Amedia 1'
+    m3utvgnames['A2'] = 'Amedia 2'
+    m3utvgnames['TV 1000'] = 'TV1000'
+    m3utvgnames['TV 1000 HD'] = 'TV1000 HD'
+    m3utvgnames['TV 1000 Action'] = 'TV1000 Action'
+    m3utvgnames['TV 1000 Action HD'] = 'TV1000 Action HD'
+    m3utvgnames['TV 1000 Premium'] = 'TV1000 Premium Baltic'
+    m3utvgnames['TV 1000 World Kino'] = 'TV1000 World Kino'
+    m3utvgnames['TV 1000 Русское кино'] = 'TV1000 Русское кино'
+    m3utvgnames['SET'] = 'Sony channel'
+    m3utvgnames['SET HD'] = 'Sony channel HD'
+    m3utvgnames['Sony Sci-Fi'] = 'Sony SCI-FI'
+    m3utvgnames['A HBO HD'] = 'Amedia Premium HD'
+    m3utvgnames['KinoTV Polska'] = 'Kino Polska'
+    m3utvgnames['Paramount Comedy HD (Россия)'] = 'Paramount Comedy'
+    m3utvgnames['Zee TV Россия'] = 'Zee TV'
+    m3utvgnames['HD Life'] = 'HDL'
+    m3utvgnames['ID Xtra'] = 'ID Investigation Discovery'
+    m3utvgnames['Авто 24'] = 'Авто24'
+    m3utvgnames['Дайвинг ТВ HD'] = 'Дайвинг.TV'
+    m3utvgnames['1 Music Channel (Hungary)'] = '1 Music Channel Hungary'
+    m3utvgnames['1HD Music Television'] = '1 HD Music Television'
+    m3utvgnames['1 MUSIC CHANNEL'] = '1 Music Channel (Romania)'
+    m3utvgnames['VH1 European'] = 'VH1 Europe'
+    m3utvgnames['5 канал (Украина)'] = '5 канал Украина'
+    m3utvgnames['24 Украина'] = '24 (Телеканал новостей 24)'
 
     # Playlist sorting options.
     sort = False

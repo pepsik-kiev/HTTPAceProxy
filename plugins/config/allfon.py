@@ -11,7 +11,7 @@ proxies = None
 url = 'http://allfon-tv.com/autogenplaylist/allfontv.m3u'
 
 # EPG urls & EPG timeshift
-tvgurl = 'http://1ttvapi.top/ttv.xmltv.xml.gz'
+tvgurl = 'http://epg.do.am/tv.gz'
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 

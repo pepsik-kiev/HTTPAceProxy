@@ -25,7 +25,7 @@ logobase = 'http://1ttv.org/uploads/'
 # This option is only for m3u playlists.
 fullpathlogo = True
 # TV Guide URL
-tvgurl = 'http://1ttvapi.top/ttv.xmltv.xml.gz'
+tvgurl = 'http://epg.do.am/tv.gz'
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 
