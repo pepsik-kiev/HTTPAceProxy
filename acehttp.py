@@ -246,7 +246,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: pass
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
               if AceConfig.new_api:
-                 with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=5) as r:
+                 with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=(5,AceConfig.aceresulttimeout)) as r:
                     logging.debug('Stop broadcast: %s' % r.json())
               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 

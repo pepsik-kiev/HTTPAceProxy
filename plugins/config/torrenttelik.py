@@ -9,9 +9,8 @@ proxies = None
 
 # Channels urls
 url = ''
-
 # EPG urls & EPG timeshift
-tvgurl = 'https://goo.gl/ajGuLS'
+tvgurl = 'http://1ttvapi.top/ttv.xmltv.xml.gz'
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 
