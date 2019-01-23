@@ -72,8 +72,10 @@ class PlaylistConfig():
     m3utvgnames['KinoTV Polska'] = 'Kino Polska'
     m3utvgnames['Paramount Comedy HD (Россия)'] = 'Paramount Comedy'
     m3utvgnames['Zee TV Россия'] = 'Zee TV'
+    m3utvgnames['Иллюзион+'] = 'Иллюзион +'
     m3utvgnames['КиноПремиум HD'] = 'КиноПремиумHD'
     m3utvgnames['Кинопоказ HD-1'] = 'Шокирующее (Кинопоказ HD-1)'
+    m3utvgnames['НСТ'] = 'Настоящее Страшное Телевидение'
     m3utvgnames['Шокирующее HD'] = 'Шокирующее (Кинопоказ HD-1)'
     m3utvgnames['ТВ 3'] = 'ТВ-3 Россия'
     m3utvgnames['HD Life'] = 'HDL'
@@ -134,6 +136,7 @@ class PlaylistConfig():
     m3utvgnames['СКИФ (Беларусь)'] = 'СКИФ Витебск'
     m3utvgnames['ТВЦ'] = 'ТВ Центр'
     m3utvgnames['ТВ Центр Международный'] = 'ТВ Центр Международный (TVCI)'
+    m3utvgnames['ТВ 3 (Беларусь)'] = 'ТВ3 Беларусь'
 
     # Playlist sorting options.
     sort = False
