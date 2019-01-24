@@ -137,6 +137,22 @@ class PlaylistConfig():
     m3utvgnames['ТВЦ'] = 'ТВ Центр'
     m3utvgnames['ТВ Центр Международный'] = 'ТВ Центр Международный (TVCI)'
     m3utvgnames['ТВ 3 (Беларусь)'] = 'ТВ3 Беларусь'
+    m3utvgnames['11 канал HD (Пенза)'] = '11 канал Наш Дом (Пенза)'
+    m3utvgnames['3+ (Латвия)'] = '3+ Latvia'
+    m3utvgnames['3+ (Estonia)'] = '3+ Estonia'
+    m3utvgnames['360 градусов'] = '360°'
+    m3utvgnames['360 градусов HD'] = '360°'
+    m3utvgnames['4 канал HD (Киев)'] = '4 канал Украина (RTi)'
+    m3utvgnames['7 канал (Казахстан)'] = '7 канал Казахстан'
+    m3utvgnames['7 канал (Одесса)'] = '7 канал Одесса'
+    m3utvgnames['8 канал (Беларусь)'] = '8 канал Беларусь'
+    m3utvgnames['8 канал (Красноярск)'] = '8 канал Красноярский край'
+    m3utvgnames['Armenia 1 Satellite'] = 'Armenia 1 TV Satellite'
+    m3utvgnames['Arte Network'] = 'ARTE'
+    m3utvgnames['ATV Azerbaycan'] = 'AzTV'
+    m3utvgnames['ATV HD'] = 'AzTV'
+    m3utvgnames['Blue Hustler'] = 'Blue Hustler Россия'
+    m3utvgnames['Brazzers TV Europe'] = 'Brazzers TV Europe (Россия)'
 
     # Playlist sorting options.
     sort = False
