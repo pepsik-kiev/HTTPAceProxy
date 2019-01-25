@@ -7,6 +7,7 @@ and groups
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 from urllib3.packages.six.moves.urllib.parse import quote
+from urllib3.packages.six import ensure_binary, ensure_str
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
@@ -51,8 +52,8 @@ class PlaylistGenerator(object):
             if not 'group' in item: item['group'] = ''
             if not 'logo' in item: item['logo'] = ''
 
-    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False,
-                  process_url=True, header=None, fmt=None, _bytearray=bytearray):
+    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False,
+                      archive=False, process_url=True, header=None, fmt=None):
         '''
         Exports m3u playlist
         '''
@@ -66,7 +67,7 @@ class PlaylistGenerator(object):
 
         for i in items:
             item = i.copy()
-            name = quote(item['name'].replace('"', "'").replace(',', '.'),'')
+            name = quote(ensure_str(item['name']).replace('"', "'").replace(',', '.'),'')
             url = item['url']
             if process_url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
@@ -85,7 +86,7 @@ class PlaylistGenerator(object):
             if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
             itemlist += self._generatem3uline(item)
 
-        return _bytearray(itemlist, 'utf-8')
+        return ensure_binary(itemlist)
 
 
     def exportxml(self, hostport, path='',):
