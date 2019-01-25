@@ -444,7 +444,7 @@ logomap = {
     u'HBO3 TV HD Bulgaria': logobase + 'ni8oAjAEIllJPcHF4zCfeJOLzGeO7g.png',
     u'HBO 2 HD (Polska)': logobase + 'Hos23DbnQUblEr53FhEJcV0iGAG1S6.png',
     u'HBO 3 HD (Polska)': logobase + 't1vX7k3TcdHwnZUsPSykRKeYD1FnWb.png',
-    u'HBO TV HD  Bulgaria': logobase + 'aazfdTWysw8N3jGFihuJpH0i3UBSVg.png',
+    u'HBO TV HD Bulgaria': logobase + 'aazfdTWysw8N3jGFihuJpH0i3UBSVg.png',
     u'HD FASHION UA': logobase + '1HDP1X4Ohu9mPxietnOgfkP5lz9NIP.png',
     u'HD Life': logobase + 'jUteUS0xRGdvLyBVqNjowEUDkOjT0t.png',
     u'HD Media': logobase + 'woAI3zcytfbyiX0LBRToKzErJNy1qF.png',

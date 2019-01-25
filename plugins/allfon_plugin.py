@@ -61,7 +61,7 @@ class Allfon(AceProxyPlugin):
         params = parse_qs(connection.query)
         add_ts = True if connection.path.endswith('/ts') else False
 
-        exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=params.get('fmt', [''])[0]).encode('utf-8')
+        exported = playlistgen.exportm3u(hostport, header=config.m3uheadertemplate, add_ts=add_ts, fmt=params.get('fmt', [''])[0])
 
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

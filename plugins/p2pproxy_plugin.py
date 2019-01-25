@@ -22,6 +22,7 @@ from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
 from urllib3.packages.six.moves.urllib.parse import parse_qs, quote, unquote
 from urllib3.packages.six.moves import range
+from urllib3.packages.six import ensure_binary
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
@@ -77,10 +78,10 @@ class P2pproxy(AceProxyPlugin):
                         if logo != '' and config.fullpathlogo: logo = config.logobase + logo
                         break
 
-                if stream_type not in (b'torrent', b'contentid'):
+                if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == b'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
-                elif stream_type == b'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
+                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
@@ -116,7 +117,7 @@ class P2pproxy(AceProxyPlugin):
                     playlistgen.addItem(fields)
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
-                exported = playlistgen.exportm3u(hostport=hostport, header=config.m3uheadertemplate, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
+                exported = playlistgen.exportm3u(hostport=hostport, header=config.m3uheadertemplate, fmt=self.params.get('fmt', [''])[0])
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 try:
@@ -191,7 +192,7 @@ class P2pproxy(AceProxyPlugin):
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
                     playlistgen.addItem({'group': '', 'tvg': '', 'name': dfmt, 'url': url})
                     d -= delta
-                exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
+                exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0])
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 try:
@@ -239,7 +240,7 @@ class P2pproxy(AceProxyPlugin):
                             url = 'http://%s/archive/?type=m3u&date=%s&channel_id=%s%s' % (hostport, d, epg_id, suffix)
                             playlistgen.addItem({'group': name, 'tvg': '', 'name': n, 'url': url, 'logo': logo})
 
-                exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
+                exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0])
                 try:
                      h = connection.headers.get('Accept-Encoding').split(',')[0]
                      exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
@@ -284,10 +285,10 @@ class P2pproxy(AceProxyPlugin):
 
                 stream_type, stream = TorrentTvApi(config.email, config.password).archive_stream_source(record_id)
 
-                if stream_type not in (b'torrent', b'contentid'):
+                if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == b'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
-                elif stream_type == b'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
+                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
@@ -347,7 +348,7 @@ class P2pproxy(AceProxyPlugin):
                         playlistgen.addItem({'group': channel_name, 'name': n, 'url': record_id, 'logo': logo, 'tvg': ''})
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
-                exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.params.get('fmt', [''])[0]).encode('utf-8')
+                exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.params.get('fmt', [''])[0])
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
@@ -397,16 +398,16 @@ class P2pproxy(AceProxyPlugin):
             connection.send_response(200)
             connection.send_header('Content-Type', 'text/plain;charset=utf-8')
             connection.end_headers()
-            connection.wfile.write("logobase = '" + config.logobase + "'\n")
-            connection.wfile.write('logomap = {\n')
+            connection.wfile.write(b"logobase = '%s'\n" % ensure_binary(config.logobase))
+            connection.wfile.write(b'logomap = {\n')
 
             for channel in translations_list:
-                name = channel.getAttribute('name').encode('utf-8')
-                logo = channel.getAttribute('logo').encode('utf-8')
-                connection.wfile.write("    u'%s': logobase + '%s'" % (name, logo))
-                connection.wfile.write(',\n') if not channel == last else connection.wfile.write('\n')
+                name = ensure_binary(channel.getAttribute('name'))
+                logo = ensure_binary(channel.getAttribute('logo'))
+                connection.wfile.write(b"    u'%s': logobase + '%s'" % (name, logo))
+                connection.wfile.write(b',\n') if not channel == last else connection.wfile.write(b'\n')
 
-            connection.wfile.write('}\n')
+            connection.wfile.write(b'}\n')
 
     def get_date_param(self):
         d = self.params.get('date', [''])[0]

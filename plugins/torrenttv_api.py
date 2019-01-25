@@ -173,7 +173,7 @@ class TorrentTvApi(object):
         allTranslations = self.allTranslations
         if not allTranslations:
             self.allTranslations = allTranslations = self.translations('all')
-        return stream_type.encode('utf-8'), source.encode('utf-8'), allTranslations
+        return stream_type, source, allTranslations
 
     def archive_stream_source(self, record_id):
         """
@@ -189,7 +189,7 @@ class TorrentTvApi(object):
         res = self._checkedjsonresult(request, params)
         stream_type = res['type']
         source = res['source']
-        return stream_type.encode('utf-8'), source.encode('utf-8')
+        return stream_type, source
 
     def _checkedjsonresult(self, request, params):
         try: return self._jsoncheck(self._jsonresult(request, params))

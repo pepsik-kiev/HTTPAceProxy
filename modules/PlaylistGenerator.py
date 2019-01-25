@@ -51,7 +51,8 @@ class PlaylistGenerator(object):
             if not 'group' in item: item['group'] = ''
             if not 'logo' in item: item['logo'] = ''
 
-    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False, process_url=True, header=None, fmt=None):
+    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False,
+                  process_url=True, header=None, fmt=None, _bytearray=bytearray):
         '''
         Exports m3u playlist
         '''
@@ -85,7 +86,8 @@ class PlaylistGenerator(object):
             if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
             itemlist += self._generatem3uline(item)
 
-        return itemlist
+        return _bytearray(itemlist, 'utf-8')
+
 
     def exportxml(self, hostport, path='',):
 

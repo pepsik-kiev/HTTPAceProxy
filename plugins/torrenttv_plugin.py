@@ -11,6 +11,7 @@ import gevent
 import logging, zlib
 import requests
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
+from urllib3.packages.six import ensure_binary, ensure_text
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -71,10 +72,10 @@ class Torrenttv(AceProxyPlugin):
                    if url.startswith(('acestream://', 'infohash://')) \
                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                        self.channels[name] = url
-                       itemdict['url'] = quote((name + '.ts').encode('utf-8'),'')
+                       itemdict['url'] = quote(ensure_binary(name + '.ts'),'')
 
                    self.playlist.addItem(itemdict)
-                   m.update(name.encode('utf-8'))
+                   m.update(ensure_binary(name))
 
                 self.etag = '"' + m.hexdigest() + '"'
                 self.logger.debug('Requested m3u playlist generated')
@@ -101,8 +102,7 @@ class Torrenttv(AceProxyPlugin):
                 connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
                 return
             name = unquote(name[0].rsplit('/', 1)[1])
-            if isinstance(name, bytes): name = name.decode('utf-8') # PY2
-            url = self.channels.get(name, None)
+            url = self.channels.get(ensure_text(name), None)
             if url is None:
                 connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
             elif url.startswith('acestream://'):
@@ -124,7 +124,7 @@ class Torrenttv(AceProxyPlugin):
             hostport = connection.headers['Host']
             path = '' if len(self.channels) == 0 else '/torrenttv/channel'
             add_ts = True if path.endswith('/ts') else False
-            exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0]).encode('utf-8')
+            exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0])
             response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
                                  'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
             try:
