@@ -66,8 +66,7 @@ class PlaylistGenerator(object):
 
         for i in items:
             item = i.copy()
-            item['name'] = item['name'].replace('"', "'").replace(',', '.')
-            name = quote(item['name'].encode('utf-8'),'')
+            name = quote(item['name'].replace('"', "'").replace(',', '.'),'')
             url = item['url']
             if process_url:
                 if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
