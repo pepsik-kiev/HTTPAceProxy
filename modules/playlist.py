@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from urllib3.packages.six import ensure_text
+
 class PlaylistConfig():
 
     # Default playlist format
@@ -182,15 +184,10 @@ class PlaylistConfig():
     @staticmethod
     def _changeItemByDict(item, key, replacementsDict, setKey=None):
         if len(replacementsDict) > 0:
-            value = item[key]
-            if not setKey: setKey = key
-
-            if type(value) == str:
-                value = replacementsDict.get(value)
-                if value: item[setKey] = value
-            elif type(value) == unicode:
-                value = replacementsDict.get(value.encode('utf-8'))
-                if value: item[setKey] = value.decode('utf-8')
+           value = item[key]
+           if not setKey: setKey = key
+           value = replacementsDict.get(value)
+           if value: item[setKey] = ensure_text(value)
 
     xml_template = """<?xml version="1.0" encoding="utf-8"?>
     <items>
