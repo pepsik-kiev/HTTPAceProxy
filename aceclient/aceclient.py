@@ -3,7 +3,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
 import telnetlib
-import logging, random
+import logging
 from gevent.event import AsyncResult, Event
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import unquote
@@ -88,7 +88,7 @@ class AceClient(object):
         self._loadasync.set()
         self._cid.set()
 
-    def _write(self, message, _bytearray=bytearray):
+    def _write(self, message):
         try:
            self._socket.write('%s\r\n' % message)
            logging.debug('>>> %s' % message)
@@ -149,17 +149,17 @@ class AceClient(object):
            errmsg = 'Engine response time %s exceeded. STATE 0 (IDLE) not resived!' % t
            raise AceException(errmsg)
 
-    def LOADASYNC(self, command, params):
+    def LOADASYNC(self, command, params, sessionid='0'):
         self._loadasync = AsyncResult()
-        self._write(AceMessage.request.LOADASYNC(command.upper(), random.randint(1000, 100000), params))
+        self._write(AceMessage.request.LOADASYNC(command.upper(), sessionid, params))
         try: return self._loadasync.get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
            raise AceException(errmsg)
 
-    def GETCONTENTINFO(self, command, value):
+    def GETCONTENTINFO(self, command, value, sessionid):
         paramsdict = { command:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
-        return self.LOADASYNC(command, paramsdict)
+        return self.LOADASYNC(command, paramsdict, sessionid)
 
     def GETCID(self, command, value):
         contentinfo = self.GETCONTENTINFO(command, value)
@@ -175,8 +175,8 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def GETINFOHASH(self, command, value, idx=0):
-        contentinfo = self.GETCONTENTINFO(command, value)
+    def GETINFOHASH(self, command, value, sessionid, idx=0):
+        contentinfo = self.GETCONTENTINFO(command, value, sessionid)
         if contentinfo['status'] in (1, 2):
            return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
         elif contentinfo['status'] == 0:
@@ -191,7 +191,8 @@ class AceClient(object):
         Data receiver method for greenlet
         '''
         while 1:
-           with gevent.Timeout(timeout, False): # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
+           # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
+           with gevent.Timeout(timeout, False):
               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
               except gevent.Timeout: self.destroy()
               except gevent.socket.timeout: pass
@@ -225,7 +226,7 @@ class AceClient(object):
                     self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
                  # STATE
                  elif self._recvbuffer.startswith('STATE'):
-                    self._state.set(AceConst.STATE[self._recvbuffer.split()[1]]) # STATE state_id
+                    self._state.set(AceConst.STATE[self._recvbuffer.split()[1]]) # STATE state_id -> STATE_NAME
                  # STATUS
                  elif self._recvbuffer.startswith('STATUS'):
                     self._tempstatus = self._recvbuffer.split()[1]

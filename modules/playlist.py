@@ -67,6 +67,7 @@ class PlaylistConfig():
     m3utvgnames['TV 1000 Premium'] = 'TV1000 Premium Baltic'
     m3utvgnames['TV 1000 World Kino'] = 'TV1000 World Kino'
     m3utvgnames['TV 1000 Русское кино'] = 'TV1000 Русское кино'
+    m3utvgnames['TV 1000 Русское кино HD'] = 'TV1000 Русское кино'
     m3utvgnames['SET'] = 'Sony channel'
     m3utvgnames['SET HD'] = 'Sony channel HD'
     m3utvgnames['Sony Sci-Fi'] = 'Sony SCI-FI'
@@ -158,6 +159,7 @@ class PlaylistConfig():
     m3utvgnames['ATV HD'] = 'AzTV'
     m3utvgnames['Blue Hustler'] = 'Blue Hustler Россия'
     m3utvgnames['Brazzers TV Europe'] = 'Brazzers TV Europe (Россия)'
+    m3utvgnames['MULTIMANIA TV'] = 'Мультимания'
 
     # This comparator is used for the playlist sorting.
     @staticmethod

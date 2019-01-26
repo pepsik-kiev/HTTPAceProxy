@@ -149,40 +149,24 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
         CID = NAME = None
-        self.sessionID = str(uuid4())
         self.connectionTime = gevent.time.time()
-        if not AceConfig.new_api:
-           try:
-              if not AceProxy.clientcounter.idleAce:
-                 logger.debug('Create connection to AceEngine.....')
-                 AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-                 AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-              CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], paramsdict['file_indexes'])
-           except aceclient.AceException as e:
-              self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-              AceProxy.clientcounter.idleAce = None
-              return
-        else:
-           try:
-              with requests.session() as s:
-                 s.stream = s.verify = False
-                 url = 'http://%s:%s/ace/%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'], 'manifest.m3u8' if AceConfig.acestreamtype['output_format']=='hls' else 'getstream')
-                 params = { 'id' if self.reqtype in ('cid', 'content_id') else self.reqtype: paramsdict[self.reqtype], 'format': 'json', 'pid': self.sessionID, '_idx': paramsdict['file_indexes'] }
-                 if AceConfig.acestreamtype['output_format']=='hls':
-                    params.update(AceConfig.acestreamtype)
-                    del params['output_format']
-                 self.cmd = s.get(url, params=params, timeout=(5,AceConfig.videotimeout)).json()['response']
-                 CID = urlparse(self.cmd['playback_url']).path.split('/')[3]
-                 url = 'http://%s:%s/server/api' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
-                 params = { 'method': 'get_media_files', self.reqtype: paramsdict[self.reqtype] }
-                 NAME = s.get(url, params=params, timeout=(5, AceConfig.aceresulttimeout)).json()['result'][paramsdict['file_indexes']]
-           except Exception as e:
-              self.dieWithError(503, '%s' % repr(e), logging.ERROR)
-              return
+        self.sessionID = str(uuid4().int)[:6]
+        self.clientInfo = self.transcoder = None
+
+        try:
+           if not AceProxy.clientcounter.idleAce:
+              logger.debug('Create connection to AceEngine.....')
+              AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+              AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+           CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
+        except aceclient.AceException as e:
+           self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+           AceProxy.clientcounter.idleAce = None
+           return
 
         self.channelName = NAME if not channelName else channelName
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
-        self.clientInfo = self.transcoder = None
+
         try:
            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
            self.out = self.wfile
@@ -210,7 +194,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            if AceProxy.clientcounter.addClient(CID, self) == 1:
               # If there is no existing broadcast we create it
-              playback_url = self.cmd['playback_url'] if AceConfig.new_api else self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
+              playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
                  playback_url = urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
               gevent.spawn(StreamReader, playback_url, CID)
@@ -246,9 +230,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
               except: pass
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
-              if AceConfig.new_api:
-                 with requests.get(self.cmd['command_url'], params={'method': 'stop'}, timeout=(5,AceConfig.aceresulttimeout)) as r:
-                    logging.debug('Stop broadcast: %s' % r.json())
               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
 
     def connectDetector(self):

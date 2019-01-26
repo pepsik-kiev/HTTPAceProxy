@@ -11,7 +11,7 @@ import gevent
 import logging, zlib
 import requests
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
-from urllib3.packages.six import ensure_binary, ensure_text
+from urllib3.packages.six import ensure_binary, ensure_text, ensure_str
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -72,7 +72,7 @@ class Torrenttv(AceProxyPlugin):
                    if url.startswith(('acestream://', 'infohash://')) \
                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                        self.channels[name] = url
-                       itemdict['url'] = quote(ensure_binary(name + '.ts'),'')
+                       itemdict['url'] = quote(ensure_str(name+'.ts'),'')
 
                    self.playlist.addItem(itemdict)
                    m.update(ensure_binary(name))
