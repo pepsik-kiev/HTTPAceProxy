@@ -38,19 +38,13 @@ class PlaylistGenerator(object):
         '''
         self.itemlist.append(itemdict)
 
-    def _generatem3uline(self, item):
-        '''
-        Generates EXTINF line with url
-        '''
-        return self.m3uchanneltemplate % item
-
     def _changeItems(self):
         for item in self.itemlist:
-            self.changeItem(item)
-            if not 'tvg' in item: item['tvg'] = item.get('name').replace(' ', '_')
-            if not 'tvgid' in item: item['tvgid'] = ''
-            if not 'group' in item: item['group'] = ''
-            if not 'logo' in item: item['logo'] = ''
+           self.changeItem(item)
+           if not 'tvg' in item: item['tvg'] = item.get('name').replace(' ', '_')
+           if not 'tvgid' in item: item['tvgid'] = ''
+           if not 'group' in item: item['group'] = ''
+           if not 'logo' in item: item['logo'] = ''
 
     def exportm3u(self, hostport, path='', add_ts=False, empty_header=False,
                       archive=False, process_url=True, header=None, fmt=None):
@@ -66,25 +60,25 @@ class PlaylistGenerator(object):
         items = self.sort(self.itemlist) if self.sort else self.itemlist
 
         for i in items:
-            item = i.copy()
-            name = quote(ensure_str(item['name']).replace('"', "'").replace(',', '.'),'')
-            url = item['url']
-            if process_url:
-                if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                   item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), name)
-                elif url.startswith('infohash://'): # For INFOHASHes
-                   item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], name)
-                elif url.startswith('acestream://'): # For PIDs
-                   item['url'] = 'http://%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], name)
-                elif archive and url.isdigit(): # For archive channel id's
-                   item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
-                elif not archive and url.isdigit(): # For channel id's
-                   item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
-                elif path == '/torrenttv/channel' : # For channel name for torrenttv_plugin
-                   item['url'] = 'http://%s%s/%s' % (hostport, path, url)
+           item = i.copy()
+           name = quote(ensure_str(item['name']).replace('"', "'").replace(',', '.'),'')
+           url = item['url']
+           if process_url:
+              if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
+                 item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), name)
+              elif url.startswith('infohash://'): # For INFOHASHes
+                 item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], name)
+              elif url.startswith('acestream://'): # For PIDs
+                 item['url'] = 'http://%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], name)
+              elif archive and url.isdigit(): # For archive channel id's
+                 item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
+              elif not archive and url.isdigit(): # For channel id's
+                 item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
+              elif path == '/torrenttv/channel' : # For channel name for torrenttv_plugin
+                 item['url'] = 'http://%s%s/%s' % (hostport, path, url)
 
-            if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
-            itemlist += self._generatem3uline(item)
+           if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
+           itemlist += self.m3uchanneltemplate % item # Generates EXTINF line with url
 
         return ensure_binary(itemlist)
 
@@ -92,12 +86,12 @@ class PlaylistGenerator(object):
     def exportxml(self, hostport, path='',):
 
         try:
-            chans = ''
-            for i in self.itemlist:
-                i['hostport'] = 'http://%s%s' % (hostport, path)
-                try:
-                    if i['type'] == 'channel': chans += config.xml_channel_template % i
-                    else: chans += config.xml_stream_template % i
-                except: chans += config.xml_channel_template % i
-            return config.xml_template % {'items': chans}
+           chans = ''
+           for i in self.itemlist:
+              i['hostport'] = 'http://%s%s' % (hostport, path)
+              try:
+                 if i['type'] == 'channel': chans += config.xml_channel_template % i
+                 else: chans += config.xml_stream_template % i
+              except: chans += config.xml_channel_template % i
+           return config.xml_template % {'items': chans}
         except: return ''

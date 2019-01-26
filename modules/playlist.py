@@ -10,6 +10,11 @@ class PlaylistConfig():
     m3uchanneltemplate = \
        '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-id="%(tvgid)s" tvg-logo="%(logo)s",%(name)s\n#EXTGRP:%(group)s\n%(url)s\n'
 
+    # Playlist sorting options.
+    sort = False
+    sortByName = False
+    sortByGroup = False
+
     # Channel names mapping. You may use this to rename channels.
     m3uchannelnames = dict()
     # Examples:
@@ -153,11 +158,6 @@ class PlaylistConfig():
     m3utvgnames['ATV HD'] = 'AzTV'
     m3utvgnames['Blue Hustler'] = 'Blue Hustler Россия'
     m3utvgnames['Brazzers TV Europe'] = 'Brazzers TV Europe (Россия)'
-
-    # Playlist sorting options.
-    sort = False
-    sortByName = False
-    sortByGroup = False
 
     # This comparator is used for the playlist sorting.
     @staticmethod
