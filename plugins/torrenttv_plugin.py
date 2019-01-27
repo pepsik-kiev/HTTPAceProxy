@@ -11,7 +11,7 @@ import gevent
 import logging, zlib
 import requests
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
-from urllib3.packages.six import ensure_binary, ensure_text, ensure_str
+from urllib3.packages.six import ensure_text, ensure_str
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
@@ -75,7 +75,7 @@ class Torrenttv(AceProxyPlugin):
                        itemdict['url'] = quote(ensure_str(name+'.ts'),'')
 
                    self.playlist.addItem(itemdict)
-                   m.update(ensure_binary(name))
+                   m.update(name.encode('utf-8'))
 
                 self.etag = '"' + m.hexdigest() + '"'
                 self.logger.debug('Requested m3u playlist generated')

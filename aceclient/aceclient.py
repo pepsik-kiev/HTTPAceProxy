@@ -157,7 +157,7 @@ class AceClient(object):
            errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
            raise AceException(errmsg)
 
-    def GETCONTENTINFO(self, command, value, sessionid):
+    def GETCONTENTINFO(self, command, value, sessionid='0'):
         paramsdict = { command:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
         return self.LOADASYNC(command, paramsdict, sessionid)
 
@@ -175,7 +175,7 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def GETINFOHASH(self, command, value, sessionid, idx=0):
+    def GETINFOHASH(self, command, value, sessionid='0', idx=0):
         contentinfo = self.GETCONTENTINFO(command, value, sessionid)
         if contentinfo['status'] in (1, 2):
            return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
@@ -244,7 +244,7 @@ class AceClient(object):
                     elif self._tempstatus.startswith(('main:prebuf','main:buf')): #buf;progress;time;
                        stat.extend(map(int, self._tempstatus.split(';')[3:]))
                     if len(stat) == len(AceConst.STATUS):
-                       self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)})
+                       self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)}) # dl, wait, buf, prebuf
                     else: self._status.set({'status': stat[0]}) # idle, loading, starting, check, err
                  # CID
                  elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)

@@ -22,13 +22,12 @@ from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
 from urllib3.packages.six.moves.urllib.parse import parse_qs, quote, unquote
 from urllib3.packages.six.moves import range
-from urllib3.packages.six import ensure_binary
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
 
 class P2pproxy(AceProxyPlugin):
-    handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logos')
+    handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logobase')
     logger = logging.getLogger('plugin_p2pproxy')
     compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
                         'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
@@ -392,22 +391,31 @@ class P2pproxy(AceProxyPlugin):
                     connection.wfile.write(records_list)
 
         # Used to generate logomap for the torrenttv plugin
-        elif connection.reqtype == 'logos':
-            translations_list = TorrentTvApi(config.email, config.password).translations('all')
-            last = translations_list[-1]
-            connection.send_response(200)
-            connection.send_header('Content-Type', 'text/plain;charset=utf-8')
-            connection.end_headers()
-            connection.wfile.write(b"logobase = '%s'\n" % ensure_binary(config.logobase))
-            connection.wfile.write(b'logomap = {\n')
-
-            for channel in translations_list:
-                name = ensure_binary(channel.getAttribute('name'))
-                logo = ensure_binary(channel.getAttribute('logo'))
-                connection.wfile.write(b"    u'%s': logobase + '%s'" % (name, logo))
-                connection.wfile.write(b',\n') if not channel == last else connection.wfile.write(b'\n')
-
-            connection.wfile.write(b'}\n')
+        elif connection.reqtype == 'logobase':
+           translations_list = TorrentTvApi(config.email, config.password).translations('all')
+           last = translations_list[-1]
+           if not self.params.get('format', [''])[0] == 'json':
+              exported = "logobase = '%s'\nlogomap = {\n" % config.logobase
+              for channel in translations_list:
+                 exported += "    u'%s': logobase + '%s'" % (channel.getAttribute('name'), channel.getAttribute('logo'))
+                 exported += ',\n' if not channel == last else '\n'
+              exported += '}\n'
+              exported = exported.encode('utf-8')
+              connection.send_response(200)
+              connection.send_header('Content-Type', 'text/plain;charset=utf-8')
+           else:
+              from requests.compat import json
+              exported = json.dumps({channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list}, ensure_ascii=False).encode('utf-8')
+              connection.send_response(200)
+              connection.send_header('Content-Type', 'application/json')
+           try:
+              h = connection.headers.get('Accept-Encoding').split(',')[0]
+              exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
+              connection.send_header('Content-Encoding', h)
+           except: pass
+           connection.send_header('Content-Length', len(exported))
+           connection.end_headers()
+           connection.wfile.write(exported)
 
     def get_date_param(self):
         d = self.params.get('date', [''])[0]

@@ -7,7 +7,7 @@ and groups
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 from urllib3.packages.six.moves.urllib.parse import quote
-from urllib3.packages.six import ensure_binary, ensure_str
+from urllib3.packages.six import ensure_str
 from playlist import PlaylistConfig as config
 
 class PlaylistGenerator(object):
@@ -44,10 +44,10 @@ class PlaylistGenerator(object):
            if not 'tvg' in item: item['tvg'] = item.get('name').replace(' ', '_')
            if not 'tvgid' in item: item['tvgid'] = ''
            if not 'group' in item: item['group'] = ''
-           if not 'logo' in item: item['logo'] = ''
+           if not 'logo' in item: item['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
 
-    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False,
-                      archive=False, process_url=True, header=None, fmt=None):
+    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False,
+                     process_url=True, header=None, fmt=None, _bytearray=bytearray):
         '''
         Exports m3u playlist
         '''
@@ -74,13 +74,13 @@ class PlaylistGenerator(object):
                  item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
               elif not archive and url.isdigit(): # For channel id's
                  item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
-              elif path == '/torrenttv/channel' : # For channel name for torrenttv_plugin
+              elif path == '/torrenttv/channel': # For channel name for torrenttv_plugin
                  item['url'] = 'http://%s%s/%s' % (hostport, path, url)
 
            if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
            itemlist += self.m3uchanneltemplate % item # Generates EXTINF line with url
 
-        return ensure_binary(itemlist)
+        return _bytearray(itemlist, 'utf-8')
 
 
     def exportxml(self, hostport, path='',):
