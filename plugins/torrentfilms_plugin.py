@@ -104,7 +104,7 @@ class Torrentfilms(AceProxyPlugin):
            return
 
         params = parse_qs(connection.query)
-        exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, params.get('fmt', [''])[0])
+        exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, params.get('fmt', [''])[0]).encode('utf-8')
 
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
