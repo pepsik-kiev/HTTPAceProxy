@@ -54,6 +54,19 @@ class PlaylistConfig():
 
     # Similar to m3uchannelnames but for groups
     m3ugroupnames = dict()
+    m3ugroupnames['kids'] = 'Детские'
+    m3ugroupnames['music'] = 'Музыка'
+    m3ugroupnames['movies'] = 'Фильмы'
+    m3ugroupnames['sport'] = 'Спорт'
+    #m3ugroupnames[''] = 'Общие'
+    m3ugroupnames['educational'] = 'Познавательные'
+    m3ugroupnames['informational'] = 'Новостные'
+    m3ugroupnames['entertaining'] = 'Развлекательные'
+    m3ugroupnames['erotic'] = 'Эротика'
+    m3ugroupnames['erotic_18_plus'] = 'Эротика'
+    #m3ugroupnames[''] = 'Мужские'
+    m3ugroupnames['regional'] = 'Региональные'
+    m3ugroupnames['religion'] = 'Религиозные'
 
     # Channel name to tvg name mappings.
     m3utvgnames = dict()
