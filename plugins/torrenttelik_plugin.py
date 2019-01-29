@@ -22,7 +22,7 @@ class Torrenttelik(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('torrenttelik_plugin')
-        self.channels = self.playlist = self.playlisttime = self.etag = None
+        self.picons = self.channels = self.playlist = self.playlisttime = self.etag = None
 
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
@@ -34,6 +34,7 @@ class Torrenttelik(AceProxyPlugin):
     def Playlistparser(self):
         self.playlisttime = int(gevent.time.time())
         self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
+        self.picons = picons.logomap
         self.channels = {}
         m = requests.auth.hashlib.md5()
         try:
@@ -46,7 +47,8 @@ class Torrenttelik(AceProxyPlugin):
                     channel['name'] = name = channel.get('name', '')
                     channel['url'] = url = 'acestream://%s' % channel.get('url')
                     channel['group'] = channel.get('cat')
-                    channel['logo'] = picons.logomap.get(name)
+                    if not 'logo' in channel: channel['logo'] = picons.logomap.get(name)
+                    self.picons[name] = channel['logo']
 
                     if url.startswith(('acestream://', 'infohash://')) \
                           or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
@@ -85,7 +87,7 @@ class Torrenttelik(AceProxyPlugin):
                 connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
                 return
             name = unquote(name[0].rsplit('/', 1)[1])
-            url = self.channels.get(ensure_text(name), None)
+            url = self.channels.get(ensure_text(name))
             if url is None:
                 connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
             elif url.startswith('acestream://'):
@@ -124,7 +126,7 @@ class Torrenttelik(AceProxyPlugin):
             gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
             connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, picons.logomap.get(name), fmt=params.get('fmt', [''])[0])
+        if play: connection.handleRequest(headers_only, name, self.picons.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only:
             self.logger.debug('Exporting torrent-telik.m3u playlist')
             connection.wfile.write(exported)
