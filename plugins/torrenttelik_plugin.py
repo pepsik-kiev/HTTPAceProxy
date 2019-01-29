@@ -124,7 +124,7 @@ class Torrenttelik(AceProxyPlugin):
             gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
             connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, picons.logomap.get(name, None), fmt=params.get('fmt', [''])[0])
+        if play: connection.handleRequest(headers_only, name, picons.logomap.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only:
             self.logger.debug('Exporting torrent-telik.m3u playlist')
             connection.wfile.write(exported)

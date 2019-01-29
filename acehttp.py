@@ -108,8 +108,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            finally: return
         self.handleRequest(headers_only)
 
-    def handleRequest(self, headers_only, channelName=None,
-                        channelIcon='http://static.acestream.net/sites/acestream/img/ACE-logo.png', fmt=None):
+    def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
 
         logger = logging.getLogger('HandleRequest')
         self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
@@ -154,7 +153,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.connectionTime = gevent.time.time()
         self.sessionID = str(uuid4().int)[:6]
         self.clientInfo = self.transcoder = None
-        self.channelIcon = channelIcon
+        self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if channelIcon is None else channelIcon
+
         try:
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection to AceEngine.....')
