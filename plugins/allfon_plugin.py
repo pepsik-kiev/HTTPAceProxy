@@ -70,7 +70,6 @@ class Allfon(AceProxyPlugin):
         play = False
         # 30 minutes cache
         if not self.playlist or (int(gevent.time.time()) - self.playlisttime > 30 * 60):
-            self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
             if not self.Playlistparser(): connection.dieWithError(); return
 
         url = urlparse(connection.path)
