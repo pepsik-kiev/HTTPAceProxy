@@ -394,7 +394,12 @@ class P2pproxy(AceProxyPlugin):
         elif connection.reqtype == 'logobase':
            translations_list = TorrentTvApi(config.email, config.password).translations('all')
            last = translations_list[-1]
-           if not self.params.get('format', [''])[0] == 'json':
+           if self.params.get('format', [''])[0] == 'json':
+              from requests.compat import json
+              exported = json.dumps({channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list}, ensure_ascii=False).encode('utf-8')
+              connection.send_response(200)
+              connection.send_header('Content-Type', 'application/json')
+           else:
               exported = "logobase = '%s'\nlogomap = {\n" % config.logobase
               for channel in translations_list:
                  exported += "    u'%s': logobase + '%s'" % (channel.getAttribute('name'), channel.getAttribute('logo'))
@@ -403,11 +408,6 @@ class P2pproxy(AceProxyPlugin):
               exported = exported.encode('utf-8')
               connection.send_response(200)
               connection.send_header('Content-Type', 'text/plain;charset=utf-8')
-           else:
-              from requests.compat import json
-              exported = json.dumps({channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list}, ensure_ascii=False).encode('utf-8')
-              connection.send_response(200)
-              connection.send_header('Content-Type', 'application/json')
            try:
               h = connection.headers.get('Accept-Encoding').split(',')[0]
               exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()

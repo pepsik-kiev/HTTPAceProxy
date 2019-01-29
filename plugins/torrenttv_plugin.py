@@ -1,86 +1,66 @@
 #-*- coding: utf-8 -*-
 '''
 Torrent-tv.ru Playlist Downloader Plugin
-http://ip:port/ttvplaylist
+http://ip:port/torrenttv
 '''
 
 __author__ = 'AndreyPavlenko, Dorik1972'
 
 import traceback
-import gevent
+import gevent, requests
 import logging, zlib
-import requests
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
 from urllib3.packages.six import ensure_text, ensure_str
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.torrenttv as config
-import config.p2pproxy as p2pconfig
-from torrenttv_api import TorrentTvApi
+import config.picons.torrenttv as picons
 
 class Torrenttv(AceProxyPlugin):
 
     # ttvplaylist handler is obsolete
-    handlers = ('torrenttv', 'ttvplaylist',)
+    handlers = ('torrenttv', 'ttvplaylist')
 
     def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('torrenttv_plugin')
-        self.channels = self.playlist = self.playlisttime = self.etag = self.tvgid = None
-        self.logomap = config.logomap
-        self.epg_id = { k:'' for k in self.logomap }
-        self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
+        self.channels = self.playlist = self.playlisttime = self.etag = None
 
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
     def playlistTimedDownloader(self):
         while 1:
-            self.downloadPlaylist()
+            self.Playlistparser()
             gevent.sleep(config.updateevery * 60)
 
-    def downloadPlaylist(self):
+    def Playlistparser(self):
         self.playlisttime = int(gevent.time.time())
         self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
         self.channels = {}
         m = requests.auth.hashlib.md5()
         try:
-            if self.updatelogos:
-                try:
-                    translations_list = TorrentTvApi(p2pconfig.email, p2pconfig.password).translations('all')
-                    for channel in translations_list:
-                        name = channel.getAttribute('name')
-                        if channel.getAttribute('epg_id') not in ('0', '', ' '):
-                           self.epg_id[name] = 'ttv%s' % channel.getAttribute('id')
-                        if not name in self.logomap:
-                           self.logomap[name] = config.logobase + channel.getAttribute('logo')
+           headers = {'User-Agent': 'Magic Browser'}
+           with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as r:
+              if r.encoding is None: r.encoding = 'utf-8'
+              self.logger.info('Playlist %s downloaded' % config.url)
+              pattern = requests.auth.re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
+              for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
+                 itemdict = match.groupdict()
+                 name = itemdict.get('name', '')
+                 if not 'logo' in itemdict: itemdict['logo'] = picons.logomap.get(name)
 
-                    self.logger.debug('Logos updated')
-                finally: self.updatelogos = False # p2pproxy plugin not configured
+                 url = itemdict['url']
+                 if url.startswith(('acestream://', 'infohash://')) \
+                       or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
+                    self.channels[name] = url
+                    itemdict['url'] = quote(ensure_str(name+'.ts'),'')
 
-            headers = {'User-Agent': 'Magic Browser'}
-            with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as r:
-                if r.encoding is None: r.encoding = 'utf-8'
-                self.logger.info('TTV playlist %s downloaded' % config.url)
-                pattern = requests.auth.re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
-                for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
-                   itemdict = match.groupdict()
-                   name = itemdict.get('name')
+                 self.playlist.addItem(itemdict)
+                 m.update(name.encode('utf-8'))
 
-                   itemdict['logo'] = self.logomap.get(name, 'http://static.acestream.net/sites/acestream/img/ACE-logo.png')
-                   itemdict['tvgid'] = self.epg_id.get(name, '')
+              self.etag = '"' + m.hexdigest() + '"'
+              self.logger.debug('torrenttv.m3u playlist generated')
 
-                   url = itemdict['url']
-                   if url.startswith(('acestream://', 'infohash://')) \
-                         or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
-                       self.channels[name] = url
-                       itemdict['url'] = quote(ensure_str(name+'.ts'),'')
-
-                   self.playlist.addItem(itemdict)
-                   m.update(name.encode('utf-8'))
-
-                self.etag = '"' + m.hexdigest() + '"'
-                self.logger.debug('Requested m3u playlist generated')
-
-        except requests.exceptions.RequestException: self.logger.error("Can't download TTV playlist!"); return False
+        except requests.exceptions.RequestException: self.logger.error("Can't download %s playlist!" % config.url); return False
         except: self.logger.error(traceback.format_exc()); return False
 
         return True
@@ -90,7 +70,7 @@ class Torrenttv(AceProxyPlugin):
         # 30 minutes cache
         if not self.playlist or (int(gevent.time.time()) - self.playlisttime > 30 * 60):
             self.updatelogos = p2pconfig.email != 're.place@me' and p2pconfig.password != 'ReplaceMe'
-            if not self.downloadPlaylist(): connection.dieWithError(); return
+            if not self.Playlistparser(): connection.dieWithError(); return
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
@@ -141,7 +121,7 @@ class Torrenttv(AceProxyPlugin):
             gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
             connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, self.logomap.get(name), fmt=params.get('fmt', [''])[0])
+        if play: connection.handleRequest(headers_only, name, picons.logomap.get(name), fmt=params.get('fmt', [''])[0])
         elif not headers_only:
-            self.logger.debug('Exporting m3u playlist')
+            self.logger.debug('Exporting torrenttv.m3u playlist')
             connection.wfile.write(exported)

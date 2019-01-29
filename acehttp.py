@@ -30,7 +30,7 @@ for wheel in glob.glob(os.path.join(ROOT_DIR, 'modules', 'wheels', '*.whl')): sy
 import logging
 import psutil, requests, signal
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
-from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
+from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
 from urllib3.packages.six.moves import range, map
 from ipaddr import IPNetwork, IPAddress
 from uuid import uuid4
@@ -108,7 +108,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            finally: return
         self.handleRequest(headers_only)
 
-    def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
+    def handleRequest(self, headers_only, channelName=None,
+                        channelIcon='http://static.acestream.net/sites/acestream/img/ACE-logo.png', fmt=None):
+
         logger = logging.getLogger('HandleRequest')
         self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
 
@@ -148,24 +150,21 @@ class HTTPHandler(BaseHTTPRequestHandler):
            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
-        CID = NAME = None
+        CID = None
         self.connectionTime = gevent.time.time()
         self.sessionID = str(uuid4().int)[:6]
         self.clientInfo = self.transcoder = None
-
+        self.channelIcon = channelIcon
         try:
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection to AceEngine.....')
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-           CID, NAME = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
+           CID, self.channelName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
         except aceclient.AceException as e:
            self.dieWithError(503, '%s' % repr(e), logging.ERROR)
            AceProxy.clientcounter.idleAce = None
            return
-
-        self.channelName = NAME if not channelName else channelName
-        self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if not channelIcon else channelIcon
 
         try:
            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog

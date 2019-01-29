@@ -20,12 +20,15 @@ password ='ReplaceMe'
 
 # TTV channels logo location
 logobase = 'http://1ttv.org/uploads/'
+
 # Generate logo with full path (e.g. http://torrent-tv.ru/uploads/ornzQpk6WCW6xk0lyBhlwqH8u2QyU7.png)
 # or put only the logo file name (e.g. ornzQpk6WCW6xk0lyBhlwqH8u2QyU7.png)
 # This option is only for m3u playlists.
 fullpathlogo = True
+
 # TV Guide URL
 tvgurl = 'http://epg.do.am/tv.gz'
+
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0
 
