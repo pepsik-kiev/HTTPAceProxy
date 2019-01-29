@@ -115,7 +115,7 @@ logomap = {
     u"Bridge HD": logobase + 'P7JEo7cGv1dtk6X69SkfEQeiVrQvXj.png',
 #    u"M1": logobase + '',
     u"VH1 Classic": logobase + 'FhxUFQ2Bsfom4vb8Ce41gFObAbh1Vh.png',
-    u"VH1 Europe": logobase + logobase + '58.png',
+    u"VH1 Europe": logobase + '58.png',
     u"Eurosport 2 HD": logobase + '0mo5WOW3xn7FmcIRM9PMZxb2Zgad86.png',
     u"Eurosport HD": logobase + 'DpFTzUEA3y67Z6ObTPF4xH0XLNRAZm.png',
     u"Viasat Sport HD Россия": logobase + 'prAZKkny3W1HGM03lP0EhzcMmTPZdi.png',
