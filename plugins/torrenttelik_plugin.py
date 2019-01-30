@@ -32,15 +32,15 @@ class Torrenttelik(AceProxyPlugin):
             gevent.sleep(config.updateevery * 60)
 
     def Playlistparser(self):
-        self.playlisttime = int(gevent.time.time())
-        self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
-        self.picons = picons.logomap
-        self.channels = {}
-        m = requests.auth.hashlib.md5()
         try:
            headers = {'User-Agent': 'Magic Browser'}
            with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as playlist:
               if playlist.encoding is None: playlist.encoding = 'utf-8'
+              self.playlisttime = gevent.time.time()
+              self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
+              self.picons = picons.logomap
+              self.channels = {}
+              m = requests.auth.hashlib.md5()
               self.logger.info('Playlist %s downloaded' % config.url)
               try:
                  for channel in playlist.json()['channels']:
@@ -73,7 +73,7 @@ class Torrenttelik(AceProxyPlugin):
     def handle(self, connection, headers_only=False):
         play = False
         # 30 minutes cache
-        if not self.playlist or (int(gevent.time.time()) - self.playlisttime > 30 * 60):
+        if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
             if not self.Playlistparser(): connection.dieWithError(); return
 
         url = urlparse(connection.path)
