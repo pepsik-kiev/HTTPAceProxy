@@ -90,7 +90,7 @@ $(document).ready(function() {
         $inf_disk_free.text("free: " + bytes2human(sys_info.disk_info['free']));
 
         if (sys_info.cpu_freq && sys_info.cpu_freq.current) {
-            $inf_cpu_freq.text("freq: " + sys_info.cpu_freq['current'] + " Mhz");
+            $inf_cpu_freq.text("freq: " + sys_info.cpu_freq['current'].toFixed() + " Mhz");
         };
 
         if (sys_info.cpu_temp) {
@@ -114,9 +114,10 @@ $(document).ready(function() {
     function renderClientsTable(clients_data) {
         var $tbody = $('tbody'),
             statusColorCss = {
-                wait: 'warning',
+                wait: 'danger',
                 buf: 'warning',
                 prebuf: 'danger',
+                err: 'danger',
                 dl: 'success',
                 loading: 'info',
                 starting: 'info',

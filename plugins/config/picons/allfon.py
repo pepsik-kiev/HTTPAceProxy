@@ -6,7 +6,7 @@ AllFonTV channels picon
 logobase = 'http://1ttv.org/uploads/'
 # Channels logo/path mapping
 logomap = {
-#    u'24 ДОК': logobase + '',
+    u'24 ДОК': logobase + 'FznqTpJ71LS3RLESzMOHhNDxJMwBE8.png',
     u'2x2': logobase + 'hTpJUV15GSTxZ5kJQGLcn42kCzKyEH.png',
     u'5 канал': logobase + 'nIUDYY41OO4Xo0ntGpGv2rfpOR5ngt.png',
     u'A1': logobase + 'NbdxfVLZtRUQzzfvQPNRVMVAl2Hp0O.png',

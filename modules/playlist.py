@@ -161,6 +161,7 @@ class PlaylistConfig():
     m3utvgnames['3+ (Estonia)'] = '3+ Estonia'
     m3utvgnames['360 градусов'] = '360°'
     m3utvgnames['360 градусов HD'] = '360°'
+    m3utvgnames['360 Новости'] = '360° Новости'
     m3utvgnames['4 канал HD (Киев)'] = '4 канал Украина (RTi)'
     m3utvgnames['7 канал (Казахстан)'] = '7 канал Казахстан'
     m3utvgnames['7 канал (Одесса)'] = '7 канал Одесса'

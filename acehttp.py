@@ -532,7 +532,7 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
    AceProxy.pluginlist.append(plugininstance)
 
 # Server setup
-server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler, spawn=Pool())
+server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler, spawn=Pool(), log=None)
 # Setting signal handlers
 gevent.signal(signal.SIGTERM, shutdown)
 gevent.signal(signal.SIGINT, shutdown)

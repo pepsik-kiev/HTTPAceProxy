@@ -24,7 +24,6 @@ class Torrenttv(AceProxyPlugin):
     def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('torrenttv_plugin')
         self.picons = self.channels = self.playlist = self.playlisttime = self.etag = None
-        self.picons = picons.logomap
 
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
