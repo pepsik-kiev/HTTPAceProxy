@@ -34,6 +34,7 @@ from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
 from urllib3.packages.six.moves import range, map
 from ipaddr import IPNetwork, IPAddress
 from uuid import uuid4
+import mimetypes
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
 from aceclient.clientcounter import ClientCounter
@@ -113,9 +114,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger = logging.getLogger('HandleRequest')
         self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
 
-        self.videoextdefaults = ('.3gp', '.aac', '.ape', '.asf', '.avi', '.dv', '.divx', '.flac', '.flc', '.flv', '.m2ts', '.m4a', '.mka', '.mkv',
-                                 '.mpeg', '.mpeg4', '.mpegts', '.mpg4', '.mp3', '.mp4', '.mpg', '.mov', '.m4v', '.ogg', '.ogm', '.ogv', '.oga',
-                                 '.ogx', '.qt', '.rm', '.swf', '.ts', '.vob', '.wmv', '.wav', '.webm')
+        self.videoextdefaults = ('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+                                   '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')
 
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= AceProxy.clientcounter.totalClients():
@@ -142,6 +142,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         # Check is AceEngine alive
         checkAce()
+
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict = {}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')
@@ -149,9 +150,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
            paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
+
         CID = None
         self.connectionTime = gevent.time.time()
-        self.sessionID = str(uuid4().int)[:6]
+        self.sessionID = str(uuid4().int)[:8]
         self.clientInfo = self.transcoder = None
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if channelIcon is None else channelIcon
 
@@ -165,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(503, '%s' % repr(e), logging.ERROR)
            AceProxy.clientcounter.idleAce = None
            return
-
+        mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
            self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
            self.out = self.wfile
@@ -196,14 +198,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
               playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
                  playback_url = urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
-              gevent.spawn(StreamReader, playback_url, CID)
+              gevent.spawn(self.ace.BrodcastStreamer, playback_url, CID)
 
            # Sending videostream headers to client
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            drop_headers = []
            proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                             'Transfer-Encoding': 'chunked', 'Content-Type': 'application/octet-stream',
-                             'Cache-Control': 'max-age=0, no-cache, no-store', 'Pragma': 'no-cache' }
+                             'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype,
+                             'Pragma': 'no-cache', 'Cache-Control': 'max-age=0, no-cache, no-store' }
 
            if not self.response_use_chunked or self.request_version == 'HTTP/1.0':
               self.protocol_version = 'HTTP/1.0'
@@ -300,60 +302,6 @@ def checkAce():
           AceProxy.clientcounter = ClientCounter()
        else:
           logger.error("Can't spawn Ace Stream!")
-
-def StreamReader(playback_url, cid):
-
-    def write_chunk(client, data, timeout=15.0, _PY34_EXACTLY=(sys.version_info[:2] == (3, 4)),
-                     _bytearray=bytearray):
-       if client.response_use_chunked:
-          ## Write the chunked encoding
-          # header
-          if _PY34_EXACTLY:
-             header_str = '%x\r\n' % len(data)
-             towrite = _bytearray(header_str, 'ascii')
-          else:
-             header_str = b'%x\r\n' % len(data)
-             towrite = _bytearray(header_str)
-          # data
-          towrite += data
-          # trailer
-          towrite += b'\r\n'
-       else: towrite = data
-
-       try:
-          client.connection.settimeout(timeout)
-          client.out.write(towrite)
-       except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
-          logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-          client.connectGreenlet.kill()
-       except: pass # The client unexpectedly disconnected while writing data to socket
-       finally: client.connection.settimeout(None)
-
-    with requests.session() as s:
-       s.verify = False
-       s.stream = True
-       try:
-          if playback_url.endswith('.m3u8'): # AceEngine return link for HLS stream
-             used_urls = []
-             while 1:
-                for url in s.get(playback_url, timeout=(5, AceConfig.videotimeout)).iter_lines():
-                   clients = AceProxy.clientcounter.getClientsList(cid)
-                   if not clients or url.startswith(b'download not found'): return
-                   if url.startswith(b'http://') and url not in used_urls:
-                      for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
-                         if chunk: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet])
-                         else: break
-                      used_urls.append(url)
-                      if len(used_urls) > 15: used_urls.pop(0)
-          else: # AceStream return link for HTTP stream
-             for chunk in s.get(playback_url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
-                clients = AceProxy.clientcounter.getClientsList(cid)
-                if not clients: break
-                gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet and chunk])
-
-       except Exception as err: # requests errors
-          gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(cid)])
-          gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceProxy.clientcounter.getClientsList(cid)])
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])

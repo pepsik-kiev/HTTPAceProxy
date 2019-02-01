@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent
+import gevent, requests
 import telnetlib
 import logging
 from gevent.event import AsyncResult, Event
-from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import unquote
 from urllib3.packages.six.moves import zip, map
 from urllib3.packages.six import PY3
@@ -186,6 +185,55 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
+    def BrodcastStreamer(self, playback_url, cid):
+
+        def write_chunk(client, data, _sock_timeout=15.0, _bytearray=bytearray):
+           if client.response_use_chunked:
+              ## Write the chunked encoding
+              # header
+              header_str = '%x\r\n' % len(data)
+              towrite = _bytearray(header_str, 'utf-8')
+              # data
+              towrite += data
+              # trailer
+              towrite += b'\r\n'
+           else: towrite = data
+
+           try:
+              client.connection.settimeout(_sock_timeout)
+              client.out.write(towrite)
+           except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
+              logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
+              client.connectGreenlet.kill()
+           except: pass # The client unexpectedly disconnected while writing data to socket
+           finally: client.connection.settimeout(None)
+
+        with requests.session() as s:
+           s.verify = False
+           s.stream = True
+           try:
+              if playback_url.endswith('.m3u8'): # AceEngine return link for HLS stream
+                 used_urls = []
+                 while 1:
+                    for url in s.get(playback_url, timeout=(5, self._videotimeout)).iter_lines():
+                       clients = self._clientcounter.getClientsList(cid)
+                       if not clients or url.startswith(b'download not found'): return
+                       if url.startswith(b'http://') and url not in used_urls:
+                          for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
+                             if chunk: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet])
+                             else: break
+                          used_urls.append(url)
+                          if len(used_urls) > 15: used_urls.pop(0)
+              else: # AceStream return link for HTTP stream
+                 for chunk in s.get(playback_url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
+                    clients = self._clientcounter.getClientsList(cid)
+                    if not clients: break
+                    gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet and chunk])
+
+           except Exception as err: # requests errors
+              gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in self._clientcounter.getClientsList(cid)])
+              gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in self._clientcounter.getClientsList(cid)])
+
     def _recvData(self, timeout=30):
         '''
         Data receiver method for greenlet
@@ -223,7 +271,7 @@ class AceClient(object):
                        self._url.set(self._recvbuffer.split()[1]) # url for play
                  # LOADRESP
                  elif self._recvbuffer.startswith('LOADRESP'):
-                    self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
+                    self._loadasync.set(requests.compat.json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
                  # STATE
                  elif self._recvbuffer.startswith('STATE'):
                     self._state.set(AceConst.STATE[self._recvbuffer.split()[1]]) # STATE state_id -> STATE_NAME
@@ -236,7 +284,6 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:starting'): pass
                     elif self._tempstatus.startswith('main:check'): pass
                     elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
-                       #self._status.set_exception(AceException('%s with message %s' % (self._tempstatus.split(';')[0],self._tempstatus.split(';')[2])))
                     elif self._tempstatus.startswith('main:dl'): #dl;
                        stat.extend(map(int, self._tempstatus.split(';')[1:]))
                     elif self._tempstatus.startswith('main:wait'): #wait;time;
@@ -245,7 +292,7 @@ class AceClient(object):
                        stat.extend(map(int, self._tempstatus.split(';')[3:]))
                     if len(stat) == len(AceConst.STATUS):
                        self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)}) # dl, wait, buf, prebuf
-                    else: self._status.set({'status': stat[0]}) # idle, loading, starting, check, err
+                    else: self._status.set({'status': stat[0]}) # idle, loading, starting, check
                  # CID
                  elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
                  # INFO

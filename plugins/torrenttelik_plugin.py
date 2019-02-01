@@ -53,7 +53,7 @@ class Torrenttelik(AceProxyPlugin):
                     if url.startswith(('acestream://', 'infohash://')) \
                           or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
                        self.channels[name] = url
-                       channel['url'] = quote(ensure_str(name+'.ts'),'')
+                       channel['url'] = quote(ensure_str(name)+'.ts','')
 
                     self.playlist.addItem(channel)
                     m.update(name.encode('utf-8'))
@@ -80,21 +80,22 @@ class Torrenttelik(AceProxyPlugin):
         path = url.path[0:-1] if url.path.endswith('/') else url.path
         params = parse_qs(connection.query)
 
-        if path.startswith('/torrent-telik/channel/'):
+        if path.startswith('/%s/channel/' % connection.reqtype):
             name = path.rsplit('.', 1)
             if not name[1]:
                 connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
                 return
-            name = unquote(name[0].rsplit('/', 1)[1])
-            url = self.channels.get(ensure_text(name))
+            name = ensure_text(unquote(name[0].rsplit('/', 1)[1]))
+            url = self.channels.get(name)
             if url is None:
-                connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR); return
+                connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR)
+                return
             elif url.startswith('acestream://'):
-                connection.path = '/content_id/%s/stream.ts' % url.split('/')[2]
+                connection.path = '/content_id/%s/%s.ts' % (url.split('/')[2], name)
             elif url.startswith('infohash://'):
-                connection.path = '/infohash/%s/stream.ts' % url.split('/')[2]
+                connection.path = '/infohash/%s/%s.ts' % (url.split('/')[2], name)
             elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-                connection.path = '/url/%s/stream.ts' % quote(url,'')
+                connection.path = '/url/%s/%s.ts' % (quote(url,''), name)
             connection.splittedpath = connection.path.split('/')
             connection.reqtype = connection.splittedpath[1].lower()
             play = True
@@ -106,7 +107,7 @@ class Torrenttelik(AceProxyPlugin):
             return
         else:
             hostport = connection.headers['Host']
-            path = '' if len(self.channels) == 0 else '/torrent-telik/channel'
+            path = '' if len(self.channels) == 0 else '/%s/channel' % connection.reqtype
             add_ts = True if path.endswith('/ts') else False
             exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0])
             response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),

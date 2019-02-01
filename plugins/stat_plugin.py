@@ -14,9 +14,8 @@ from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
 from requests.compat import json
 import time, zlib
-import psutil
+import psutil, requests
 import logging
-import requests
 
 localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
                    '172.16.0.0/12', '224.0.0.0/4',
@@ -71,15 +70,15 @@ class Stat(AceProxyPlugin):
 
     def SendResponse(self, status_code, f_ext, content, connection):
         mimetype = {
-            'js': r'text/javascript; charset=utf-8',
-            'json': r'application/json',
-            'css': r'text/css; charset=utf-8',
-            'html': r'text/html; charset=utf-8',
-            'png': r'image/png',
-            'jpg': r'image/jpeg',
-            'jpeg': r'image/jpeg',
-            'svg': r'image/svg+xml'
-             }
+            'js': 'text/javascript; charset=utf-8',
+            'json': 'application/json',
+            'css': 'text/css; charset=utf-8',
+            'html': 'text/html; charset=utf-8',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'svg': 'image/svg+xml' }
+
         if f_ext not in mimetype:
            connection.dieWithError(404, 'Not Found')
            return
