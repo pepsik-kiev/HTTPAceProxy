@@ -45,7 +45,7 @@ class Allfon(AceProxyPlugin):
               pattern = requests.auth.re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
               for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
                  itemdict = match.groupdict()
-                 name = itemdict.get('name', '')
+                 name = itemdict.get('name', '').replace(' (allfon)','')
                  url = itemdict['url']
                  if not 'logo' in itemdict: itemdict['logo'] = picons.logomap.get(name)
                  self.picons[name] = itemdict['logo']
