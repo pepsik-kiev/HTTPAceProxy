@@ -18,11 +18,17 @@ class AceException(Exception):
 
 class Telnet(telnetlib.Telnet, object):
     if PY3:
-       def read_until(self, expected, timeout=None, _bytearray=bytearray):
-           return super(Telnet, self).read_until(_bytearray(expected, 'ascii'), timeout).decode()
+       def read_until(self, expected, timeout=None):
+           return super(Telnet, self).read_until(bytes(expected, 'ascii'), timeout).decode()
 
-       def write(self, buffer, _bytearray=bytearray):
-           super(Telnet, self).write(_bytearray(buffer, 'ascii'))
+       def write(self, buffer):
+           super(Telnet, self).write(bytes(buffer, 'ascii'))
+
+       def expect(self, list, timeout=None):
+           for index, item in enumerate(list):
+              list[index] = bytes(item, 'ascii')
+           match_index, match_object, match_text = super(Telnet, self).expect(list, timeout)
+           return match_index, match_object, match_text.decode()
 
 class AceClient(object):
 
@@ -187,26 +193,18 @@ class AceClient(object):
 
     def BrodcastStreamer(self, playback_url, cid):
 
-        def write_chunk(client, data, _sock_timeout=15.0, _bytearray=bytearray):
-           if client.response_use_chunked:
-              ## Write the chunked encoding
-              # header
-              header_str = '%x\r\n' % len(data)
-              towrite = _bytearray(header_str, 'utf-8')
-              # data
-              towrite += data
-              # trailer
-              towrite += b'\r\n'
-           else: towrite = data
-
+        def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
            try:
-              client.connection.settimeout(_sock_timeout)
-              client.out.write(towrite)
+              client.connection.settimeout(timeout)
+              client.out.write(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data)
            except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
               logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
               client.connectGreenlet.kill()
            except: pass # The client unexpectedly disconnected while writing data to socket
            finally: client.connection.settimeout(None)
+
+        def chunk_iterator(url):
+           return s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576)
 
         with requests.session() as s:
            s.verify = False
@@ -219,13 +217,13 @@ class AceClient(object):
                        clients = self._clientcounter.getClientsList(cid)
                        if not clients or url.startswith(b'download not found'): return
                        if url.startswith(b'http://') and url not in used_urls:
-                          for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
+                          for chunk in chunk_iterator(url):
                              if chunk: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet])
                              else: break
                           used_urls.append(url)
                           if len(used_urls) > 15: used_urls.pop(0)
               else: # AceStream return link for HTTP stream
-                 for chunk in s.get(playback_url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
+                 for chunk in chunk_iterator(playback_url):
                     clients = self._clientcounter.getClientsList(cid)
                     if not clients: break
                     gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet and chunk])

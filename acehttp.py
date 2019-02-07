@@ -103,8 +103,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
            except Exception as e:
-              import traceback
-              logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
            finally: return
         self.handleRequest(headers_only)
@@ -451,12 +449,13 @@ if AceProxy.ace:
    if AceConfig.osplatform == 'Windows': detectPort()
    else: gevent.sleep(AceConfig.acestartuptimeout)
 else:
-   try:
-      url = 'http://%s:%s/webui/api/service' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
-      params = {'method': 'get_version', 'format': 'json', 'callback': 'mycallback'}
-      version = requests.get(url, params=params, timeout=5).json()['result']['version']
-      logger.info('Remote AceStream engine ver.%s will be used on %s:%s' % (version, AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
-   except: logger.error('AceStream not found!')
+   url = 'http://%s:%s/webui/api/service' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
+   params = {'method': 'get_version', 'format': 'json', 'callback': 'mycallback'}
+   with requests.get(url, params=params, timeout=5) as r:
+      try:
+         version = r.json()['result']['version']
+         logger.info('Remote AceStream engine ver.%s will be used on %s:%s' % (version, AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
+      except: logger.error('AceStream not found!')
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)
