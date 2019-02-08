@@ -103,6 +103,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
            except Exception as e:
+              #import traceback
+              #logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
            finally: return
         self.handleRequest(headers_only)
@@ -196,7 +198,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
                  playback_url = urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
-              gevent.spawn(self.ace.BrodcastStreamer, playback_url, CID)
+              gevent.spawn(self.ace.StreamReader, playback_url, CID)
 
            # Sending videostream headers to client
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
@@ -451,11 +453,11 @@ if AceProxy.ace:
 else:
    url = 'http://%s:%s/webui/api/service' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
    params = {'method': 'get_version', 'format': 'json', 'callback': 'mycallback'}
-   with requests.get(url, params=params, timeout=5) as r:
-      try:
+   try:
+      with requests.get(url, params=params, timeout=5) as r:
          version = r.json()['result']['version']
          logger.info('Remote AceStream engine ver.%s will be used on %s:%s' % (version, AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
-      except: logger.error('AceStream not found!')
+   except: logger.error('AceStream not found!')
 
 # Loading plugins
 # Trying to change dir (would fail in freezed state)

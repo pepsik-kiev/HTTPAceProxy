@@ -191,7 +191,7 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def BrodcastStreamer(self, playback_url, cid):
+    def StreamReader(self, playback_url, cid):
 
         def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
            try:
@@ -206,6 +206,9 @@ class AceClient(object):
         def chunk_iterator(url):
            return s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576)
 
+        def StreamWriter(chunk):
+           gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in self._clientcounter.getClientsList(cid) if client.connectGreenlet])
+
         with requests.session() as s:
            s.verify = False
            s.stream = True
@@ -214,22 +217,18 @@ class AceClient(object):
                  used_urls = []
                  while 1:
                     for url in s.get(playback_url, timeout=(5, self._videotimeout)).iter_lines():
-                       clients = self._clientcounter.getClientsList(cid)
-                       if not clients or url.startswith(b'download not found'): return
+                       if not self._clientcounter.getClientsList(cid) or url.startswith(b'download not found'): return
                        if url.startswith(b'http://') and url not in used_urls:
                           for chunk in chunk_iterator(url):
-                             if chunk: gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet])
-                             else: break
+                             if chunk: StreamWriter(chunk)
                           used_urls.append(url)
                           if len(used_urls) > 15: used_urls.pop(0)
               else: # AceStream return link for HTTP stream
                  for chunk in chunk_iterator(playback_url):
-                    clients = self._clientcounter.getClientsList(cid)
-                    if not clients: break
-                    gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if client.connectGreenlet and chunk])
+                    if chunk: StreamWriter(chunk)
 
            except Exception as err: # requests errors
-              gevent.joinall([gevent.spawn(client.dieWithError, 503, 'BrodcastStreamer:%s' % repr(err), logging.ERROR) for client in self._clientcounter.getClientsList(cid)])
+              gevent.joinall([gevent.spawn(client.dieWithError, 503, 'StreamReader:%s' % repr(err), logging.ERROR) for client in self._clientcounter.getClientsList(cid)])
               gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in self._clientcounter.getClientsList(cid)])
 
     def _recvData(self, timeout=30):
