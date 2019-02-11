@@ -12,7 +12,7 @@ logomap = {
     u"Animal Planet HD": logobase + '45.png',
     u"Discovery Science HD": logobase + 'lyo9uHELb4es3DBo5p0ztPw0JnLaEf.png',
     u"Discovery Россия HD": logobase + 'SmWnYlOvkJn8GzttT2UY0vmo8PYfMg.png',
-#    u"Eureka HD": logobase + '',
+    u"Eureka HD": logobase + 'OaWtWXpPyC1adsRP69CUPBnJPrT0lt.png',
     u"HD-Life": logobase + 'jUteUS0xRGdvLyBVqNjowEUDkOjT0t.png',
     u"History Россия HD": logobase + 'VFgU260pmiIyPxCzD3f8R7Yc6DXClH.png',
     u"History2 HD": logobase + 'TaToxTsGJnMk9nvWCBqfZvcJ2GyGUC.png',
