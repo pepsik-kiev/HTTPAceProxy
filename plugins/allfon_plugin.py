@@ -35,30 +35,33 @@ class Allfon(AceProxyPlugin):
     def Playlistparser(self):
         try:
            with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as r:
-              if r.encoding is None: r.encoding = 'utf-8'
-              self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
-              self.picons = picons.logomap
-              self.channels = {}
-              m = requests.auth.hashlib.md5()
-              self.logger.info('Playlist %s downloaded' % config.url)
-              pattern = requests.auth.re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
-              for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
-                 itemdict = match.groupdict()
-                 name = itemdict.get('name', '').replace(' (allfon)','')
-                 url = itemdict['url']
-                 if not 'logo' in itemdict: itemdict['logo'] = picons.logomap.get(name)
-                 self.picons[name] = itemdict['logo']
+              if r.status_code != 304:
+                 if r.encoding is None: r.encoding = 'utf-8'
+                 self.playlisttime = gevent.time.time()
+                 self.headers['If-Modified-Since'] = gevent.time.strftime('%a, %d %b %Y %H:%M:%S %Z', gevent.time.gmtime(self.playlisttime))
+                 self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
+                 self.picons = picons.logomap
+                 self.channels = {}
+                 m = requests.auth.hashlib.md5()
+                 self.logger.info('Playlist %s downloaded' % config.url)
+                 pattern = requests.auth.re.compile(r',(?P<name>.+)[\r\n].+[\r\n].+[\r\n](?P<url>[^\r\n]+)?')
+                 for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
+                    itemdict = match.groupdict()
+                    name = itemdict.get('name', '').replace(' (allfon)','')
+                    url = itemdict['url']
+                    if not 'logo' in itemdict: itemdict['logo'] = picons.logomap.get(name)
+                    self.picons[name] = itemdict['logo']
 
-                 if url.startswith(('acestream://', 'infohash://')) \
-                       or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
-                    self.channels[name] = url
-                    itemdict['url'] = quote(ensure_str(name+'.ts'),'')
+                    if url.startswith(('acestream://', 'infohash://')) \
+                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
+                       self.channels[name] = url
+                       itemdict['url'] = quote(ensure_str(name+'.ts'),'')
 
-                 self.playlist.addItem(itemdict)
-                 m.update(name.encode('utf-8'))
+                    self.playlist.addItem(itemdict)
+                    m.update(name.encode('utf-8'))
 
-              self.etag = '"' + m.hexdigest() + '"'
-              self.logger.debug('AllFon.m3u playlist generated')
+                 self.etag = '"' + m.hexdigest() + '"'
+                 self.logger.debug('AllFon.m3u playlist generated')
 
         except requests.exceptions.RequestException: self.logger.error("Can't download %s playlist!" % config.url); return False
         except: self.logger.error(traceback.format_exc()); return False
@@ -69,19 +72,7 @@ class Allfon(AceProxyPlugin):
         play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
-           self.playlisttime = gevent.time.time()
-           with requests.head(config.url, headers=self.headers, proxies=config.proxies, timeout=30) as r:
-              try:
-                 url_time = r.headers.get('last-modified')
-                 if url_time:
-                    url_time = gevent.time.mktime(gevent.time.strptime(url_time ,"%a, %d %b %Y %I:%M:%S %Z"))
-                    if self.last_modified is None or url_time > self.last_modified:
-                       if not self.Playlistparser(): connection.dieWithError(); return
-                       self.last_modified = url_time
-                 else:
-                    if not self.Playlistparser(): connection.dieWithError(); return
-              except requests.exceptions.RequestException:
-                 self.logger.error("Playlist %$ not available !" % config.url)
+           if not self.Playlistparser(): connection.dieWithError(); return
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path

@@ -35,34 +35,37 @@ class Torrenttelik(AceProxyPlugin):
     def Playlistparser(self):
         try:
            with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as playlist:
-              if playlist.encoding is None: playlist.encoding = 'utf-8'
-              self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
-              self.picons = picons.logomap
-              self.channels = {}
-              m = requests.auth.hashlib.md5()
-              self.logger.info('Playlist %s downloaded' % config.url)
-              try:
-                 for channel in playlist.json()['channels']:
-                    channel['name'] = name = channel.get('name', '')
-                    channel['url'] = url = 'acestream://%s' % channel.get('url')
-                    channel['group'] = channel.get('cat')
-                    if not 'logo' in channel: channel['logo'] = picons.logomap.get(name)
-                    self.picons[name] = channel['logo']
+              if playlist.status_code != 304:
+                 if playlist.encoding is None: playlist.encoding = 'utf-8'
+                 self.playlisttime = gevent.time.time()
+                 self.headers['If-Modified-Since'] = gevent.time.strftime('%a, %d %b %Y %H:%M:%S %Z', gevent.time.gmtime(self.playlisttime))
+                 self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
+                 self.picons = picons.logomap
+                 self.channels = {}
+                 m = requests.auth.hashlib.md5()
+                 self.logger.info('Playlist %s downloaded' % config.url)
+                 try:
+                    for channel in playlist.json()['channels']:
+                       channel['name'] = name = channel.get('name', '')
+                       channel['url'] = url = 'acestream://%s' % channel.get('url')
+                       channel['group'] = channel.get('cat')
+                       if not 'logo' in channel: channel['logo'] = picons.logomap.get(name)
+                       self.picons[name] = channel['logo']
 
-                    if url.startswith(('acestream://', 'infohash://')) \
-                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
-                       self.channels[name] = url
-                       channel['url'] = quote(ensure_str(name)+'.ts','')
+                       if url.startswith(('acestream://', 'infohash://')) \
+                             or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
+                          self.channels[name] = url
+                          channel['url'] = quote(ensure_str(name)+'.ts','')
 
-                    self.playlist.addItem(channel)
-                    m.update(name.encode('utf-8'))
+                       self.playlist.addItem(channel)
+                       m.update(name.encode('utf-8'))
 
-              except Exception as e:
-                 self.logger.error("Can't parse JSON! %s" % repr(e))
-                 return
+                 except Exception as e:
+                    self.logger.error("Can't parse JSON! %s" % repr(e))
+                    return
 
-              self.etag = '"' + m.hexdigest() + '"'
-              self.logger.debug('torrent-telik.m3u playlist generated')
+                 self.etag = '"' + m.hexdigest() + '"'
+                 self.logger.debug('torrent-telik.m3u playlist generated')
 
         except requests.exceptions.RequestException: self.logger.error("Can't download %s playlist!" % config.url); return False
         except: self.logger.error(traceback.format_exc()); return False
@@ -73,20 +76,7 @@ class Torrenttelik(AceProxyPlugin):
         play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
-           self.playlisttime = gevent.time.time()
-           with requests.head(config.url, headers=self.headers, proxies=config.proxies, timeout=30) as r:
-              try:
-                 url_time = r.headers.get('last-modified')
-                 if url_time:
-                    url_time = gevent.time.mktime(gevent.time.strptime(url_time ,"%a, %d %b %Y %I:%M:%S %Z"))
-                    if self.last_modified is None or url_time > self.last_modified:
-                       if not self.Playlistparser(): connection.dieWithError(); return
-                       self.last_modified = url_time
-                 else:
-                    if not self.Playlistparser(): connection.dieWithError(); return
-              except requests.exceptions.RequestException:
-                 self.logger.error("Playlist %$ not available !" % config.url)
-                 connection.dieWithError(); return
+           if not self.Playlistparser(): connection.dieWithError(); return
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
