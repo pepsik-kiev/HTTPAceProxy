@@ -285,6 +285,7 @@ logomap = {
     u'Eurosport Gold HD': logobase + 'ghrEKYz6UXQY3gnTf9KRKw85YOiCbV.png',
     u'EWTN - Katholisches Fernsehen': logobase + 'XM9LR6lzQ8F4yCLo6l0rf78q9056kC.png',
     u'EWTN UK and Ireland': logobase + 'maP6bdwOGv77xHPvRnKBHww9cmG2oV.png',
+    u'EXTASY HD': logobase + '3YbYfxwKMunniJodntFypXD0fwospq.png',
     u'Extrema TV HD': logobase + '7Vc6BhIxeY0PQmsDnyzBj5loBesx5r.png',
     u'Extremadura TV': logobase + 'jzo6ZI8gyCrYIeb3WFGUy8sLn30TKF.png',
     u'Extreme Sports': logobase + '21FhIqWK82JDPNuLTEIC9hSO2EHfks.png',

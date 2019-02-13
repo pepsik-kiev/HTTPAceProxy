@@ -35,7 +35,6 @@ class Allfon(AceProxyPlugin):
         try:
            with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as r:
               if r.encoding is None: r.encoding = 'utf-8'
-              self.playlisttime = gevent.time.time()
               self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
               self.picons = picons.logomap
               self.channels = {}
@@ -69,6 +68,7 @@ class Allfon(AceProxyPlugin):
         play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
+           self.playlisttime = gevent.time.time()
            with requests.head(config.url, headers=self.headers, proxies=config.proxies, timeout=30) as r:
               try:
                  url_time = r.headers.get('last-modified')
