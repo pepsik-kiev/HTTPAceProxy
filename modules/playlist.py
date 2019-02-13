@@ -92,6 +92,7 @@ class PlaylistConfig():
     m3utvgnames['КиноПремиум HD'] = 'КиноПремиумHD'
     m3utvgnames['Кинопоказ HD-1'] = 'Шокирующее (Кинопоказ HD-1)'
     m3utvgnames['НСТ'] = 'Настоящее Страшное Телевидение'
+    m3utvgnames['BOLT HD (UA)'] = 'BOLT'
     m3utvgnames['Шокирующее HD'] = 'Шокирующее (Кинопоказ HD-1)'
     m3utvgnames['ТВ 3'] = 'ТВ-3 Россия'
     m3utvgnames['HD Life'] = 'HDL'

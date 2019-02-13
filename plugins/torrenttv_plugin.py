@@ -23,8 +23,8 @@ class Torrenttv(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('torrenttv_plugin')
-        self.picons = self.channels = self.playlist = self.playlisttime = self.etag = None
-
+        self.picons = self.channels = self.playlist = self.playlisttime = self.etag = self.last_modified = None
+        self.headers = {'User-Agent': 'Magic Browser'}
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
     def playlistTimedDownloader(self):
@@ -34,8 +34,7 @@ class Torrenttv(AceProxyPlugin):
 
     def Playlistparser(self):
         try:
-           headers = {'User-Agent': 'Magic Browser'}
-           with requests.get(config.url, headers=headers, proxies=config.proxies, stream=False, timeout=30) as r:
+           with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as r:
               if r.encoding is None: r.encoding = 'utf-8'
               self.playlisttime = gevent.time.time()
               self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
@@ -71,7 +70,18 @@ class Torrenttv(AceProxyPlugin):
         play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
-            if not self.Playlistparser(): connection.dieWithError(); return
+           with requests.head(config.url, headers=self.headers, proxies=config.proxies, timeout=30) as r:
+              try:
+                 url_time = r.headers.get('last-modified')
+                 if url_time:
+                    url_time = gevent.time.mktime(gevent.time.strptime(url_time ,"%a, %d %b %Y %I:%M:%S %Z"))
+                    if self.last_modified is None or url_time > self.last_modified:
+                       if not self.Playlistparser(): connection.dieWithError(); return
+                       self.last_modified = url_time
+                 else:
+                    if not self.Playlistparser(): connection.dieWithError(); return
+              except requests.exceptions.RequestException:
+                 self.logger.error("Playlist %$ not available !" % config.url)
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
