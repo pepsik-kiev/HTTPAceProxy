@@ -22,7 +22,8 @@ class Allfon(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('allfon_plugin')
-        self.picons = self.channels = self.playlist = self.playlisttime = self.etag = self.last_modified = None
+        self.picons = self.channels = self.playlist = self.etag = self.last_modified = None
+        self.playlisttime = gevent.time.time()
         self.headers = {'User-Agent': 'Magic Browser'}
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 

@@ -22,7 +22,8 @@ class Torrenttelik(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceProxy):
         self.logger = logging.getLogger('torrenttelik_plugin')
-        self.picons = self.channels = self.playlist = self.etag = self.playlisttime = self.last_modified = None
+        self.picons = self.channels = self.playlist = self.etag = self.last_modified = None
+        self.playlisttime = gevent.time.time()
         self.headers = {'User-Agent': 'Magic Browser'}
         if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
 
