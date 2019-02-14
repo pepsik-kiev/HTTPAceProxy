@@ -37,7 +37,6 @@ class Torrenttelik(AceProxyPlugin):
            with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as playlist:
               if playlist.status_code != 304:
                  if playlist.encoding is None: playlist.encoding = 'utf-8'
-                 self.playlisttime = gevent.time.time()
                  self.headers['If-Modified-Since'] = gevent.time.strftime('%a, %d %b %Y %H:%M:%S %Z', gevent.time.gmtime(self.playlisttime))
                  self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
                  self.picons = picons.logomap
@@ -66,6 +65,8 @@ class Torrenttelik(AceProxyPlugin):
 
                  self.etag = '"' + m.hexdigest() + '"'
                  self.logger.debug('torrent-telik.m3u playlist generated')
+
+              self.playlisttime = gevent.time.time()
 
         except requests.exceptions.RequestException: self.logger.error("Can't download %s playlist!" % config.url); return False
         except: self.logger.error(traceback.format_exc()); return False
