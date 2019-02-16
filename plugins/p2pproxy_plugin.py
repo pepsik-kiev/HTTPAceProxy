@@ -79,8 +79,8 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
-                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+                elif stream_type == 'torrent': connection.path = '/url/%s/%s.ts' % (quote(stream,''), name)
+                elif stream_type == 'contentid': connection.path = '/content_id/%s/%s.ts' % (stream, name)
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
@@ -286,8 +286,8 @@ class P2pproxy(AceProxyPlugin):
 
                 if stream_type not in ('torrent', 'contentid'):
                     connection.dieWithError(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
-                elif stream_type == 'torrent': connection.path = '/url/%s/stream.mp4' % quote(stream,'')
-                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.mp4' % stream
+                elif stream_type == 'torrent': connection.path = '/url/%s/stream.ts' % quote(stream,'')
+                elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.ts' % stream
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
@@ -393,17 +393,22 @@ class P2pproxy(AceProxyPlugin):
         # Used to generate logomap for the torrenttv plugin
         elif connection.reqtype == 'logobase':
            translations_list = TorrentTvApi(config.email, config.password).translations('all')
-           last = translations_list[-1]
+           logomap={}
+           try:
+              import config.picons.torrenttv as picons
+              logomap = { k: v[v.rfind('/')+1:] for k, v in picons.logomap.items() if v is not None }
+           except: pass
+           logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
+
            if self.params.get('format', [''])[0] == 'json':
               from requests.compat import json
-              exported = json.dumps({channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list}, ensure_ascii=False).encode('utf-8')
+              exported = json.dumps(logomap, ensure_ascii=False).encode('utf-8')
               connection.send_response(200)
               connection.send_header('Content-Type', 'application/json')
            else:
               exported = "logobase = '%s'\nlogomap = {\n" % config.logobase
-              for channel in translations_list:
-                 exported += "    u'%s': logobase + '%s'" % (channel.getAttribute('name'), channel.getAttribute('logo'))
-                 exported += ',\n' if not channel == last else '\n'
+              for name, logo in logomap.items():
+                 exported += "    u'%s': logobase + '%s',\n" % (name, logo)
               exported += '}\n'
               exported = exported.encode('utf-8')
               connection.send_response(200)
@@ -416,6 +421,7 @@ class P2pproxy(AceProxyPlugin):
            connection.send_header('Content-Length', len(exported))
            connection.end_headers()
            connection.wfile.write(exported)
+           P2pproxy.logger.debug('%s picon channels exported' % len(logomap))
 
     def get_date_param(self):
         d = self.params.get('date', [''])[0]
