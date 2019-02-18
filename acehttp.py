@@ -19,7 +19,8 @@ import gevent
 from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
 from gevent.pool import Pool
-from gevent.socket import socket, AF_INET, SOCK_DGRAM
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketError
+from gevent.util import wrap_errors
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -169,7 +170,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           self.connectGreenlet = gevent.spawn(self.connectDetector) # client disconnection watchdog
+           self.connectDetector = gevent.spawn(wrap_errors(SocketError, self.rfile.read))
+           self.connectDetector.link_exception(self.finish)
            self.out = self.wfile
            # If &fmt transcode key present in request
            fmt = self.reqparams.get('fmt', [''])[0]
@@ -218,11 +220,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
 
-           self.connectGreenlet.join() # Wait until request complite or client disconnected
+           self.connectDetector.join() # Wait until request complite or client disconnected
 
         except aceclient.AceException as e:
            gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(CID)])
-           gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in AceProxy.clientcounter.getClientsList(CID)])
+           gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in AceProxy.clientcounter.getClientsList(CID)])
         except gevent.GreenletExit: pass # Client disconnected
         except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
         finally:
@@ -232,11 +234,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: pass
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-
-    def connectDetector(self):
-        try: self.rfile.read()
-        except: pass
-        finally: self.handlerGreenlet.kill()
 
 class AceProxy(object):
     '''
@@ -294,7 +291,7 @@ def checkAce():
        if hasattr(AceProxy, 'ace'): del AceProxy.ace
        AceProxy.acecmd = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
        if spawnAce(AceProxy.acecmd, AceConfig.acestartuptimeout):
-          logger.error('Ace Stream died, respawned it with pid %s' % AceProxy.ace.pid)
+          logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
           # refresh the acestream.port file for Windows only after full loading...
           if AceConfig.osplatform == 'Windows': detectPort()
           else: gevent.sleep(AceConfig.acestartuptimeout)

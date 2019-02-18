@@ -6,7 +6,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 class ClientCounter(object):
 
     def __init__(self):
-        self.streams = {}   # {'CID':[client1, client2,....]} dict of current broadcasts and clients
+        self.streams = {}   # {'CID':[client1, client2,....]}
         self.idleAce = None
 
     def getClientsQuantity(self, cid):

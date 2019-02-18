@@ -5,6 +5,7 @@ import gevent, requests
 import telnetlib
 import logging
 from gevent.event import AsyncResult, Event
+from gevent.util import wrap_errors
 from urllib3.packages.six.moves.urllib.parse import unquote
 from urllib3.packages.six.moves import zip, map
 from urllib3.packages.six import PY3
@@ -100,6 +101,9 @@ class AceClient(object):
         except gevent.socket.error:
            raise AceException('Error writing data to AceEngine API port')
 
+    def _recvError(self, ex):
+        raise AceException('Error reading data from AceEngine API port')
+
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
         self._age = age
@@ -108,7 +112,9 @@ class AceClient(object):
         self._videotimeout = videotimeout
         self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        gevent.spawn(self._recvData, self._videotimeout)
+        gevent.spawn(wrap_errors(EOFError, self._recvData), self._videotimeout).link_exception(self._recvError)
+
+        #self._videotimeout
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -140,7 +146,7 @@ class AceClient(object):
         self._write(AceMessage.request.START(command.upper(), paramsdict))
         try: return self._url.get(timeout=self._videotimeout)
         except gevent.Timeout as t:
-           errmsg = 'START URL not resived! Engine response time %s exceeded' % t
+           errmsg = 'START URL not received! Engine response time %s exceeded' % t
            raise AceException(errmsg)
 
     def STOP(self):
@@ -199,15 +205,13 @@ class AceClient(object):
               client.out.write(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data)
            except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
               logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-              client.connectGreenlet.kill()
+              client.connectDetector.kill()
            except: pass # The client unexpectedly disconnected while writing data to socket
            finally: client.connection.settimeout(None)
 
-        def chunk_iterator(url):
-           return s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576)
-
-        def StreamWriter(chunk):
-           gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in self._clientcounter.getClientsList(cid) if client.connectGreenlet])
+        def StreamWriter(url):
+           for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
+              gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in self._clientcounter.getClientsList(cid) if chunk and client.connectDetector])
 
         with requests.session() as s:
            s.verify = False
@@ -219,17 +223,15 @@ class AceClient(object):
                     for url in s.get(playback_url, timeout=(5, self._videotimeout)).iter_lines():
                        if not self._clientcounter.getClientsList(cid) or url.startswith(b'download not found'): return
                        if url.startswith(b'http://') and url not in used_urls:
-                          for chunk in chunk_iterator(url):
-                             if chunk: StreamWriter(chunk)
+                          StreamWriter(url)
                           used_urls.append(url)
                           if len(used_urls) > 15: used_urls.pop(0)
               else: # AceStream return link for HTTP stream
-                 for chunk in chunk_iterator(playback_url):
-                    if chunk: StreamWriter(chunk)
+                 StreamWriter(playback_url)
 
            except Exception as err: # requests errors
               gevent.joinall([gevent.spawn(client.dieWithError, 503, 'StreamReader:%s' % repr(err), logging.ERROR) for client in self._clientcounter.getClientsList(cid)])
-              gevent.joinall([gevent.spawn(client.connectGreenlet.kill) for client in self._clientcounter.getClientsList(cid)])
+              gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in self._clientcounter.getClientsList(cid)])
 
     def _recvData(self, timeout=30):
         '''
@@ -241,9 +243,6 @@ class AceClient(object):
               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
               except gevent.Timeout: self.destroy()
               except gevent.socket.timeout: pass
-              except Exception as err:
-                 logging.error('AceException:%s' % repr(err))
-                 break
               else:
                  logging.debug('<<< %s' % unquote(self._recvbuffer))
                  # Parsing everything only if the string is not empty

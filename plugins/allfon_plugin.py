@@ -10,7 +10,7 @@ import traceback
 import gevent, requests
 import logging, zlib
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
-from urllib3.packages.six import ensure_text, ensure_str
+from urllib3.packages.six import ensure_str, ensure_text
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.allfon as config
@@ -52,9 +52,9 @@ class Allfon(AceProxyPlugin):
                     self.picons[name] = itemdict['logo']
 
                     if url.startswith(('acestream://', 'infohash://')) \
-                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive','.acestream','.acemedia'))):
+                         or (url.startswith(('http://','https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent'))):
                        self.channels[name] = url
-                       itemdict['url'] = quote(ensure_str(name+'.ts'),'')
+                       itemdict['url'] = quote(ensure_str('%s.ts' % name),'')
 
                     self.playlist.addItem(itemdict)
                     m.update(name.encode('utf-8'))
@@ -80,23 +80,23 @@ class Allfon(AceProxyPlugin):
         params = parse_qs(connection.query)
 
         if path.startswith('/%s/channel/' % connection.reqtype):
-           name = path.rsplit('.', 1)
-           if not name[1]:
+           if not path.endswith('.ts'):
               connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
               return
-           name = ensure_text(unquote(name[0].rsplit('/', 1)[1]))
-           url = self.channels.get(name)
+           name = ensure_text(unquote(path[path.rfind('/')+1:]))
+           url = self.channels.get(name.split('.')[0])
            if url is None:
               connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR)
               return
            elif url.startswith('acestream://'):
-              connection.path = '/content_id/%s/%s.ts' % (url.split('/')[2], name)
+              connection.path = '/content_id/%s/%s' % (url.split('/')[2], name)
            elif url.startswith('infohash://'):
-              connection.path = '/infohash/%s/%s.ts' % (url.split('/')[2], name)
-           elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia')):
-              connection.path = '/url/%s/%s.ts' % (quote(url,''), name)
+              connection.path = '/infohash/%s/%s' % (url.split('/')[2], name)
+           elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
+              connection.path = '/url/%s/%s' % (quote(url,''), name)
            connection.splittedpath = connection.path.split('/')
            connection.reqtype = connection.splittedpath[1].lower()
+           name = name.split('.')[0]
            play = True
         elif self.etag == connection.headers.get('If-None-Match'):
            self.logger.debug('ETag matches - returning 304')

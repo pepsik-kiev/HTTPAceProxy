@@ -465,7 +465,7 @@ logomap = {
     u'MTV Hits': logobase + 'iLJhuLh9kFLQkG4ERvLGSjSgMfNiM4.png',
     u'MTV Lebanon HD': logobase + '4inIqsqTGNAi8BNsxQ7rsUjrPrlyIc.png',
     u'MTV Live HD': logobase + 'WjyYXtYHhG5COxGab7luHb1bmvAioA.png',
-    u'MTV Mix (Уфа)': logobase + 'vGhFdhcCOzjQkOkGAhTmqNziCajLpV.png',
+    u'MTV Mix (Уфа)': logobase + 'VHjOKK6tK3CihBYdezrNxOydjszCOe.png',
     u'MTV Rocks': logobase + 'SEwn7rL2FxPcf5Ol9KRKedIwXlpsAP.png',
     u'MTV Россия': logobase + 'P5ijp2sRQsKVZkOJwjdqIVgYdJzhpZ.png',
     u'MTV Россия HD': logobase + 'YOE9yEg2KwmItjHwMHcQDVvIMsfOTg.png',
@@ -1417,4 +1417,8 @@ logomap = {
     u'XITE Music  HD (GR)': logobase + 'FeWCTdXHZKnid3qXQNH7afhkBDdA0t.png',
     u'Восток 24 HD !': logobase + 'lsPwiihTgSjp4xKzSgbPYxw0fFq3Ae.png',
     u'Doma TV HD': logobase + 'hHqxPdyIScgl2qzl30LRUvnPOei8Bw.png',
+    u'Canal 10': logobase + 'EnE6fchsYAxkDGXoGglOvBF7tTyLaw.png',
+    u'UA: Культура': logobase + 'ERDJTwNGcwed6bEuhseryKq6Q2UJWL.png',
+    u'Пирамида': logobase + 'Q1UES69yePAxzMPu11U8R9VwBFHBGu.png',
+    u'Пятница (+4)': logobase + 'd4MuaoHrWCP3z2vAhE0FeRqeHjbXQ0.png',
 }

@@ -392,12 +392,13 @@ class P2pproxy(AceProxyPlugin):
 
         # Used to generate logomap for the torrenttv plugin
         elif connection.reqtype == 'logobase':
-           translations_list = TorrentTvApi(config.email, config.password).translations('all')
            logomap={}
            try:
               import config.picons.torrenttv as picons
               logomap = { k: v[v.rfind('/')+1:] for k, v in picons.logomap.items() if v is not None }
            except: pass
+
+           translations_list = TorrentTvApi(config.email, config.password).translations('all')
            logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
 
            if self.params.get('format', [''])[0] == 'json':

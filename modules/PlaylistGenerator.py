@@ -61,10 +61,10 @@ class PlaylistGenerator(object):
 
         for i in items:
            item = i.copy()
-           name = quote(ensure_str(item['name']).replace('"', "'").replace(',', '.'),'')
+           name = quote(ensure_str(item['name'].replace('"', "'").replace(',', '.')),'')
            url = item['url']
            if process_url:
-              if url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
+              if url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
                  item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), name)
               elif url.startswith('infohash://'): # For INFOHASHes
                  item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], name)
