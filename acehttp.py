@@ -19,8 +19,7 @@ import gevent
 from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
 from gevent.pool import Pool
-from gevent.socket import socket, AF_INET, SOCK_DGRAM, error as SocketError
-from gevent.util import wrap_errors
+from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -152,10 +151,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
         #End parameters dict
 
-        CID = None
         self.connectionTime = gevent.time.time()
         self.sessionID = str(uuid4().int)[:8]
-        self.clientInfo = self.transcoder = None
+        CID = self.clientInfo = self.transcoder = None
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if channelIcon is None else channelIcon
 
         try:
@@ -170,8 +168,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           self.connectDetector = gevent.spawn(wrap_errors(SocketError, self.rfile.read))
-           self.connectDetector.link_exception(self.finish)
+           self.connectDetector = gevent.spawn(self._start_watching)
            self.out = self.wfile
            # If &fmt transcode key present in request
            fmt = self.reqparams.get('fmt', [''])[0]
@@ -234,6 +231,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: pass
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+
+    def _start_watching(self):
+        try: self.rfile.read()
+        except: pass
+        finally: self.handlerGreenlet.kill()
 
 class AceProxy(object):
     '''
