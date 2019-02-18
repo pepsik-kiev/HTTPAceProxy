@@ -112,9 +112,7 @@ class AceClient(object):
         self._videotimeout = videotimeout
         self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        gevent.spawn(wrap_errors(EOFError, self._recvData), self._videotimeout).link_exception(self._recvError)
-
-        #self._videotimeout
+        gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._recvData), self._videotimeout).link_exception(self._recvError)
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -243,6 +241,7 @@ class AceClient(object):
               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
               except gevent.Timeout: self.destroy()
               except gevent.socket.timeout: pass
+              except: raise
               else:
                  logging.debug('<<< %s' % unquote(self._recvbuffer))
                  # Parsing everything only if the string is not empty
