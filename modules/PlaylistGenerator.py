@@ -60,7 +60,7 @@ class PlaylistGenerator(object):
         items = self.sort(self.itemlist) if self.sort else self.itemlist
 
         for i in items:
-           item = i.copy()
+           item = i # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX}
            name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')),'')
            url = item['url']
            if process_url:
@@ -78,10 +78,10 @@ class PlaylistGenerator(object):
                  item['url'] = 'http://%s%s/%s' % (hostport, path, url)
 
            if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
-           itemlist += self.m3uchanneltemplate % item # Generates EXTINF line with url
+
+           itemlist += self.m3uchanneltemplate % item #Generates EXTINF line with url
 
         return _bytearray(itemlist, 'utf-8')
-
 
     def exportxml(self, hostport, path='',):
 
