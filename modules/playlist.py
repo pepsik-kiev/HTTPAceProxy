@@ -201,7 +201,7 @@ class PlaylistConfig():
     @staticmethod
     def _changeItemByDict(item, key, replacementsDict, setKey=None):
         if len(replacementsDict) > 0:
-           value = item[key]
+           value = item.get(key)
            if not setKey: setKey = key
            value = replacementsDict.get(value)
            if value: item[setKey] = ensure_text(value)

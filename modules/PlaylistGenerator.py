@@ -37,13 +37,13 @@ class PlaylistGenerator(object):
         group - channel playlist group-title (optional)
         logo - channel picon file tvg-logo (optional)
         '''
+        # Remap items
+        self.changeItem(itemdict)
         # Check and add missing items and their values
-        if not itemdict.get('tvg'): itemdict['tvg'] = itemdict.get('name').replace(' ', '_')
+        itemdict['tvg'] = itemdict['tvg'].replace(' ', '_') if itemdict.get('tvg') else itemdict.get('name').replace(' ', '_')
         if not itemdict.get('tvgid'): itemdict['tvgid'] = ''
         if not itemdict.get('group'): itemdict['group'] = ''
         if not itemdict.get('logo'): itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
-        # Remap items
-        self.changeItem(itemdict)
         # Add items
         self.itemlist.append(itemdict)
 
@@ -61,7 +61,7 @@ class PlaylistGenerator(object):
 
         for i in items:
            item = i.copy()
-           name = quote(ensure_str(item['name'].replace('"', "'").replace(',', '.')),'')
+           name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')),'')
            url = item['url']
            if process_url:
               if url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
