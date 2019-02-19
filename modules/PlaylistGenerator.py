@@ -40,8 +40,8 @@ class PlaylistGenerator(object):
         # Remap items
         self.changeItem(itemdict)
         # Check and add missing items and their values
-        itemdict['tvg'] = itemdict['tvg'].replace(' ', '_') if itemdict.get('tvg') else itemdict.get('name').replace(' ', '_')
-        if not itemdict.get('tvgid'): itemdict['tvgid'] = ''
+        itemdict['tvg'] = itemdict['tvg'] if itemdict.get('tvg') else itemdict.get('name')
+        if not itemdict.get('tvgid'): itemdict['tvgid'] = itemdict['tvg']
         if not itemdict.get('group'): itemdict['group'] = ''
         if not itemdict.get('logo'): itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Add items
@@ -58,7 +58,6 @@ class PlaylistGenerator(object):
         else: itemlist = header
 
         items = self.sort(self.itemlist) if self.sort else self.itemlist
-
         for i in items:
            item = i # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX}
            name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')),'')
