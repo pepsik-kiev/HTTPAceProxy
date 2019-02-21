@@ -199,7 +199,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               # If there is no existing broadcast we create it
               playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
-                 playback_url = urlparse(playback_url)._replace(netloc='%s:%s' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])).geturl()
+                 playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
               gevent.spawn(self.ace.StreamReader, playback_url, CID)
 
            # Sending videostream headers to client
