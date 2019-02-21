@@ -33,6 +33,7 @@ class ClientCounter(object):
         '''
         try:
             client.ace = self.getClientsList(cid)[0].ace
+            client.q = self.getClientsList(cid)[0].q.copy()
             self.idleAce.destroy()
         except: client.ace = self.idleAce
         finally:

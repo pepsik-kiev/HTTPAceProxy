@@ -6,9 +6,9 @@ class PlaylistConfig():
     # Default playlist format
     m3uemptyheader = '#EXTM3U\n'
     m3uheader = '#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
-    # If you need the #EXTGRP field put this #EXTGRP:%(group)s\n after %(name)s\n.
+    # If you need the #EXTGRP field put this #EXTGRP:{group}\n after {name}\n.
     m3uchanneltemplate = \
-       '#EXTINF:-1 group-title="%(group)s" tvg-name="%(tvg)s" tvg-id="%(tvgid)s" tvg-logo="%(logo)s",%(name)s\n#EXTGRP:%(group)s\n%(url)s\n'
+       '#EXTINF:-1 group-title="{group}" tvg-name="{tvg}" tvg-id="{tvgid}" tvg-logo="{logo}",{name}\n#EXTGRP:{group}\n{url}\n'
 
     # Playlist sorting options.
     sort = False

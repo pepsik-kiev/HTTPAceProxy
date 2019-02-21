@@ -111,8 +111,8 @@ class P2pproxy(AceProxyPlugin):
                     logo = channel.getAttribute('logo')
                     if logo != '' and config.fullpathlogo: logo = config.logobase + logo
 
-                    fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo}
-                    if channel.getAttribute('epg_id') != '0': fields['tvgid'] = config.tvgid % fields
+                    fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo,
+                              'tvgid': config.tvgid.format(**fields) if channel.getAttribute('epg_id') != '0' else ''}
                     playlistgen.addItem(fields)
 
                 P2pproxy.logger.debug('Exporting m3u playlist')

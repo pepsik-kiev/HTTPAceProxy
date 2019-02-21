@@ -19,6 +19,7 @@ import gevent
 from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
 from gevent.pool import Pool
+from gevent.util import wrap_errors
 from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
 import os, sys, glob
@@ -103,8 +104,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
            except Exception as e:
-              #import traceback
-              #logger.error(traceback.format_exc())
+              import traceback
+              logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
            finally: return
         self.handleRequest(headers_only)
@@ -168,7 +169,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           self.connectDetector = gevent.spawn(self._start_watching)
+           self.connectDetector = gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read))
+           self.connectDetector.link(lambda x: self.finish())
+           self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
            fmt = self.reqparams.get('fmt', [''])[0]
@@ -217,7 +220,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
 
-           self.connectDetector.join() # Wait until request complite or client disconnected
+           while self.connectDetector:
+              try: self.out.write(self.q.get(timeout=AceConfig.videotimeout))
+              except: break
 
         except aceclient.AceException as e:
            gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(CID)])
@@ -225,17 +230,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except gevent.GreenletExit: pass # Client disconnected
         except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
         finally:
+           self.q.queue.clear()
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
               except: pass
            if AceProxy.clientcounter.deleteClient(CID, self) == 0:
               logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
-
-    def _start_watching(self):
-        try: self.rfile.read()
-        except: pass
-        finally: self.handlerGreenlet.kill()
 
 class AceProxy(object):
     '''

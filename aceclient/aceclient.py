@@ -101,7 +101,7 @@ class AceClient(object):
         except gevent.socket.error:
            raise AceException('Error writing data to AceEngine API port')
 
-    def _recvError(self, ex):
+    def _recvError(self):
         raise AceException('Error reading data from AceEngine API port')
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
@@ -112,7 +112,7 @@ class AceClient(object):
         self._videotimeout = videotimeout
         self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._recvData), self._videotimeout).link_exception(self._recvError)
+        gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._recvData), self._videotimeout).link_exception(lambda x: self._recvError())
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -198,14 +198,11 @@ class AceClient(object):
     def StreamReader(self, playback_url, cid):
 
         def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
-           try:
-              client.connection.settimeout(timeout)
-              client.out.write(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data)
-           except gevent.socket.timeout:  # Client did not read the data from socket for N sec - disconnect it
-              logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-              client.connectDetector.kill()
-           except: pass # The client unexpectedly disconnected while writing data to socket
-           finally: client.connection.settimeout(None)
+           try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
+           except:  # Client did not read the data from socket for N sec - disconnect it
+              if client.connectDetector:
+                 logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
+                 client.connectDetector.kill()
 
         def StreamWriter(url):
            for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):

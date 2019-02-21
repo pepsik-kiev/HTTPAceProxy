@@ -29,6 +29,7 @@ class PlaylistGenerator(object):
         '''
         Adds and remap item to the list
         itemdict is a dictionary with the following fields:
+        {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX, 'url': XXX}
 
         name - channel name
         url - channel URL
@@ -40,8 +41,8 @@ class PlaylistGenerator(object):
         # Remap items
         self.changeItem(itemdict)
         # Check and add missing items and their values
-        itemdict['tvg'] = itemdict['tvg'] if itemdict.get('tvg') else itemdict.get('name')
-        if not itemdict.get('tvgid'): itemdict['tvgid'] = itemdict['tvg']
+        if not itemdict.get('tvg'): itemdict['tvg'] = itemdict.get('name').replace(' ','_')
+        if not itemdict.get('tvgid'): itemdict['tvgid'] = ''
         if not itemdict.get('group'): itemdict['group'] = ''
         if not itemdict.get('logo'): itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Add items
@@ -59,7 +60,7 @@ class PlaylistGenerator(object):
 
         items = self.sort(self.itemlist) if self.sort else self.itemlist
         for i in items:
-           item = i # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX}
+           item = i # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX, 'url': XXX}
            name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')),'')
            url = item['url']
            if process_url:
@@ -78,7 +79,7 @@ class PlaylistGenerator(object):
 
            if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
 
-           itemlist += self.m3uchanneltemplate % item #Generates EXTINF line with url
+           itemlist += self.m3uchanneltemplate.format(**item) #Generates EXTINF line with url
 
         return _bytearray(itemlist, 'utf-8')
 
