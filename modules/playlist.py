@@ -4,11 +4,11 @@ from urllib3.packages.six import ensure_text
 class PlaylistConfig():
 
     # Default playlist format
-    m3uemptyheader = '#EXTM3U\n'
-    m3uheader = '#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
+    m3uemptyheader = u'#EXTM3U\n'
+    m3uheader = u'#EXTM3U deinterlace=1 m3uautoload=1 cache=1000\n'
     # If you need the #EXTGRP field put this #EXTGRP:{group}\n after {name}\n.
     m3uchanneltemplate = \
-       '#EXTINF:-1 group-title="{group}" tvg-name="{tvg}" tvg-id="{tvgid}" tvg-logo="{logo}",{name}\n#EXTGRP:{group}\n{url}\n'
+       u'#EXTINF:-1 group-title="{group}" tvg-name="{tvg}" tvg-id="{tvgid}" tvg-logo="{logo}",{name}\n#EXTGRP:{group}\n{url}\n'
 
     # Playlist sorting options.
     sort = False
@@ -217,9 +217,8 @@ class PlaylistConfig():
     @staticmethod
     def _changeItemByDict(item, key, replacementsDict, setKey=None):
         if len(replacementsDict) > 0:
-           value = item.get(key)
+           value = replacementsDict.get(item.get(key))
            if not setKey: setKey = key
-           value = replacementsDict.get(value)
            if value: item[setKey] = ensure_text(value)
 
     xml_template = """<?xml version="1.0" encoding="utf-8"?>

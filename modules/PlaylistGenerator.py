@@ -41,7 +41,7 @@ class PlaylistGenerator(object):
         # Remap items
         self.changeItem(itemdict)
         # Check and add missing items and their values
-        if not itemdict.get('tvg'): itemdict['tvg'] = itemdict.get('name').replace(' ','_')
+        itemdict['tvg'] = itemdict['name'].replace(' ','_') if not itemdict.get('tvg') else itemdict['tvg'].replace(' ','_')
         if not itemdict.get('tvgid'): itemdict['tvgid'] = ''
         if not itemdict.get('group'): itemdict['group'] = ''
         if not itemdict.get('logo'): itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
