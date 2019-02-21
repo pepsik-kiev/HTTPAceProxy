@@ -61,7 +61,7 @@ class PlaylistGenerator(object):
         items = self.sort(self.itemlist) if self.sort else self.itemlist
         for i in items:
            item = i # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX, 'url': XXX}
-           name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')),'')
+           name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')), '')
            url = item['url']
            if process_url:
               if url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
