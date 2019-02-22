@@ -71,7 +71,7 @@ class Stat(AceProxyPlugin):
     def SendResponse(self, status_code, f_ext, content, connection):
         mimetype = {
             'js': 'text/javascript; charset=utf-8',
-            'json': 'application/json',
+            'json': 'application/json; charset=utf-8',
             'css': 'text/css; charset=utf-8',
             'html': 'text/html; charset=utf-8',
             'png': 'image/png',
@@ -138,6 +138,7 @@ class Stat(AceProxyPlugin):
                 'channelName': c.channelName,
                 'clientIP': c.clientip,
                 'clientInfo': c.clientInfo,
+                'clientBuff': c.q.qsize()*100/self.config.videotimeout,
                 'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                 'stat': c.ace._status.get(timeout=2)

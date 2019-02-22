@@ -197,7 +197,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
               if not AceProxy.ace: #Rewrite host:port for remote AceEngine
                  playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
-              gevent.spawn(self.ace.StreamReader, playback_url, CID)
+              gevent.spawn(self.ace.StreamReader, playback_url, CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            # Sending videostream headers to client
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
@@ -227,13 +227,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except gevent.GreenletExit: pass # Client disconnected
         except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
         finally:
-           self.q.queue.clear()
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
               except: pass
-           if AceProxy.clientcounter.deleteClient(CID, self) == 0:
-              logging.debug('Broadcast "%s" stoped. Last client %s disconnected' % (self.channelName, self.clientip))
+           AceProxy.clientcounter.deleteClient(CID, self)
 
 class AceProxy(object):
     '''
@@ -285,9 +283,9 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
        return isRunning(AceProxy.ace)
     except: return False
 
-def checkAce():
+def checkAce(chekinterval=AceConfig.acestartuptimeout):
     while 1:
-       gevent.sleep(AceConfig.acestartuptimeout)
+       gevent.sleep(chekinterval)
        if AceConfig.acespawn and not isRunning(AceProxy.ace):
           if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.destroy()
           if hasattr(AceProxy, 'ace'): del AceProxy.ace

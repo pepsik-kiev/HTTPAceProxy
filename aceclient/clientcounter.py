@@ -44,19 +44,16 @@ class ClientCounter(object):
 
     def deleteClient(self, cid, client):
         '''
-        Remove client from the dictionary list by CID key and return their number
+        Remove client from the dictionary list by CID key
         '''
         clients = self.streams.get(cid,[])
-        if not clients: return 0
-        elif client not in clients: return len(clients)
-        elif len(clients) > 1:
-            self.streams[cid].remove(client)
-            return self.getClientsQuantity(cid)
+        if not clients: return
+        elif len(clients) > 1: self.streams[cid].remove(client)
         else:
             del self.streams[cid]
             try:
-                client.ace.STOP()
-                self.idleAce = client.ace
-                self.idleAce.reset()
+               client.ace.STOP()
+               client.ace.reset()
+               self.idleAce = client.ace
             except: self.idleAce = None
-            finally: return 0
+        return
