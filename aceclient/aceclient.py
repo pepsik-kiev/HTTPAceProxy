@@ -200,13 +200,13 @@ class AceClient(object):
         def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
            try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
            except:  # Client did not read the data from socket for N sec - disconnect it
-              if client.connectDetector:
+              if client.handlerGreenlet:
                  logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-                 client.connectDetector.kill()
+                 client.finish()
 
         def StreamWriter(url):
            for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
-              gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in self._clientcounter.getClientsList(cid) if chunk and client.connectDetector])
+              gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in self._clientcounter.getClientsList(cid) if chunk and client.handlerGreenlet])
 
         with requests.session() as s:
            s.verify = False
@@ -226,7 +226,7 @@ class AceClient(object):
 
            except Exception as err: # requests errors
               gevent.joinall([gevent.spawn(client.dieWithError, 503, 'StreamReader:%s' % repr(err), logging.ERROR) for client in self._clientcounter.getClientsList(cid)])
-              gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in self._clientcounter.getClientsList(cid)])
+              gevent.joinall([gevent.spawn(client.finish) for client in self._clientcounter.getClientsList(cid)])
 
     def _recvData(self, timeout=30):
         '''

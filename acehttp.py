@@ -141,8 +141,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.send_header('Connection', 'Close')
            self.end_headers()
            return
-        # Check is AceEngine alive
-        checkAce()
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
@@ -169,8 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           self.connectDetector = gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read))
-           self.connectDetector.link(lambda x: self.finish())
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
@@ -220,13 +217,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
 
-           while self.connectDetector:
+           while self.handlerGreenlet:
               try: self.out.write(self.q.get(timeout=AceConfig.videotimeout))
               except: break
 
         except aceclient.AceException as e:
            gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(CID)])
-           gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in AceProxy.clientcounter.getClientsList(CID)])
+           gevent.joinall([gevent.spawn(client.finish) for client in AceProxy.clientcounter.getClientsList(CID)])
         except gevent.GreenletExit: pass # Client disconnected
         except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
         finally:
@@ -270,7 +267,7 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
     return False
 
 # Spawning procedures
-def spawnAce(cmd, delay=0.1):
+def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):
     if AceConfig.osplatform == 'Windows':
        from urllib3.packages.six.moves.winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
        reg = ConnectRegistry(None, HKEY_CURRENT_USER)
@@ -284,24 +281,25 @@ def spawnAce(cmd, delay=0.1):
        logger.debug('AceEngine start up .....')
        AceProxy.ace = gevent.event.AsyncResult()
        gevent.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
-       AceProxy.ace = AceProxy.ace.get(timeout=delay)
+       AceProxy.ace = AceProxy.ace.get(timeout=delay if delay>=0 else 0.1)
        return isRunning(AceProxy.ace)
     except: return False
 
 def checkAce():
-    if AceConfig.acespawn and not isRunning(AceProxy.ace):
-       if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.destroy()
-       if hasattr(AceProxy, 'ace'): del AceProxy.ace
-       AceProxy.acecmd = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
-       if spawnAce(AceProxy.acecmd, AceConfig.acestartuptimeout):
-          logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
-          # refresh the acestream.port file for Windows only after full loading...
-          if AceConfig.osplatform == 'Windows': detectPort()
-          else: gevent.sleep(AceConfig.acestartuptimeout)
-          # Creating ClientCounter
-          AceProxy.clientcounter = ClientCounter()
-       else:
-          logger.error("Can't spawn Ace Stream!")
+    while 1:
+       gevent.sleep(AceConfig.acestartuptimeout)
+       if AceConfig.acespawn and not isRunning(AceProxy.ace):
+          if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.destroy()
+          if hasattr(AceProxy, 'ace'): del AceProxy.ace
+          if spawnAce():
+             logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
+             # refresh the acestream.port file for Windows only after full loading...
+             if AceConfig.osplatform == 'Windows': detectPort()
+             else: gevent.sleep(AceConfig.acestartuptimeout)
+             # Creating ClientCounter
+             AceProxy.clientcounter = ClientCounter()
+          else:
+             logger.error("Can't spawn Ace Stream!")
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
@@ -328,11 +326,12 @@ def detectPort():
        AceProxy.acedir = os.path.dirname(engine[0])
        try:
            gevent.sleep(AceConfig.acestartuptimeout)
-           AceConfig.ace['aceAPIport'] = open(AceProxy.acedir + '\\acestream.port', 'r').read()
-           logger.info("Detected ace port: %s" % AceConfig.ace['aceAPIport'])
+           with open(AceProxy.acedir + '\\acestream.port', 'r') as f:
+              AceConfig.ace['aceAPIport'] = f.read()
        except IOError:
            logger.error("Couldn't detect port! acestream.port file doesn't exist?")
            clean_proc(); sys.exit(1)
+       else: logger.info("Detected ace port: %s" % AceConfig.ace['aceAPIport'])
 
 def isRunning(process):
     return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
@@ -437,9 +436,9 @@ AceProxy.clientcounter = ClientCounter()
 #### AceEngine startup
 AceProxy.ace = findProcess('ace_engine.exe' if AceConfig.osplatform == 'Windows' else os.path.basename(AceConfig.acecmd))
 if not AceProxy.ace and AceConfig.acespawn:
-   AceProxy.acecmd = '' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split()
-   if spawnAce(AceProxy.acecmd, AceConfig.acestartuptimeout):
+   if spawnAce():
       logger.info('Local AceStream engine spawned with pid %s' % AceProxy.ace.pid)
+      gevent.spawn(checkAce) # Start AceEngine alive watchdog
 elif AceProxy.ace:
    AceProxy.ace = psutil.Process(AceProxy.ace)
    logger.info('Local AceStream engine found with pid %s' % AceProxy.ace.pid)
