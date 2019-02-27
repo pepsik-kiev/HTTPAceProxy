@@ -100,6 +100,7 @@ class Stat(AceProxyPlugin):
 
     def getStatusJSON(self):
         # Sys Info
+        clients = self.stuff.clientcounter.getAllClientsList() # Get connected clients list
         statusJSON = {}
         statusJSON['status'] = 'success'
         statusJSON['sys_info'] = {
@@ -113,12 +114,10 @@ class Stat(AceProxyPlugin):
 
         statusJSON['connection_info'] = {
             'max_clients': self.config.maxconns,
-            'total_clients': self.stuff.clientcounter.totalClients(),
+            'total_clients': len(clients),
             }
 
         statusJSON['clients_data'] = []
-        # Dict {'CID': [client1, client2,....]} to list of values
-        clients = [item for sublist in self.stuff.clientcounter.streams.values() for item in sublist]
         for c in clients:
             if not c.clientInfo:
                if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):

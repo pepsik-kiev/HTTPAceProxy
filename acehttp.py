@@ -8,7 +8,7 @@ Website: https://github.com/pepsik-kiev/HTTPAceProxy
 !!!!! Requirements !!!!!
 
 Python2 (>=2.7.10) or Python3 (>=3.4)
-gevent >= 1.2.2
+gevent >= 1.3.3
 psutil >= 5.3.0
 
 '''
@@ -46,7 +46,6 @@ from aceconfig import AceConfig
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
-    handlerGreenlet = None
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, unquote(self.path).decode('utf8')))
@@ -55,7 +54,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
-        if self.handlerGreenlet: self.handlerGreenlet.kill()
+        if self.handlerGreenlet:
+           self.handlerGreenlet.kill()
+        AceProxy.clientcounter.deleteClient(self)
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -115,17 +116,18 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger = logging.getLogger('HandleRequest')
         self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
 
-        self.videoextdefaults = ('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+        videoextdefaults = ('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                    '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')
 
         # Limit on the number of connected clients
-        if 0 < AceConfig.maxconns <= AceProxy.clientcounter.totalClients():
+        if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
            self.dieWithError(501, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)
            return
-        # Check if third parameter exists…/self.reqtype/blablablablabla/video.mpg
+        # Check if third parameter exists…/pid/blablablablabla/video.mpg
+        #                                                     |_________|
         # And if it ends with regular video extension
         try:
-           if not self.path.endswith(self.videoextdefaults):
+           if not self.path.endswith(videoextdefaults):
               self.dieWithError(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
               return
         except IndexError:
@@ -152,7 +154,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         self.connectionTime = gevent.time.time()
         self.sessionID = str(uuid4().int)[:8]
-        CID = self.clientInfo = self.transcoder = None
+        self.clientInfo = self.transcoder = None
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if channelIcon is None else channelIcon
 
         try:
@@ -160,18 +162,20 @@ class HTTPHandler(BaseHTTPRequestHandler):
               logger.debug('Create connection to AceEngine.....')
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-           CID, self.channelName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
+           self.CID, chName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
         except aceclient.AceException as e:
            self.dieWithError(503, '%s' % repr(e), logging.ERROR)
            AceProxy.clientcounter.idleAce = None
            return
+        self.channelName = channelName if channelName is not None else chName
         mimetype = mimetypes.guess_type(self.channelName)[0]
+
         try:
            gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
-           fmt = self.reqparams.get('fmt', [''])[0]
+           if fmt is None: fmt = self.reqparams.get('fmt', [''])[0]
            if fmt and AceConfig.osplatform != 'Windows':
               if fmt in AceConfig.transcodecmd:
                  stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -192,15 +196,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            self.response_use_chunked = False if self.transcoder is not None else AceConfig.use_chunked
 
-           if AceProxy.clientcounter.addClient(CID, self) == 1:
-              # If there is no existing broadcast we create it
-              playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
-              if not AceProxy.ace: #Rewrite host:port for remote AceEngine
-                 playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
-              gevent.spawn(self.ace.StreamReader, playback_url, CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
-
            # Sending videostream headers to client
-           logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            drop_headers = []
            proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
                              'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype,
@@ -216,14 +212,19 @@ class HTTPHandler(BaseHTTPRequestHandler):
            logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
-
+           # Start broadcast if it does not exist
+           if AceProxy.clientcounter.addClient(self) == 1:
+              gevent.spawn(self.ace.StreamReader, self.reqtype, paramsdict, AceConfig.acestreamtype, self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
+           logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
+           # write data to client while he is alive
            while self.handlerGreenlet:
               try: self.out.write(self.q.get(timeout=AceConfig.videotimeout))
               except: break
 
         except aceclient.AceException as e:
-           gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in AceProxy.clientcounter.getClientsList(CID)])
-           gevent.joinall([gevent.spawn(client.finish) for client in AceProxy.clientcounter.getClientsList(CID)])
+           clients = AceProxy.clientcounter.getClientsList(self.CID)
+           gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in clients])
+           gevent.joinall([gevent.spawn(client.finish) for client in clients])
         except gevent.GreenletExit: pass # Client disconnected
         except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
         finally:
@@ -231,7 +232,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
               except: pass
-           AceProxy.clientcounter.deleteClient(CID, self)
+        return
 
 class AceProxy(object):
     '''

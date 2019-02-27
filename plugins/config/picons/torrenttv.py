@@ -1462,4 +1462,5 @@ logomap = {
     u'КиноСат': logobase + 'hYSLdpFRPvtTJLNnLJ1B7IDrGsfSaL.png',
     u'Мосфильм ТВ': logobase + 'lanIXbFwr3hHj0D8ScOv25jcUwRodw.png',
     u'ТДК HD': logobase + 'gt2ObuIyr9m45zUiuVJ8k7fKyCfCef.png',
+    u'Vivid Red HD': logobase + 'PVhz58YaeHI4yRTxAsXIFeCMHMkjGl.png',
 }
