@@ -10,7 +10,7 @@ Torrent-tv.ru Playlist Downloader Plugin configuration file
 #proxies = {'http' : 'socks5h://192.168.1.1:9100', 'https' : 'socks5h://192.168.1.1:9100'}
 proxies = None
 
-# Insert your Torrent-tv.ru playlist URL here
+# Insert your Torrent-tv.ru playlist URL here or path to file ('file:///path/to/file')
 url = ''
 
 # Download playlist every N minutes to keep it fresh

@@ -13,6 +13,7 @@ from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, u
 from urllib3.packages.six import ensure_str, ensure_text
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
+from requests_file import FileAdapter
 import config.torrenttelik as config
 import config.picons.torrenttelik as picons
 
@@ -34,7 +35,9 @@ class Torrenttelik(AceProxyPlugin):
 
     def Playlistparser(self):
         try:
-           with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as playlist:
+           s = requests.Session()
+           s.mount('file://', FileAdapter())
+           with s.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as playlist:
               if playlist.status_code != 304:
                  if playlist.encoding is None: playlist.encoding = 'utf-8'
                  self.headers['If-Modified-Since'] = gevent.time.strftime('%a, %d %b %Y %H:%M:%S %Z', gevent.time.gmtime(self.playlisttime))

@@ -3,8 +3,7 @@
 Torrent-tv.ru channels picon
 '''
 # Channels logo location
-#logobase = 'http://1ttv.org/uploads/'
-logobase = 'http://192.168.2.1:81/playlist/picons/'
+logobase = 'http://1ttv.org/uploads/'
 # Channels logo/path mapping
 logomap = {
     u'0x0 Fireplace HD': logobase + 'H1VboxDJC7sE7x3nKXoYT0X5r4LIqD.png',
@@ -1483,4 +1482,20 @@ logomap = {
     u'Steelbird Music': logobase + 'sAYLwQoJKIs94hRXUoTJC1dvDJ8rNi.png',
     u'Tezaur TV': logobase + 'jlQok3vuBzDmA4S4RzNB37QDAB2uhV.png',
     u'Че (+4) !!': logobase + 'ifkh3TikaoX8dVqpVVcRQlGoQ53xdZ.png',
+    u'Acrobatic Channel': logobase + '5AXnsEkkIk9DghnyMfsiEX5YfmZmZr.png',
+    u'Jordan Sport TV': logobase + 'xohvVI86wxeXSL5CPNfL0EVyHTbQns.png',
+    u'Kentron TV Europe': logobase + 'W3akyfkIqGA8PDmOZOuKHC1JuhD1UT.png',
+    u'KRAL TV HD': logobase + 'h7SPz4GculQWK7A1T0AUp4clnTuhNr.png',
+    u'Moldova 1 HD': logobase + 'Ylt16CruMMffj3qOt4HFEXSZNeb0SP.png',
+    u'Moldova 2 TV': logobase + '4qvdML2U9ylTQi3LUTrbaLezbMI0zc.png',
+    u'Setanta Sport HD': logobase + 'YU81BpeQ2JW5cBvmloS1sW3z0qwneT.png',
+    u'Silence TV WORLD HD': logobase + '1zZIFeRdNDYPcpX17nLhO6o0rSZIQI.png',
+    u'Sky Sports F1': logobase + 'OoO8jHDyw77pYBiUQ2Zv0mE9d6votv.png',
+    u'Sportstv': logobase + '2KZTqm56s7uFK1k9Sk9trohbFkncib.png',
+    u'Trucks TV': logobase + 'Eu1mOQlAi4Q9g78P9qKttwGPsHatdh.png',
+    u'TV Brics HD': logobase + 'j0C5PbpuNKTeHpZZyGEwJYxnkhx0SV.png',
+    u'TVP Historia': logobase + 'Lw9ddFdgjZtflIUVSL08t8wbg14pbB.png',
+    u'Первый Канал Армения': logobase + 'dHBr6dcQF0KHxSBnS8GUWqFwz9Nghf.png',
+    u'Первый Канал Грузия': logobase + 'JAKPsNSO39apdstzmoV2hAyei6XCEz.png',
+    u'ТОЛЬЯТТИ 24': logobase + 'VkoPypRFKGMosyn2RTSw6bRK7qJ5Gw.png',
 }

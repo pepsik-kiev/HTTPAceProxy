@@ -13,6 +13,7 @@ from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, u
 from urllib3.packages.six import ensure_str, ensure_text
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
+from requests_file import FileAdapter
 import config.allfon as config
 import config.picons.allfon as picons
 
@@ -34,7 +35,9 @@ class Allfon(AceProxyPlugin):
 
     def Playlistparser(self):
         try:
-           with requests.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as r:
+           s = requests.Session()
+           s.mount('file://', FileAdapter())
+           with s.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as r:
               if r.status_code != 304:
                  if r.encoding is None: r.encoding = 'utf-8'
                  self.headers['If-Modified-Since'] = gevent.time.strftime('%a, %d %b %Y %H:%M:%S %Z', gevent.time.gmtime(self.playlisttime))
