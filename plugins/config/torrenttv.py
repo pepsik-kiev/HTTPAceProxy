@@ -18,7 +18,7 @@ url = ''
 updateevery = 0
 
 # TV Guide URL
-tvgurl = 'http://epg.do.am/tv.gz'
+tvgurl = 'https://iptvx.one/epg/epg.xml.gz'
 
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0

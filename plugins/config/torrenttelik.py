@@ -26,7 +26,7 @@ proxies = None
 url = 'http://pomoyka.win/trash/ttv-list/ace.json'
 
 # EPG urls
-tvgurl = 'http://epg.do.am/tv.gz'
+tvgurl = 'https://iptvx.one/epg/epg.xml.gz'
 
 # Shift the TV Guide time to the specified number of hours
 tvgshift = 0

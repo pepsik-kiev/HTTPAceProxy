@@ -375,7 +375,10 @@ def _reloadconfig(signum=None, frame=None):
     logger.info('Ace Stream HTTP Proxy config reloaded.....')
 
 def get_ip_address():
-    return [(s.connect(('1.1.1.1', 80)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+    try: return [(s.connect(('1.1.1.1', 80)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+    except:
+       logger.error('Network is unreachable')
+       sys.exit()
 
 def check_compatibility(gevent_version, psutil_version):
 

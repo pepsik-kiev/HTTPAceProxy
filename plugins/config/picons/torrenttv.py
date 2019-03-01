@@ -3,7 +3,8 @@
 Torrent-tv.ru channels picon
 '''
 # Channels logo location
-logobase = 'http://1ttv.org/uploads/'
+#logobase = 'http://1ttv.org/uploads/'
+logobase = 'http://192.168.2.1:81/playlist/picons/'
 # Channels logo/path mapping
 logomap = {
     u'0x0 Fireplace HD': logobase + 'H1VboxDJC7sE7x3nKXoYT0X5r4LIqD.png',
@@ -104,7 +105,6 @@ logomap = {
     u'Astrakhan.Ru': logobase + 'AoYdzaHGvvNQv7cIslo8ABexpgRnAH.png',
     u'ATR': logobase + 'uggqxQxxDTuz1P1mY4PZdlRcAKow3F.png',
     u'ATV Azerbaycan': logobase + 'yx7GzFSH3BlxYYa0Nuq4eiVRqxZSa5.png',
-    u'Aurora Visual': logobase + 'K1ZhYXoruwAUzSwqL8KFCEhgKJiznb.png',
     u'AXN tv Bulgaria': logobase + 'gOsBHsNXFyyOxbuq9qnEBvV18pVgdg.png',
     u'AXN White Polska': logobase + 'Nb2eZGYc4tCBeUvnS2TxX3DcjXC2Bm.png',
     u'Az TV': logobase + 'FB2qxgNm8xTU6YiR2fY1jH4PIRR2SF.png',
@@ -333,7 +333,7 @@ logomap = {
     u'Fox': logobase + 'XGC77wQNeEyaJ2z2mDipyIPsoF0xc1.png',
     u'Fox HD': logobase + 'Pl8S60EJ52htHxi1gAw1SS1y8i1p3z.png',
     u'Fox Life': logobase + 'rkksGUl3DstQSEyT26Q07hNCEwyNnd.png',
-    u'Fox Life HD': logobase + '1wC1oNQ7XQpg7D9iYBBMAv9W5zAT2H.png',
+    u'Fox Life HD': logobase + 'fTnadIbO9Huene4bNkSS9MsEGzQfgr.png',
     u'FOX Life TV (Bulgaria)': logobase + 'R36GWSpq7QLkOvfsawz60INBuPufuk.png',
     u'FOX TV (Bulgaria)': logobase + 'znTPqLpCnaXkgEf73UH3svFcluw4OU.png',
     u'France 24': logobase + 'pViXgcMjLnB5WyOoQJ7sBxhHo5fTSB.png',
@@ -1463,4 +1463,24 @@ logomap = {
     u'Мосфильм ТВ': logobase + 'lanIXbFwr3hHj0D8ScOv25jcUwRodw.png',
     u'ТДК HD': logobase + 'gt2ObuIyr9m45zUiuVJ8k7fKyCfCef.png',
     u'Vivid Red HD': logobase + 'PVhz58YaeHI4yRTxAsXIFeCMHMkjGl.png',
+    u'Архыз24': logobase + 'tuMbRlnkeMiYQ6u9oeiAVfHF0F20RB.png',
+    u'AD SPORT 1 HD': logobase + 'U9rKIKs8KmcOfpLwYf7X5ASLGNPLwZ.png',
+    u'AD SPORT 2 HD': logobase + 'HWdKp4yECc31UC38c1KJHCRg0vZrLh.png',
+    u'Anyday HD': logobase + 'vb1nemZk2LsqWPxUPIckNot7CzZGzE.png',
+    u'Aurora Visual': logobase + 'K1ZhYXoruwAUzSwqL8KFCEhgKJiznb.png',
+    u'Cachipum.TV': logobase + 'JXutbPE5ZWSm6t8kUvy31FG2ZTNGtI.png',
+    u'CBN News': logobase + 'zAXaWj1xveneYypgoK08b7EAlTJyqm.png',
+    u'Glazella 3D': logobase + '5L2C2KguncLr1rnRgvlv4EYXTaia0t.png',
+    u'Glazella HD': logobase + 'rDmokMelaDsyrUnMXMuSFwW4MaH5Zb.png',
+    u'Hunt Channel': logobase + '3oOYhzgoskS6OIr8fLND3b6UMwOhdI.png',
+    u'MM TV': logobase + 'VUtT5j0CsrEdu4RKWThSRSNzUoMJ6Q.png',
+    u'Mute HD': logobase + 'Q30vOfeA5PnkVvx1wPaAaPl2q8Xj8E.png',
+    u'Nago TV': logobase + 'zHn1EVCTC4D2HjOCdzbkReZ84bWp3l.png',
+    u'NHK World': logobase + 'qGLLezOlERi6vOmaQkl9W4iMcs6fgb.png',
+    u'NRG 91 TV': logobase + 'yz28iMk8ZCTeoW7zKwbG7StoAmOnj5.png',
+    u'Oppna Kanalen': logobase + 'K8CPpptLH2L8dieqPXwFsJdJhx9eZL.png',
+    u'Rock FM Romania': logobase + 'Z0NhVbJcPNGuJkadK15U9BN3Jj3KTn.png',
+    u'Steelbird Music': logobase + 'sAYLwQoJKIs94hRXUoTJC1dvDJ8rNi.png',
+    u'Tezaur TV': logobase + 'jlQok3vuBzDmA4S4RzNB37QDAB2uhV.png',
+    u'Че (+4) !!': logobase + 'ifkh3TikaoX8dVqpVVcRQlGoQ53xdZ.png',
 }
