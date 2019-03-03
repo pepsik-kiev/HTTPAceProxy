@@ -22,7 +22,7 @@ Playlist format example:
 proxies = None
 #proxies = {'http' : 'socks5h://192.168.1.1:9100', 'https' : 'socks5h://192.168.1.1:9100'}
 
-# Channels urls or path to file ('file:///path/to/file')
+# Channels urls or path to file ('file:///path/to/file' or 'file://C://path//to//file' for Windows OS)
 url = 'http://pomoyka.win/trash/ttv-list/ace.json'
 
 # EPG urls

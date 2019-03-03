@@ -157,9 +157,6 @@ class AceConfig(acedefconfig.AceDefConfig):
             return True
         elif useragent == 'samsung-agent/1.1' and 'Range' in headers and not 'accept-encoding' in headers:
             return True
-        # Samsung N series
-        elif useragent == 'Mozilla/5.0 (SMART-TV; LINUX; Tizen 4.0) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 TV Safari/537.36' and 'Range' in headers and not 'accept-encoding' in headers:
-            return True
          # Dune 301
         elif useragent == 'DuneHD/1.0' and headers.get('Range') != 'bytes=0-':
             return True
