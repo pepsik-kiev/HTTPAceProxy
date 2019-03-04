@@ -9,7 +9,7 @@ Allfon.tv Playlist Downloader Plugin configuration file
 #proxies = {'http' : 'socks5h://192.168.2.1:9100', 'https' : 'socks5h://192.168.2.1:9100'}
 proxies = None
 
-# Insert your allfon.tv playlist URL here or path to file ('file:///path/to/file' or 'file://C://path//to//file' for Windows OS)
+# Insert your allfon.tv playlist URL here or path to file ('file:///path/to/file' or 'file:///C://path//to//file' for Windows OS)
 url = 'http://allfon-tv.com/autogenplaylist/allfontv.m3u'
 
 # EPG urls & EPG timeshift
