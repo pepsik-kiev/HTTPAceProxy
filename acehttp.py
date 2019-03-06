@@ -54,8 +54,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
-        if self.handlerGreenlet:
-           self.handlerGreenlet.kill()
         AceProxy.clientcounter.deleteClient(self)
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
@@ -222,11 +220,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: break
 
         except aceclient.AceException as e:
-           clients = AceProxy.clientcounter.getClientsList(self.CID)
-           gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(e), logging.ERROR) for client in clients])
-           gevent.joinall([gevent.spawn(client.finish) for client in clients])
+           logging.error(repr(e))
+           gevent.joinall([gevent.spawn(client.finish) for client in AceProxy.clientcounter.getClientsList(self.CID)])
         except gevent.GreenletExit: pass # Client disconnected
-        except Exception as e: self.dieWithError(500, 'Unexpected error: %s' % repr(e))
         finally:
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
@@ -270,7 +266,7 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
     if AceConfig.osplatform == 'Windows':
        from urllib3.packages.six.moves.winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
        reg = ConnectRegistry(None, HKEY_CURRENT_USER)
-       try: key = OpenKey(reg, 'Software\AceStream')
+       try: key = OpenKey(reg, 'Software\\AceStream')
        except: logger.error("Can't find acestream!"); sys.exit(1)
        else:
           engine = QueryValueEx(key, 'EnginePath')
@@ -316,7 +312,7 @@ def detectPort():
           clean_proc(); sys.exit(1)
     from urllib3.packages.six.moves.winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
     reg = ConnectRegistry(None, HKEY_CURRENT_USER)
-    try: key = OpenKey(reg, 'Software\AceStream')
+    try: key = OpenKey(reg, 'Software\\AceStream')
     except:
        logger.error("Can't find AceStream!")
        clean_proc(); sys.exit(1)

@@ -226,9 +226,8 @@ class AceClient(object):
                  StreamWriter(playback_url)
 
         except Exception as err:
-           clients = self._clientcounter.getClientsList(cid)
-           gevent.joinall([gevent.spawn(client.dieWithError, 503, '%s' % repr(err), logging.ERROR) for client in clients])
-           gevent.joinall([gevent.spawn(client.finish) for client in clients])
+           logging.error('StreamReader:%s' % repr(err))
+           gevent.joinall([gevent.spawn(client.finish) for client in self._clientcounter.getClientsList(cid)])
 
     def _recvData(self, timeout=30):
         '''
