@@ -44,13 +44,13 @@ class ClientCounter(object):
         '''
         clients = self.getClientsList(client.CID) if hasattr(client, 'CID') else None
         if not clients: return
-        client.handlerGreenlet.kill()
         if len(clients) > 1: self.clients[client.CID].remove(client)
         else:
            del self.clients[client.CID]
            try:
               client.ace.STOP()
-              client.ace.reset()
               self.idleAce = client.ace
+              self.idleAce.reset()
            except: self.idleAce = None
+        client.handlerGreenlet.kill()
         return

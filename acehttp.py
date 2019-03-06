@@ -265,8 +265,7 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):
     if AceConfig.osplatform == 'Windows':
        from urllib3.packages.six.moves.winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
-       reg = ConnectRegistry(None, HKEY_CURRENT_USER)
-       try: key = OpenKey(reg, 'Software\\AceStream')
+       try: key = OpenKey(ConnectRegistry(None, HKEY_CURRENT_USER), r'Software\AceStream')
        except: logger.error("Can't find acestream!"); sys.exit(1)
        else:
           engine = QueryValueEx(key, 'EnginePath')
@@ -311,8 +310,7 @@ def detectPort():
           logger.error("Ace Engine is not running!")
           clean_proc(); sys.exit(1)
     from urllib3.packages.six.moves.winreg import ConnectRegistry, OpenKey, QueryValueEx, HKEY_CURRENT_USER
-    reg = ConnectRegistry(None, HKEY_CURRENT_USER)
-    try: key = OpenKey(reg, 'Software\\AceStream')
+    try: key = OpenKey(ConnectRegistry(None, HKEY_CURRENT_USER), r'Software\AceStream')
     except:
        logger.error("Can't find AceStream!")
        clean_proc(); sys.exit(1)
