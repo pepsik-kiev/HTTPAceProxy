@@ -224,7 +224,7 @@ class AceClient(object):
                           if len(used_urls) > 15: used_urls.pop(0)
               else: # AceStream return link for HTTP stream
                  StreamWriter(playback_url)
-
+        except TypeError: pass
         except Exception as err:
            logging.error('StreamReader:%s' % repr(err))
            gevent.joinall([gevent.spawn(client.finish) for client in self._clientcounter.getClientsList(cid)])
