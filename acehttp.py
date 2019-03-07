@@ -54,6 +54,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
+        if self.handlerGreenlet:
+           self.handlerGreenlet.kill()
         AceProxy.clientcounter.deleteClient(self)
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
