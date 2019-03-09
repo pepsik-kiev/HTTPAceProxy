@@ -46,7 +46,6 @@ from aceconfig import AceConfig
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
-    handlerGreenlet = None
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, unquote(self.path).decode('utf8')))
@@ -55,9 +54,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
-        if self.handlerGreenlet:
-           self.handlerGreenlet.kill()
-        AceProxy.clientcounter.deleteClient(self)
+       try:
+          self.handlerGreenlet.kill()
+          AceProxy.clientcounter.deleteClient(self)
+       except Exception:
+          import traceback
+          logger.error(traceback.format_exc())
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -453,8 +455,8 @@ else:
    params = {'method': 'get_version', 'format': 'json', 'callback': 'mycallback'}
    try:
       with requests.get(url, params=params, timeout=5) as r:
-         version = r.json()['result']['version']
-         logger.info('Remote AceStream engine ver.%s will be used on %s:%s' % (version, AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
+         logger.info('Remote AceStream engine ver.%s will be used on %s:%s' %
+                      (r.json()['result']['version'], AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
    except: logger.error('AceStream not found!')
 
 # Loading plugins
