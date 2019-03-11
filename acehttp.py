@@ -225,8 +225,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: break
 
         except aceclient.AceException as e:
-           logging.error(repr(e))
-           gevent.joinall([gevent.spawn(client.finish) for client in AceProxy.clientcounter.getClientsList(self.CID)])
+           clients = AceProxy.clientcounter.getClientsList(self.CID)
+           gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(e), logging.ERROR) for client in clients])
+           gevent.joinall([gevent.spawn(client.finish) for client in clients])
         except gevent.GreenletExit: pass # Client disconnected
         finally:
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))

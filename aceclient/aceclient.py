@@ -222,12 +222,12 @@ class AceClient(object):
                           StreamWriter(url)
                           used_urls.append(url)
                           if len(used_urls) > 15: used_urls.pop(0)
-              else: # AceStream return link for HTTP stream
-                 StreamWriter(playback_url)
+              else: StreamWriter(playback_url) #AceStream return link for HTTP stream
         except TypeError: pass
         except Exception as err:
-           logging.error('StreamReader:%s' % repr(err))
-           gevent.joinall([gevent.spawn(client.finish) for client in self._clientcounter.getClientsList(cid)])
+           clients = self._clientcounter.getClientsList(cid)
+           gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(err), logging.ERROR) for client in clients])
+           gevent.joinall([gevent.spawn(client.finish) for client in clients])
 
     def _recvData(self, timeout=30):
         '''
