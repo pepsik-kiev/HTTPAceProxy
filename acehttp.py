@@ -124,7 +124,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-           self.dieWithError(501, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)
+           self.dieWithError(403, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)
            return
         # Check if third parameter exists…/pid/blablablablabla/video.mpg
         #                                                     |_________|
@@ -167,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
            self.CID, chName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
         except aceclient.AceException as e:
-           self.dieWithError(503, '%s' % repr(e), logging.ERROR)
+           self.dieWithError(404, '%s' % repr(e), logging.ERROR)
            AceProxy.clientcounter.idleAce = None
            return
         self.channelName = channelName if channelName is not None else chName
