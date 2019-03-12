@@ -54,12 +54,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
-       try:
-          self.handlerGreenlet.kill()
-          AceProxy.clientcounter.deleteClient(self)
-       except Exception:
-          import traceback
-          logger.error(traceback.format_exc())
+        try: self.connection.close()
+        except:
+           import traceback
+           logger.error(traceback.format_exc())
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -77,8 +75,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        # Current greenlet
-        self.handlerGreenlet = gevent.getcurrent()
         # Connected client IP address
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
         logging.info('Accepted connection from %s path %s' % (self.clientip, unquote(self.path)))
@@ -171,10 +167,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
            AceProxy.clientcounter.idleAce = None
            return
         self.channelName = channelName if channelName is not None else chName
+        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         mimetype = mimetypes.guess_type(self.channelName)[0]
-
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
+           self.connectDetector = gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read))
+           self.connectDetector.link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
@@ -197,7 +194,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               else:
                  logger.error("Can't found fmt key. Transcoding not started!")
 
-           self.response_use_chunked = False if self.transcoder is not None else AceConfig.use_chunked
+           self.response_use_chunked = False if (self.transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
 
            # Sending videostream headers to client
            drop_headers = []
@@ -205,7 +202,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                              'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype,
                              'Pragma': 'no-cache', 'Cache-Control': 'max-age=0, no-cache, no-store' }
 
-           if not self.response_use_chunked or self.request_version == 'HTTP/1.0':
+           if not self.response_use_chunked:
               self.protocol_version = 'HTTP/1.0'
               proxy_headers['Connection'] = 'Close'
               drop_headers.extend(['Transfer-Encoding', 'Keep-Alive', 'Cache-Control'])
@@ -227,14 +224,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except aceclient.AceException as e:
            clients = AceProxy.clientcounter.getClientsList(self.CID)
            gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(e), logging.ERROR) for client in clients])
-           gevent.joinall([gevent.spawn(client.finish) for client in clients])
+           gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in clients])
         except gevent.GreenletExit: pass # Client disconnected
         finally:
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
               except: pass
-        return
+           AceProxy.clientcounter.deleteClient(self)
+           return
 
 class AceProxy(object):
     '''

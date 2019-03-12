@@ -197,15 +197,16 @@ class AceClient(object):
 
     def StreamReader(self, reqtype, paramsdict, acestreamtype, cid):
 
-        def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
+        def write_chunk(client, data, timeout=5.0, _bytearray=bytearray):
            try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
            except:  # Client did not read the data from socket for N sec - disconnect it
               logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-              client.finish()
+              client.connectDetector.kill()
 
         def StreamWriter(url):
            for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
               clients = self._clientcounter.getClientsList(cid)
+              if not clients: break
               gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
 
         try:
@@ -227,7 +228,7 @@ class AceClient(object):
         except Exception as err:
            clients = self._clientcounter.getClientsList(cid)
            gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(err), logging.ERROR) for client in clients])
-           gevent.joinall([gevent.spawn(client.finish) for client in clients])
+           gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in clients])
 
     def _recvData(self, timeout=30):
         '''
