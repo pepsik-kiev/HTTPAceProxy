@@ -88,7 +88,7 @@ class Torrenttv(AceProxyPlugin):
               connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
               return
            name = ensure_text(unquote(path[path.rfind('/')+1:]))
-           url = self.channels.get(('.').join(name.split('.')[:-1]))
+           url = self.channels.get('.'.join(name.split('.')[:-1]))
            if url is None:
               connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR)
               return
