@@ -195,7 +195,7 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def StreamReader(self, reqtype, paramsdict, acestreamtype, cid):
+    def StreamReader(self, playback_url, cid):
 
         def write_chunk(client, data, timeout=5.0, _bytearray=bytearray):
            try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
@@ -210,7 +210,7 @@ class AceClient(object):
               gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
 
         try:
-           playback_url = urlparse(self.START(reqtype, paramsdict, acestreamtype))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**self._ace)).geturl()
+           playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**self._ace)).geturl()
            with requests.session() as s:
               s.verify = False
               s.stream = True
@@ -310,3 +310,4 @@ class AceClient(object):
                  elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
                  # SHUTDOWN
                  elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
+              finally: gevent.sleep()

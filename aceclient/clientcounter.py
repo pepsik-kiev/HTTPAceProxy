@@ -27,9 +27,8 @@ class ClientCounter(object):
         '''
         clients = self.getClientsList(client.CID)
         if clients:
-           existing_client = clients[0]
-           client.ace = existing_client.ace
-           client.q = existing_client.q.copy()
+           client.ace = clients[0].ace
+           client.q = clients[0].q.copy()
            self.idleAce.destroy()
         else: client.ace = self.idleAce
 
@@ -42,9 +41,7 @@ class ClientCounter(object):
         '''
         Remove client from the dictionary list by CID key
         '''
-        clients = self.getClientsList(client.CID) if hasattr(client, 'CID') else None
-        if not clients: return
-        if len(clients) > 1: self.clients[client.CID].remove(client)
+        if len(self.getClientsList(client.CID)) > 1: self.clients[client.CID].remove(client)
         else:
            del self.clients[client.CID]
            try:
@@ -52,4 +49,5 @@ class ClientCounter(object):
               self.idleAce = client.ace
               self.idleAce.reset()
            except: self.idleAce = None
+        client.finish()
         return

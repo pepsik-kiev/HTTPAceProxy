@@ -401,18 +401,16 @@ class P2pproxy(AceProxyPlugin):
            translations_list = TorrentTvApi(config.email, config.password).translations('all')
            logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
 
+           connection.send_response(200)
            if self.params.get('format', [''])[0] == 'json':
               from requests.compat import json
               exported = json.dumps(logomap, ensure_ascii=False).encode('utf-8')
-              connection.send_response(200)
               connection.send_header('Content-Type', 'application/json')
            else:
               exported = "logobase = '%s'\nlogomap = {\n" % config.logobase
-              for name, logo in logomap.items():
-                 exported += "    u'%s': logobase + '%s',\n" % (name, logo)
+              exported += ''.join("    u'%s': logobase + '%s',\n" % (name, logo) for name, logo in logomap.items())
               exported += '}\n'
               exported = exported.encode('utf-8')
-              connection.send_response(200)
               connection.send_header('Content-Type', 'text/plain;charset=utf-8')
            try:
               h = connection.headers.get('Accept-Encoding').split(',')[0]
