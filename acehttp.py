@@ -53,9 +53,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
-    def handle(self):
+    def handle_one_request(self):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
-        BaseHTTPRequestHandler.handle(self)
+        BaseHTTPRequestHandler.handle_one_request(self)
 
     def finish(self):
         self.handlerGreenlet.kill()
@@ -113,9 +113,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
               import traceback
               logger.error(traceback.format_exc())
               self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-           finally:
-              self.closeConnection()
-              return
+           else: self.closeConnection()
+           finally: return
         self.handleRequest(headers_only)
 
     def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):

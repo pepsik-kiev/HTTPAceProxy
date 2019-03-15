@@ -63,6 +63,7 @@ class Stat(AceProxyPlugin):
               return
         else:
            connection.dieWithError(404, 'Not Found')
+           return
 
     def getReqFileContent(self, path):
         with open('http/%s' % path, 'rb') as handle:
@@ -137,7 +138,7 @@ class Stat(AceProxyPlugin):
                 'channelName': c.channelName,
                 'clientIP': c.clientip,
                 'clientInfo': c.clientInfo,
-                'clientBuff': c.q.qsize()*100/self.config.videotimeout,
+                #'clientBuff': c.q.qsize()*100/self.config.videotimeout,
                 'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                 'stat': c.ace._status.get(timeout=2)
