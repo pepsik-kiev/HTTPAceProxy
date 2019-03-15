@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
-import gevent, requests
+import gevent
 import telnetlib
 import logging
 from gevent.event import AsyncResult, Event
 from gevent.util import wrap_errors
+from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
 from urllib3.packages.six.moves import zip, map
 from urllib3.packages.six import PY3
@@ -93,6 +94,7 @@ class AceClient(object):
         self._url.set()
         self._loadasync.set()
         self._cid.set()
+        self._status = AsyncResult()
 
     def _write(self, message):
         try:
@@ -195,41 +197,6 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def StreamReader(self, playback_url, cid):
-
-        def write_chunk(client, data, timeout=5.0, _bytearray=bytearray):
-           try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
-           except:  # Client did not read the data from socket for N sec - disconnect it
-              logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-              client.connectDetector.kill()
-
-        def StreamWriter(url):
-           for chunk in s.get(url, timeout=(5, self._videotimeout)).iter_content(chunk_size=1048576):
-              clients = self._clientcounter.getClientsList(cid)
-              if not clients: break
-              gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
-
-        try:
-           playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**self._ace)).geturl()
-           with requests.session() as s:
-              s.verify = False
-              s.stream = True
-              if playback_url.endswith('.m3u8'): # AceEngine return link for HLS stream
-                 used_urls = []
-                 while 1:
-                    for url in s.get(playback_url, timeout=(5, self._videotimeout)).iter_lines():
-                       if not self._clientcounter.getClientsList(cid) or url.startswith(b'download not found'): return
-                       if url.startswith(b'http://') and url not in used_urls:
-                          StreamWriter(url)
-                          used_urls.append(url)
-                          if len(used_urls) > 15: used_urls.pop(0)
-              else: StreamWriter(playback_url) #AceStream return link for HTTP stream
-        except TypeError: pass
-        except Exception as err:
-           clients = self._clientcounter.getClientsList(cid)
-           gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(err), logging.ERROR) for client in clients])
-           gevent.joinall([gevent.spawn(client.connectDetector.kill) for client in clients])
-
     def _recvData(self, timeout=30):
         '''
         Data receiver method for greenlet
@@ -265,7 +232,7 @@ class AceClient(object):
                        self._url.set(self._recvbuffer.split()[1]) # url for play
                  # LOADRESP
                  elif self._recvbuffer.startswith('LOADRESP'):
-                    self._loadasync.set(requests.compat.json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
+                    self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
                  # STATE
                  elif self._recvbuffer.startswith('STATE'):
                     self._state.set(AceConst.STATE[self._recvbuffer.split()[1]]) # STATE state_id -> STATE_NAME

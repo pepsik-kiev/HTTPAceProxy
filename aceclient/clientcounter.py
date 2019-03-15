@@ -49,5 +49,3 @@ class ClientCounter(object):
               self.idleAce = client.ace
               self.idleAce.reset()
            except: self.idleAce = None
-        client.finish()
-        return
