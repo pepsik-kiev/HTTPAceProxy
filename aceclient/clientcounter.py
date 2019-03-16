@@ -6,7 +6,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 class ClientCounter(object):
 
     def __init__(self):
-        self.clients = {}   # {'CID':[client1, client2,....]}
+        self.clients = {} # existing broadcast dict {'CID':[client1, client2,....]}
         self.idleAce = None
 
     def getAllClientsList(self):
@@ -23,15 +23,14 @@ class ClientCounter(object):
 
     def addClient(self, client):
         '''
-        Adds client to the dictionary list by CID key and returns their number
+        Adds client to the list by CID key in broadcast dictionary
+        Returns the number of clients of the current broadcast
         '''
-        clients = self.getClientsList(client.CID)
-        if clients:
-           client.ace = clients[0].ace
-           client.q = clients[0].q.copy()
+        c = next(iter(self.getClientsList(client.CID)), None) # Get the first client of existing broadcast
+        if c:
+           client.q, client.ace = c.q.copy(), c.ace
            self.idleAce.destroy()
         else: client.ace = self.idleAce
-
         self.clients.setdefault(client.CID, []).append(client)
         self.idleAce = None
 
@@ -39,13 +38,15 @@ class ClientCounter(object):
 
     def deleteClient(self, client):
         '''
-        Remove client from the dictionary list by CID key
+        Remove client from the list by CID key in broadcast dictionary
         '''
-        if len(self.getClientsList(client.CID)) > 1: self.clients[client.CID].remove(client)
-        else:
+        try:
+           (client,) = self.getClientsList(client.CID) # Get the last client of existing broadcast
            del self.clients[client.CID]
            try:
               client.ace.STOP()
               self.idleAce = client.ace
               self.idleAce.reset()
            except: self.idleAce = None
+        except:
+           self.clients[client.CID].remove(client)

@@ -94,7 +94,9 @@ class AceClient(object):
         self._url.set()
         self._loadasync.set()
         self._cid.set()
-        self._status = AsyncResult()
+        self._status.set()
+        self._event.set()
+        self._state .set()
 
     def _write(self, message):
         try:
@@ -251,9 +253,8 @@ class AceClient(object):
                        stat.extend(map(int, self._tempstatus.split(';')[2:]))
                     elif self._tempstatus.startswith(('main:prebuf','main:buf')): #buf;progress;time;
                        stat.extend(map(int, self._tempstatus.split(';')[3:]))
-                    if len(stat) == len(AceConst.STATUS):
-                       self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)}) # dl, wait, buf, prebuf
-                    else: self._status.set({'status': stat[0]}) # idle, loading, starting, check
+                    try: self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)}) # dl, wait, buf, prebuf
+                    except: self._status.set({'status': stat[0]}) # idle, loading, starting, check
                  # CID
                  elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
                  # INFO
