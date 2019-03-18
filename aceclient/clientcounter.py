@@ -43,13 +43,10 @@ class ClientCounter(object):
         try:
            (client,) = self.getClientsList(client.CID) # Get the last client of existing broadcast
            try:
-              del self.clients[client.CID]
-              client.ace.STOP()
               self.idleAce = client.ace
+              self.idleAce.STOP()
               self.idleAce.reset()
-           except:
-              try: client.ace.destroy()
-              except: self.idleAce = None
+           except: self.idleAce = None
+           finally: del self.clients[client.CID]
         except:
            self.clients[client.CID].remove(client)
-        finally: client.handlerGreenlet.kill()

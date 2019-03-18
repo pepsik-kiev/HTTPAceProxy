@@ -53,10 +53,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
-    def handle_one_request(self):
-        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
-        BaseHTTPRequestHandler.handle_one_request(self)
-
     def finish(self):
         self.handlerGreenlet.kill()
 
@@ -81,8 +77,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        # Connected client IP address
-        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0]
+        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
+        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0] # Connected client IP address
         logging.info('Accepted connection from %s path %s' % (self.clientip, unquote(self.path)))
         logging.debug('Client headers: %s' % dict(self.headers))
         params = urlparse(self.path)
@@ -177,7 +173,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.channelName = channelName if channelName is not None else chName
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: AceProxy.clientcounter.deleteClient(self)) # Client disconection watchdog
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
@@ -231,8 +227,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            clients = AceProxy.clientcounter.getClientsList(self.CID)
            gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(e), logging.ERROR) for client in clients])
            gevent.joinall([gevent.spawn(client.handlerGreenlet.kill) for client in clients])
-        except (gevent.GreenletExit, gevent.socket.error): pass  # Client disconnected
+        except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
+           AceProxy.clientcounter.deleteClient(self)
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
@@ -276,7 +273,7 @@ def StreamReader(playback_url, cid):
        try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
        except:  # Client did not read the data from socket for N sec - disconnect it
           logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-          client.finish()
+          client.handlerGreenlet.kill()
 
     def StreamWriter(url):
        for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):

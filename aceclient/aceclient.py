@@ -96,7 +96,7 @@ class AceClient(object):
         self._cid.set()
         self._status.set()
         self._event.set()
-        self._state .set()
+        self._state.set()
 
     def _write(self, message):
         try:
@@ -154,13 +154,8 @@ class AceClient(object):
         '''
         Stop video method
         '''
-        if self._state and self._state.get(timeout=self._resulttimeout) != '0':
-           self._state = AsyncResult()
+        if self._state:
            self._write(AceMessage.request.STOP)
-           try: return self._state.get(timeout=self._resulttimeout)
-           except gevent.Timeout as t:
-              errmsg = 'STOP command not complited! Engine response time %s exceeded' % t
-              raise AceException(errmsg)
 
     def LOADASYNC(self, command, params, sessionid='0'):
         self._loadasync = AsyncResult()
@@ -203,7 +198,7 @@ class AceClient(object):
         '''
         Data receiver method for greenlet
         '''
-        while self._socket:
+        while 1:
            # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
            with gevent.Timeout(timeout, False):
               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
