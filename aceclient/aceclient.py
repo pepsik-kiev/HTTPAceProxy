@@ -125,8 +125,9 @@ class AceClient(object):
            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
 
-        self._auth = AsyncResult()
-        self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
+        if isinstance(params, dict):
+           self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
+        else: self._auth.set(params)
 
         try:
            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
@@ -199,7 +200,7 @@ class AceClient(object):
         '''
         Data receiver method for greenlet
         '''
-        while 1:
+        while self._socket:
            # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
            with gevent.Timeout(timeout, False):
               try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
