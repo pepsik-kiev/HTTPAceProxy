@@ -72,7 +72,7 @@ class AceClient(object):
 
         try:
            self._socket = Telnet(self._ace['aceHostIP'], self._ace['aceAPIport'], connect_timeout)
-           logging.debug('Successfully connected to AceStream on %s:%s' % (self._ace['aceHostIP'], self._ace['aceAPIport']))
+           logging.debug('Successfully connected to AceStream on {aceHostIP}:{aceAPIport}'.format(**self._ace))
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
@@ -127,6 +127,7 @@ class AceClient(object):
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
+
         try:
            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
               errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
@@ -155,12 +156,7 @@ class AceClient(object):
         '''
         Stop video method
         '''
-        self._state = AsyncResult()
         self._write(AceMessage.request.STOP)
-        try: self._state.get(timeout=self._resulttimeout)
-        except gevent.Timeout as t:
-           errmsg = 'Engine response time %s exceeded. STATE 0 (IDLE) not resived!' % t
-           raise AceException(errmsg)
 
     def LOADASYNC(self, command, params, sessionid='0'):
         self._loadasync = AsyncResult()
@@ -278,4 +274,3 @@ class AceClient(object):
                  elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
                  # SHUTDOWN
                  elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
-              finally: gevent.sleep()

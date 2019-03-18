@@ -234,11 +234,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
            gevent.joinall([gevent.spawn(client.handlerGreenlet.kill) for client in clients])
         except gevent.GreenletExit: pass # Client disconnected
         finally:
+           AceProxy.clientcounter.deleteClient(self)
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
               except: pass
-           AceProxy.clientcounter.deleteClient(self)
            self.closeConnection()
 
 class AceProxy(object):
@@ -492,12 +492,11 @@ if AceProxy.ace:
    if AceConfig.osplatform == 'Windows': detectPort()
    else: gevent.sleep(AceConfig.acestartuptimeout)
 else:
-   url = 'http://%s:%s/webui/api/service' % (AceConfig.ace['aceHostIP'], AceConfig.ace['aceHTTPport'])
+   url = 'http://{aceHostIP}:{aceHTTPport}/webui/api/service'.format(**AceConfig.ace)
    params = {'method': 'get_version', 'format': 'json', 'callback': 'mycallback'}
    try:
       with requests.get(url, params=params, timeout=5) as r:
-         logger.info('Remote AceStream engine ver.%s will be used on %s:%s' %
-                      (r.json()['result']['version'], AceConfig.ace['aceHostIP'], AceConfig.ace['aceAPIport']))
+         logger.info('Remote AceStream engine ver.{} will be used on {aceHostIP}:{aceAPIport}'.format(r.json()['result']['version'], **AceConfig.ace))
    except: logger.error('AceStream not found!')
 
 # Loading plugins
