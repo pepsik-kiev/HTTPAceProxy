@@ -105,9 +105,6 @@ class AceClient(object):
         except gevent.socket.error:
            raise AceException('Error writing data to AceEngine API port')
 
-    def _recvError(self):
-        raise AceException('Error reading data from AceEngine API port')
-
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         self._gender = gender
         self._age = age
@@ -116,7 +113,7 @@ class AceClient(object):
         self._videotimeout = videotimeout
         self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._recvData), self._videotimeout).link_exception(lambda x: self._recvError())
+        gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._recvData), self._videotimeout).link_exception(lambda x: logging.error('Error reading data from AceEngine API port'))
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
@@ -157,7 +154,13 @@ class AceClient(object):
         '''
         Stop video method
         '''
-        self._write(AceMessage.request.STOP)
+        if self._state and self._state.get(timeout=self._resulttimeout) != '0':
+           self._state = AsyncResult()
+           self._write(AceMessage.request.STOP)
+           try: return self._state.get(timeout=self._resulttimeout)
+           except gevent.Timeout as t:
+              errmsg = 'STOP command not complited! Engine response time %s exceeded' % t
+              raise AceException(errmsg)
 
     def LOADASYNC(self, command, params, sessionid='0'):
         self._loadasync = AsyncResult()
@@ -234,7 +237,7 @@ class AceClient(object):
                     self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
                  # STATE
                  elif self._recvbuffer.startswith('STATE'):
-                    self._state.set(AceConst.STATE[self._recvbuffer.split()[1]]) # STATE state_id -> STATE_NAME
+                    self._state.set(self._recvbuffer.split()[1]) # STATE state_id -> STATE_NAME
                  # STATUS
                  elif self._recvbuffer.startswith('STATUS'):
                     self._tempstatus = self._recvbuffer.split()[1]
