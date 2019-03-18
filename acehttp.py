@@ -177,7 +177,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.channelName = channelName if channelName is not None else chName
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: AceProxy.clientcounter.deleteClient(self)) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
@@ -225,16 +225,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            # write data to client while he is alive
            for chunk in self.q:
-              try: self.out.write(chunk)
-              except gevent.socket.error: break
+              self.out.write(chunk)
 
         except aceclient.AceException as e:
            clients = AceProxy.clientcounter.getClientsList(self.CID)
            gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(e), logging.ERROR) for client in clients])
            gevent.joinall([gevent.spawn(client.handlerGreenlet.kill) for client in clients])
-        except gevent.GreenletExit: pass # Client disconnected
+        except (gevent.GreenletExit, gevent.socket.error): pass  # Client disconnected
         finally:
-           AceProxy.clientcounter.deleteClient(self)
            logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
            if self.transcoder:
               try: self.transcoder.kill(); logging.info('Transcoding for %s stoped' % self.clientip)

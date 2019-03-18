@@ -3,7 +3,8 @@
 Torrent-telik channels picon
 '''
 # Channels logo location
-logobase = 'http://1ttv.org/uploads/'
+#logobase = 'http://1ttv.org/uploads/'
+logobase = 'http://ttv.pp.ua/picons/'
 # Channels logo/path mapping
 logomap = {
     u"24Техно": logobase + 'JbUGHLuuZa3WQbjtbzUo0cDZkGnLRK.png',
@@ -34,6 +35,11 @@ logomap = {
     u"Живая природа HD": logobase + 'L9qmq6UIprbg4VBQA46tqRjQ22thsp.png',
     u'Звезда': logobase + '0HLRrFHt2QIkbJpLc1fy0RVe7hqCEC.png',
     u"Кухня ТВ": logobase + 'G0WbVMphlP9oJ6KvHRfx0xDfhrF9Re.png',
+    u'Кинопремьера HD': logobase + 'y4Ihg8o7ikgJHF768iJHFH76iu.png',
+    u'Мужское кино': logobase + 'y997iu65e65h4w5d3s4dy.png',
+    u'Наш Кинороман HD': logobase + 'NyV9o2C4xIMFxxYUQsS1qsdAtkqz0k.png',
+    u'Русская комедия': logobase + 'iX91z8phOzJDBJRY028YcyLv6bCaBC.png',
+    u'AXN Sci-Fi': logobase + 'zLWEgf9BbxBr1TR2Qj2NxVQBuPecEP.png',
     u"Оружие": logobase + 'CyDUCmYXK8WS2kXCX5kiAOFejnlwoP.png',
     u"Охота и рыбалка": logobase + '5l2P20J6ebTh0ptOr27Hh704niP3nU.png',
     u"Планета HD": logobase + '1QjirpCLi3q9qPu1CTvEvCB0BfINeo.png',

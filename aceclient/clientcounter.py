@@ -52,3 +52,4 @@ class ClientCounter(object):
               except: self.idleAce = None
         except:
            self.clients[client.CID].remove(client)
+        finally: client.handlerGreenlet.kill()
