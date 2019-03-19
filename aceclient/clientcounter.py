@@ -46,7 +46,7 @@ class ClientCounter(object):
               self.idleAce = client.ace
               self.idleAce.STOP()
               self.idleAce.reset()
-           except: self.idleAce = None
+           except: self.idleAce.destroy()
            finally: del self.clients[client.CID]
         except:
            self.clients[client.CID].remove(client)

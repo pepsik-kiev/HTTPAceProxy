@@ -45,7 +45,7 @@ class TorrentTvApi(object):
         self.conf = RawConfigParser()
         self.headers = {'User-Agent': 'Magic Browser'} # headers for connection to the TTV API
 
-    def auth(self):
+    def _auth(self):
         """
         User authentication
         Returns user session that can be used for API requests
@@ -71,10 +71,11 @@ class TorrentTvApi(object):
            params = {'typeresult': 'json', 'username': self.email, 'password': self.password, 'application': 'tsproxy', 'guid': self.guid}
            try:
               with requests.get(url, params=params, headers=self.headers, timeout=5, hooks=hooks) as result:
+                 result.raise_for_status()
                  self.session = result.json()['session']
                  self.log.debug("New session created: %s" % self.session)
            except requests.exceptions.RequestException as e:
-              raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
+              raise TorrentTvApiException('_auth:%s' % repr(e))
 
            # Store session detales to config file
            if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
@@ -178,10 +179,13 @@ class TorrentTvApi(object):
         :return: json result
         :raise: TorrentTvApiException
         """
-        if not resp.json().get('success'):
-           self._resetSession()
-           error = resp.json()['error']
-           raise TorrentTvApiException('API returned error: %s' % error)
+        try:
+           if not resp.json().get('success'):
+              self._resetSession()
+              error = resp.json()['error']
+              raise TorrentTvApiException('TTV API returned error: %s' % error)
+        except Exception as err:
+           raise TorrentTvApiException('_jsoncheck:%s' % repr(err))
 
     def _checkxml(self, resp, *args, **kwargs):
         """
@@ -192,12 +196,15 @@ class TorrentTvApi(object):
         :return: minidom-parsed xmlresult
         :raise: TorrentTvApiException
         """
-        xmlresult = dom.parseString(resp.content).documentElement
-        success = xmlresult.getElementsByTagName('success')[0].firstChild.data
-        if success == '0' or not success:
-           self._resetSession()
-           error = xmlresult.getElementsByTagName('error')[0].firstChild.data
-           raise TorrentTvApiException('API returned error: %s' % error)
+        try:
+           xmlresult = dom.parseString(resp.content).documentElement
+           success = xmlresult.getElementsByTagName('success')[0].firstChild.data
+           if success == '0' or not success:
+              self._resetSession()
+              error = xmlresult.getElementsByTagName('error')[0].firstChild.data
+              raise TorrentTvApiException('TTV API returned error: %s' % error)
+        except Exception as err:
+           raise TorrentTvApiException('_checkxml:%s' % repr(err))
 
     def _jsonresult(self, request, params):
         """
@@ -208,13 +215,14 @@ class TorrentTvApi(object):
         :raise: TorrentTvApiException
         """
         url = TorrentTvApi.API_URL + request
-        params.update({'session': self.auth(), 'typeresult': 'json'})
+        params.update({'session': self._auth(), 'typeresult': 'json'})
         hooks={'response': self._jsoncheck}
         try:
            with requests.get(url, params=params, headers=self.headers, timeout=5, hooks=hooks) as result:
+              result.raise_for_status()
               return result.json()
-        except requests.exceptions.RequestException as e:
-           raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
+        except requests.exceptions.RequestException as err:
+           raise TorrentTvApiException('_jsonresult:%s' % repr(err))
 
     def _xmlresult(self, request, params):
         """
@@ -225,13 +233,14 @@ class TorrentTvApi(object):
         :raise: TorrentTvApiException
         """
         url = TorrentTvApi.API_URL + request
-        params.update({'session': self.auth(), 'typeresult': 'xml'})
+        params.update({'session': self._auth(), 'typeresult': 'xml'})
         hooks = {'response': self._checkxml}
         try:
            with requests.get(url, params=params, headers=self.headers, timeout=5, hooks=hooks) as result:
+              result.raise_for_status()
               return dom.parseString(result.content).documentElement
-        except requests.exceptions.RequestException as e:
-           raise TorrentTvApiException('Error happened while trying to access API: %s' % repr(e))
+        except requests.exceptions.RequestException as err:
+           raise TorrentTvApiException('_xmlresult:%s' % repr(err))
 
     def _resetSession(self):
         self.allTranslations = self.session = None
@@ -240,4 +249,4 @@ class TorrentTvApi(object):
         if not self.conf.has_section('torrenttv_api'): self.conf.add_section('torrenttv_api')
         self.conf.set('torrenttv_api', 'session', '')
         with open('.aceconfig', 'w+') as config: self.conf.write(config)
-        self.auth()
+        self._auth()
