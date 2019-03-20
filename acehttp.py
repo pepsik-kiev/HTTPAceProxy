@@ -165,12 +165,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
               logger.debug('Create connection to AceEngine.....')
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-           self.CID, chName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
+           self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
            return
-        self.channelName = channelName if channelName is not None else chName
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
            gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog

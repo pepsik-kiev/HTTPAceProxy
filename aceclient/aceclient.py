@@ -186,7 +186,7 @@ class AceClient(object):
     def GETINFOHASH(self, command, value, sessionid='0', idx=0):
         contentinfo = self.GETCONTENTINFO(command, value, sessionid)
         if contentinfo['status'] in (1, 2):
-           return contentinfo['infohash'], [x[0] for x in contentinfo['files'] if x[1] == int(idx)][0]
+           return contentinfo['infohash'], next(iter([x[0] for x in contentinfo['files'] if x[1] == int(idx)]), None)
         elif contentinfo['status'] == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
            raise AceException(errmsg)
