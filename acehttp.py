@@ -172,7 +172,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
@@ -184,7 +184,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                                   'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                  try:
                     self.transcoder = gevent.event.AsyncResult()
-                    gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
+                    AceProxy.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
                     self.transcoder = self.transcoder.get(timeout=2.0)
                     self.out = self.transcoder.stdin
                     logger.info('Transcoding for %s started' % self.clientip)
@@ -198,7 +198,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
               playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
-              gevent.spawn(StreamReader, playback_url, self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
+              AceProxy.pool.spawn(StreamReader, playback_url, self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            # Sending videostream headers to client
@@ -219,13 +219,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
            # write data to client while he is alive
-           for chunk in self.q:
-              self.out.write(chunk)
+           for chunk in self.q: self.out.write(chunk)
 
         except aceclient.AceException as e:
-           clients = AceProxy.clientcounter.getClientsList(self.CID)
-           gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(e), logging.ERROR) for client in clients])
-           gevent.joinall([gevent.spawn(client.handlerGreenlet.kill) for client in clients])
+           AceProxy.pool.map(lambda x: x.dieWithError(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
@@ -269,16 +266,14 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 def StreamReader(playback_url, cid):
 
     def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
-       try: client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
-       except:  # Client did not read the data from socket for N sec - disconnect it
-          logging.warning('Client %s does not read data until %s sec' % (client.clientip, timeout))
-          client.handlerGreenlet.kill()
+        try:
+           client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
+        except gevent.queue.Full:
+           client.dieWithError(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
     def StreamWriter(url):
-       for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
-          clients = AceProxy.clientcounter.getClientsList(cid)
-          if not clients: break
-          gevent.joinall([gevent.spawn(write_chunk, client, chunk) for client in clients if chunk])
+        for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
+           AceProxy.pool.map(lambda x: write_chunk(x, chunk), AceProxy.clientcounter.getClientsList(cid))
 
     try:
        playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
@@ -297,9 +292,7 @@ def StreamReader(playback_url, cid):
           else: StreamWriter(playback_url) #AceStream return link for HTTP stream
     except TypeError: pass
     except Exception as err:
-       clients = AceProxy.clientcounter.getClientsList(cid)
-       gevent.joinall([gevent.spawn(client.dieWithError, 500, repr(err), logging.ERROR) for client in clients])
-       gevent.joinall([gevent.spawn(client.handlerGreenlet.kill) for client in clients])
+       AceProxy.pool.map(lambda x: x.dieWithError(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(cid))
 
 # Spawning procedures
 def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):
@@ -515,7 +508,8 @@ for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*
    AceProxy.pluginlist.append(plugininstance)
 
 # Server setup
-server = WSGIServer((AceConfig.httphost, AceConfig.httpport), log=None, handler_class=HTTPHandler, spawn=Pool())
+AceProxy.pool = Pool()
+server = WSGIServer((AceConfig.httphost, AceConfig.httpport), log=None, handler_class=HTTPHandler, spawn=AceProxy.pool)
 # Setting signal handlers
 gevent.signal(signal.SIGTERM, shutdown)
 gevent.signal(signal.SIGINT, shutdown)
