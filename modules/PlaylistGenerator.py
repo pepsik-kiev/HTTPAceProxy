@@ -5,7 +5,7 @@ This module can generate .m3u playlists with tv guide
 and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
-
+from urllib3.packages.six.moves import map
 from urllib3.packages.six.moves.urllib.parse import quote
 from urllib3.packages.six import ensure_str
 from playlist import PlaylistConfig as config
@@ -53,35 +53,36 @@ class PlaylistGenerator(object):
         '''
         Exports m3u playlist
         '''
+        def line_generator(item):
+            '''
+            Generates EXTINF line with url
+            '''
+            item = item.copy() # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX, 'url': XXX}
+            name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')), '')
+            url = item['url']
+            if process_url:
+               if url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
+                  item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), name)
+               elif url.startswith('infohash://'): # For INFOHASHes
+                  item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], name)
+               elif url.startswith('acestream://'): # For PIDs
+                  item['url'] = 'http://%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], name)
+               elif archive and url.isdigit(): # For archive channel id's
+                  item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
+               elif not archive and url.isdigit(): # For channel id's
+                  item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
+               elif path.endswith('channel'): # For plugins  channel name maping
+                  item['url'] = 'http://%s%s/%s' % (hostport, path, url)
+
+            if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
+
+            return self.m3uchanneltemplate.format(**item)
+
         if add_ts: hostport = 'ts://%s' % hostport  # Adding ts:// after http:// for some players
 
-        if header is None: itemlist = self.m3uheader if not empty_header else self.m3uemptyheader
-        else: itemlist = header
+        if header is None: header = self.m3uheader if not empty_header else self.m3uemptyheader
 
-        items = self.sort(self.itemlist) if self.sort else self.itemlist
-        for i in items:
-           item = i.copy() # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX, 'url': XXX}
-           name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')), '')
-           url = item['url']
-           if process_url:
-              if url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                 item['url'] = 'http://%s/url/%s/%s.ts' % (hostport, quote(url,''), name)
-              elif url.startswith('infohash://'): # For INFOHASHes
-                 item['url'] = 'http://%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], name)
-              elif url.startswith('acestream://'): # For PIDs
-                 item['url'] = 'http://%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], name)
-              elif archive and url.isdigit(): # For archive channel id's
-                 item['url'] = 'http://%s/archive/play?id=%s' % (hostport, url)
-              elif not archive and url.isdigit(): # For channel id's
-                 item['url'] = 'http://%s/channels/play?id=%s' % (hostport, url)
-              elif path.endswith('channel'): # For plugins  channel name maping
-                 item['url'] = 'http://%s%s/%s' % (hostport, path, url)
-
-           if fmt: item['url'] += '&fmt=%s' % fmt if '?' in item['url'] else '/?fmt=%s' % fmt
-
-           itemlist += self.m3uchanneltemplate.format(**item) #Generates EXTINF line with url
-
-        return _bytearray(itemlist, 'utf-8')
+        return _bytearray(header+''.join(map(line_generator, self.sort(self.itemlist) if self.sort else self.itemlist)), 'utf-8')
 
     def exportxml(self, hostport, path='',):
 

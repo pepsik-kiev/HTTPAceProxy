@@ -172,7 +172,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
         mimetype = mimetypes.guess_type(self.channelName)[0]
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
+           AceProxy.pool.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
@@ -265,13 +265,13 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 
 def StreamReader(playback_url, cid):
 
-    def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
+    def write_chunk(client, data, timeout=5.0, _bytearray=bytearray):
         try:
            client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
         except gevent.queue.Full:
            client.dieWithError(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
-    def StreamWriter(url):
+    def StreamWriter(url, timeout=5.0, _bytearray=bytearray):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
            AceProxy.pool.map(lambda x: write_chunk(x, chunk), AceProxy.clientcounter.getClientsList(cid))
 
@@ -490,25 +490,22 @@ else:
 # Trying to change dir (would fail in freezed state)
 try: os.chdir(ROOT_DIR)
 except: pass
-# Creating dict of handlers
-AceProxy.pluginshandlers = {}
-# And a list with plugin instances
-AceProxy.pluginlist = []
 sys.path.insert(0, 'plugins')
 logger.info("Load Ace Stream HTTP Proxy plugins .....")
-for i in [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]:
-   plugin = __import__(i)
-   plugname = i.split('_')[0].capitalize()
-   try: plugininstance = getattr(plugin, plugname)(AceConfig, AceProxy)
-   except Exception as e:
-       logger.error("Can't load plugin %s: %s" % (plugname, repr(e)))
-       continue
-   logger.debug('Plugin loaded: %s' % plugname)
-   for j in plugininstance.handlers: AceProxy.pluginshandlers[j] = plugininstance
-   AceProxy.pluginlist.append(plugininstance)
+pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]
 
-# Server setup
+def add_handler(i):
+    plugin = __import__(i)
+    plugname = i.split('_')[0].capitalize()
+    try: plugininstance = getattr(plugin, plugname)(AceConfig, AceProxy)
+    except Exception as err: logger.error("Can't load plugin %s: %s" % (plugname, repr(err)))
+    logger.debug('Plugin loaded: %s' % plugname)
+    return {j:plugininstance for j in plugininstance.handlers}
+
 AceProxy.pool = Pool()
+# Creating dict of handlers
+AceProxy.pluginshandlers = {key:val for k in AceProxy.pool.map(add_handler, pluginslist) for key,val in k.items()}
+# Server setup
 server = WSGIServer((AceConfig.httphost, AceConfig.httpport), log=None, handler_class=HTTPHandler, spawn=AceProxy.pool)
 # Setting signal handlers
 gevent.signal(signal.SIGTERM, shutdown)
