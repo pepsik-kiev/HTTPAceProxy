@@ -149,14 +149,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         # Make dict with parameters
         # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
-        paramsdict = {}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')
-        for i in range(3, len(self.splittedpath)):
-           paramsdict[aceclient.acemessages.AceConst.START_PARAMS[i-3]] = self.splittedpath[i] if self.splittedpath[i].isdigit() else '0'
-        paramsdict[self.reqtype] = unquote(self.splittedpath[2]) #self.path_unquoted
+        paramsdict = {self.reqtype: unquote(self.splittedpath[2])} #self.path_unquoted
+        paramsdict.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0'))
+        paramsdict.update({ k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))] })
+        paramsdict['request_id'] = self.sessionID = str(uuid4().int)[:8]
         #End parameters dict
 
         self.connectionTime = gevent.time.time()
-        self.sessionID = str(uuid4().int)[:8]
         self.clientInfo = self.transcoder = None
         self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if channelIcon is None else channelIcon
 
@@ -165,7 +164,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               logger.debug('Create connection to AceEngine.....')
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-           self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETINFOHASH(self.reqtype, paramsdict[self.reqtype], self.sessionID, paramsdict['file_indexes'])
+           self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
@@ -176,7 +175,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
-           if fmt is None: fmt = self.reqparams.get('fmt', [''])[0]
+           fmt = self.reqparams.get('fmt', [''])[0] if fmt is None else fmt
            if fmt and AceConfig.osplatform != 'Windows':
               if fmt in AceConfig.transcodecmd:
                  stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -197,7 +196,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              playback_url = self.ace.START(self.reqtype, paramsdict, AceConfig.acestreamtype)
+              playback_url = self.ace.START(paramsdict, AceConfig.acestreamtype)
               AceProxy.pool.spawn(StreamReader, playback_url, self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))

@@ -65,8 +65,8 @@ class AceMessage(object):
         # End READY
 
         @staticmethod
-        def LOADASYNC(command, request_id, params_dict):
-            params_dict['request_id'] = request_id
+        def LOADASYNC(params_dict):
+            command = next(iter(params_dict)).upper()
             if command == 'URL':
                 return 'LOADASYNC {request_id} TORRENT {url} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
@@ -81,7 +81,8 @@ class AceMessage(object):
         # End LOADASYNC
 
         @staticmethod
-        def START(command, params_dict):
+        def START(params_dict):
+            command = next(iter(params_dict)).upper()
             if command == 'URL':
                 return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} {stream_type}'.format(**params_dict)
 
@@ -105,7 +106,7 @@ class AceMessage(object):
 
         @staticmethod
         def GETCID(params_dict):
-            return 'GETCID %s' % ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])
+            return 'GETCID checksum={checksum} infohash={infohash} developer={developer_id} affiliate={affiliate_id} zone={zone_id}'.format(**params_dict)
         # End GETCID
 
         @staticmethod

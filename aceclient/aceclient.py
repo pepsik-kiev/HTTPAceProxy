@@ -138,13 +138,13 @@ class AceClient(object):
            params_dict = {'use_stop_notifications': '1'}
            self._write(AceMessage.request.SETOPTIONS(params_dict))
 
-    def START(self, command, paramsdict, acestreamtype):
+    def START(self, paramsdict, acestreamtype):
         '''
         Start video method. Get url for play from AceEngine
         '''
-        paramsdict['stream_type'] = ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()])
+        paramsdict.update({ 'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()]) })
         self._url = AsyncResult()
-        self._write(AceMessage.request.START(command.upper(), paramsdict))
+        self._write(AceMessage.request.START(paramsdict))
         try: return self._url.get(timeout=self._videotimeout)
         except gevent.Timeout as t:
            errmsg = 'START URL not received! Engine response time %s exceeded' % t
@@ -157,24 +157,19 @@ class AceClient(object):
         if self._state:
            self._write(AceMessage.request.STOP)
 
-    def LOADASYNC(self, command, params, sessionid='0'):
+    def LOADASYNC(self, paramsdict):
         self._loadasync = AsyncResult()
-        self._write(AceMessage.request.LOADASYNC(command.upper(), sessionid, params))
+        self._write(AceMessage.request.LOADASYNC(paramsdict))
         try: return self._loadasync.get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            errmsg = 'Engine response %s time exceeded. LOADARESP not resived!' % t
            raise AceException(errmsg)
 
-    def GETCONTENTINFO(self, command, value, sessionid='0'):
-        paramsdict = { command:value, 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0' }
-        return self.LOADASYNC(command, paramsdict, sessionid)
-
-    def GETCID(self, command, value):
-        contentinfo = self.GETCONTENTINFO(command, value)
+    def GETCID(self, paramsdict):
+        contentinfo = self.LOADASYNC(paramsdict)
         if contentinfo['status'] in (1, 2):
-           paramsdict = {'checksum':contentinfo['checksum'], 'infohash':contentinfo['infohash'], 'developer_id':'0', 'affiliate_id':'0', 'zone_id':'0'}
            self._cid = AsyncResult()
-           self._write(AceMessage.request.GETCID(paramsdict))
+           self._write(AceMessage.request.GETCID(paramsdict.update(contentinfo)))
            try: return self._cid.get(timeout=self._resulttimeout)[2:] # ##CID
            except gevent.Timeout as t:
               errmsg = 'Engine response time %s exceeded. CID not resived!' % t
@@ -183,10 +178,10 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def GETINFOHASH(self, command, value, sessionid='0', idx=0):
-        contentinfo = self.GETCONTENTINFO(command, value, sessionid)
+    def GETCONTENTINFO(self, paramsdict):
+        contentinfo = self.LOADASYNC(paramsdict)
         if contentinfo['status'] in (1, 2):
-           return contentinfo['infohash'], next(iter([x[0] for x in contentinfo['files'] if x[1] == int(idx)]), None)
+           return contentinfo['infohash'], next(iter([x[0] for x in contentinfo['files'] if x[1] == int(paramsdict['file_indexes'])]), None)
         elif contentinfo['status'] == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
            raise AceException(errmsg)
