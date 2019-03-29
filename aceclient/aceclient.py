@@ -121,7 +121,6 @@ class AceClient(object):
         except gevent.Timeout as t:
            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
-
         if isinstance(params, dict):
            self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
         else: self._auth.set(params)
@@ -138,11 +137,10 @@ class AceClient(object):
            params_dict = {'use_stop_notifications': '1'}
            self._write(AceMessage.request.SETOPTIONS(params_dict))
 
-    def START(self, paramsdict, acestreamtype):
+    def START(self, paramsdict):
         '''
         Start video method. Get url for play from AceEngine
         '''
-        paramsdict.update({ 'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in acestreamtype.items()]) })
         self._url = AsyncResult()
         self._write(AceMessage.request.START(paramsdict))
         try: return self._url.get(timeout=self._videotimeout)

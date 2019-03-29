@@ -152,6 +152,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         paramsdict = {self.reqtype: unquote(self.splittedpath[2])} #self.path_unquoted
         paramsdict.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0'))
         paramsdict.update({ k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))] })
+        paramsdict.update({ 'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()]) })
         paramsdict['request_id'] = self.sessionID = str(uuid4().int)[:8]
         #End parameters dict
 
@@ -196,7 +197,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              playback_url = self.ace.START(paramsdict, AceConfig.acestreamtype)
+              playback_url = self.ace.START(paramsdict)
               AceProxy.pool.spawn(StreamReader, playback_url, self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
