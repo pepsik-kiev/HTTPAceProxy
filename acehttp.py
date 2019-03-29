@@ -271,7 +271,7 @@ def StreamReader(playback_url, cid):
         except gevent.queue.Full:
            client.dieWithError(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
-    def StreamWriter(url, timeout=5.0, _bytearray=bytearray):
+    def StreamWriter(url):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
            AceProxy.pool.map(lambda x: write_chunk(x, chunk), AceProxy.clientcounter.getClientsList(cid))
 
