@@ -121,9 +121,10 @@ class AceClient(object):
         except gevent.Timeout as t:
            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
+
         if isinstance(params, dict):
+           self._auth = AsyncResult()
            self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
-        else: self._auth.set(params)
 
         try:
            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
@@ -204,7 +205,7 @@ class AceClient(object):
                  # HELLOTS
                  if self._recvbuffer.startswith('HELLOTS'):
                     #version=engine_version version_code=version_code key=request_key http_port=http_port
-                    self._auth.set({ k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) })
+                    self._auth.set({ k:v for k,v in [x.split('=') for x in self._recvbuffer.split() if '=' in x] })
                  # NOTREADY
                  elif self._recvbuffer.startswith('NOTREADY'): self._auth.set('NOTREADY')
                  # AUTH
@@ -212,7 +213,7 @@ class AceClient(object):
                  # START
                  elif self._recvbuffer.startswith('START'):
                     # url [ad=1 [interruptable=1]] [stream=1] [pos=position]
-                    params = { k:v for k,v in (x.split('=') for x in self._recvbuffer.split() if '=' in x) }
+                    params = { k:v for k,v in [x.split('=') for x in self._recvbuffer.split() if '=' in x] }
                     if not self._seekback or self._started_again.ready() or params.get('stream','') is not '1':
                        # If seekback is disabled, we use link in first START command.
                        # If seekback is enabled, we wait for first START command and
@@ -251,7 +252,7 @@ class AceClient(object):
                  elif self._recvbuffer.startswith('EVENT'):
                     self._tempevent = self._recvbuffer.split()
                     if self._seekback and not self._started_again.ready() and 'livepos' in self._tempevent:
-                       params = { k:v for k,v in (x.split('=') for x in self._tempevent if '=' in x) }
+                       params = { k:v for k,v in [x.split('=') for x in self._tempevent if '=' in x] }
                        self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
                        self._started_again.set()
                     elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(self._gender, self._age))

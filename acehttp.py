@@ -94,8 +94,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
            old2newUrlParts = {'torrent': 'url', 'pid': 'content_id'}
            if self.reqtype in old2newUrlParts: self.reqtype = old2newUrlParts[self.reqtype]
 
-           # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin #'direct_url', 'data', 'efile_url'
-           if not (self.reqtype in ('content_id', 'url', 'infohash') or self.reqtype in AceProxy.pluginshandlers):
+           # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
+           if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceProxy.pluginshandlers):
               self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
               return
         except IndexError:
@@ -148,11 +148,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
            return
 
         # Make dict with parameters
-        # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
-        paramsdict = {self.reqtype: unquote(self.splittedpath[2])} #self.path_unquoted
-        paramsdict.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0'))
+        paramsdict = {self.reqtype: unquote(self.splittedpath[2])} # {command: value}
+        paramsdict.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict.update({ k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))] })
-        paramsdict.update({ 'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()]) })
+        paramsdict.update({ 'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()]) }) # request http or hls from AceEngine
         paramsdict['request_id'] = self.sessionID = str(uuid4().int)[:8]
         #End parameters dict
 
@@ -165,7 +164,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
               logger.debug('Create connection to AceEngine.....')
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
-           self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
+           if self.reqtype not in ('direct_url', 'efile_url'):
+              self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
+           else:
+              self.channelName = channelName if channelName is not None else 'NoName'
+              self.CID = requests.auth.hashlib.sha1(self.channelName.encode('utf-8')).hexdigest()
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
