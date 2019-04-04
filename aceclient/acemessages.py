@@ -94,7 +94,7 @@ class AceMessage(object):
                 return 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
             elif 'direct_url' in params_dict:
-                return 'START URL {direct_url} {stream_type}'.format(**params_dict)
+                return 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
             elif 'efile_url' in params_dict:
                 return 'START EFILE {efile_url} {stream_type}'.format(**params_dict)
