@@ -268,7 +268,7 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 
 def StreamReader(playback_url, cid):
 
-    def write_chunk(client, data, timeout=5.0, _bytearray=bytearray):
+    def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
         try:
            client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
         except gevent.queue.Full:
@@ -279,7 +279,8 @@ def StreamReader(playback_url, cid):
            AceProxy.pool.map(lambda x: write_chunk(x, chunk), AceProxy.clientcounter.getClientsList(cid))
 
     try:
-       playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
+       if not AceProxy.ace:
+          playback_url = urlparse(playback_url)._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
        with requests.session() as s:
           s.verify = False
           s.stream = True

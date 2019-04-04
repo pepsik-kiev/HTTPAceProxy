@@ -66,39 +66,37 @@ class AceMessage(object):
 
         @staticmethod
         def LOADASYNC(params_dict):
-            command = next(iter(params_dict)).upper()
-            if command == 'URL':
+            if 'url' in params_dict:
                 return 'LOADASYNC {request_id} TORRENT {url} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
-            elif command == 'INFOHASH':
+            elif 'infohash' in params_dict:
                 return 'LOADASYNC {request_id} INFOHASH {infohash} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
-            elif command == 'DATA':
+            elif 'data' in params_dict:
                 return 'LOADASYNC {request_id} RAW {data} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
 
-            elif command == 'CONTENT_ID':
+            elif 'content_id' in params_dict:
                 return 'LOADASYNC {request_id} PID {content_id}'.format(**params_dict)
         # End LOADASYNC
 
         @staticmethod
         def START(params_dict):
-            command = next(iter(params_dict)).upper()
-            if command == 'URL':
+            if 'url' in params_dict:
                 return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} {stream_type}'.format(**params_dict)
 
-            elif command == 'INFOHASH':
+            elif 'infohash' in params_dict:
                 return 'START INFOHASH {infohash} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
-            elif command == 'CONTENT_ID':
+            elif 'content_id' in params_dict:
                 return 'START PID {content_id} {file_indexes} {stream_type}'.format(**params_dict)
 
-            elif command == 'DATA':
+            elif 'data' in params_dict:
                 return 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
 
-            elif command == 'DIRECT_URL':
-                return 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
+            elif 'direct_url' in params_dict:
+                return 'START URL {direct_url} {stream_type}'.format(**params_dict)
 
-            elif command == 'EFILE_URL':
+            elif 'efile_url' in params_dict:
                 return 'START EFILE {efile_url} {stream_type}'.format(**params_dict)
         # End START
 
