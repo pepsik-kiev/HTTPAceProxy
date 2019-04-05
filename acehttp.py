@@ -95,28 +95,33 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if self.reqtype in old2newUrlParts: self.reqtype = old2newUrlParts[self.reqtype]
 
            # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
-           if not (self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url') or self.reqtype in AceProxy.pluginshandlers):
+           if self.reqtype in AceProxy.pluginshandlers:
+              try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
+              except Exception as e:
+                 import traceback
+                 logger.error(traceback.format_exc())
+                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+              else: self.closeConnection()
+              finally: return
+
+           elif self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'):
+              self.handleRequest(headers_only)
+
+           else:
               self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
               return
+
         except IndexError:
            self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
            return
 
-        # Handle request with plugin handler
-        if self.reqtype in AceProxy.pluginshandlers:
-           try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
-           except Exception as e:
-              import traceback
-              logger.error(traceback.format_exc())
-              self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-           else: self.closeConnection()
-           finally: return
-        self.handleRequest(headers_only)
-
-    def handleRequest(self, headers_only, channelName=None, channelIcon=None, fmt=None):
+    def handleRequest(self, headers_only, **params):
+        '''
+        :params: dict() with keys: channelName, channelIcon
+        '''
 
         logger = logging.getLogger('HandleRequest')
-        self.reqparams, self.path = parse_qs(self.query), self.path[:-1] if self.path.endswith('/') else self.path
+        self.path = self.path[:-1] if self.path.endswith('/') else self.path
 
         videoextdefaults = ('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                    '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')
@@ -136,9 +141,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(400, 'Bad Request', logging.WARNING) # 400 Bad Request
            return
         # Pretend to work fine with Fake or HEAD request.
-        if headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
+        if params.get('headers_only') or AceConfig.isFakeRequest(self.path, self.query, self.headers):
            # Return 200 and exit
-           if headers_only: logger.debug('Sending headers and closing connection')
+           if params.get('headers_only'): logger.debug('Sending headers and closing connection')
            else: logger.debug('Fake request - closing connection')
            self.send_response(200)
            self.send_header('Content-Type', 'video/mp2t')
@@ -157,7 +162,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         self.connectionTime = gevent.time.time()
         self.clientInfo = self.transcoder = None
-        self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png' if channelIcon is None else channelIcon
+        self.channelIcon = params.get('channelIcon','http://static.acestream.net/sites/acestream/img/ACE-logo.png')
 
         try:
            if not AceProxy.clientcounter.idleAce:
@@ -167,7 +172,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
            else:
-              self.channelName = channelName if channelName is not None else 'NoName'
+              self.channelName = params.get('channelName')
               self.CID = requests.auth.hashlib.sha1(self.channelName.encode('utf-8')).hexdigest()
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
@@ -179,7 +184,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            self.out = self.wfile
            # If &fmt transcode key present in request
-           fmt = self.reqparams.get('fmt', [''])[0] if fmt is None else fmt
+           fmt = parse_qs(self.query).get('fmt', [''])[0]
            if fmt and AceConfig.osplatform != 'Windows':
               if fmt in AceConfig.transcodecmd:
                  stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
@@ -187,7 +192,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                                   'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                  try:
                     self.transcoder = gevent.event.AsyncResult()
-                    AceProxy.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
+                    AceProxy.pool.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(self.transcoder)
                     self.transcoder = self.transcoder.get(timeout=2.0)
                     self.out = self.transcoder.stdin
                     logger.info('Transcoding for %s started' % self.clientip)

@@ -87,7 +87,7 @@ class P2pproxy(AceProxyPlugin):
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
-                connection.handleRequest(headers_only, name, logo, fmt=self.params.get('fmt', [''])[0])
+                connection.handleRequest(headers_only, channelName=name, channelIcon=logo, fmt=self.params.get('fmt', [''])[0])
 
             # /channels/?filter=[filter]&group=[group]&type=m3u
             elif connection.reqtype == 'channels.m3u' or self.params.get('type', [''])[0] == 'm3u':
@@ -432,11 +432,16 @@ class P2pproxy(AceProxyPlugin):
               logomap = { k: v[v.rfind('/')+1:] for k, v in picons.logomap.items() if v is not None }
            except: pass
 
-           try: translations_list = TorrentTvApi(config.email, config.password).translations('all')
-           except Exception as err:
-              connection.dieWithError(404, '%s' % repr(err), logging.ERROR)
-              return
-           logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
+           #try: translations_list = TorrentTvApi(config.email, config.password).translations('all')
+           #except Exception as err:
+           #   connection.dieWithError(404, '%s' % repr(err), logging.ERROR)
+           #   return
+           #logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
+           import requests
+           url = 'http://hmxuku36whbypzxi.onion/trash/ttv-list/ttv_logo.json'
+           proxies = {'http': 'socks5h://192.168.2.1:9100', 'https': 'socks5h://192.168.2.1:9100'}
+           with requests.get(url, proxies=proxies, timeout=30) as r:
+              logomap.update(r.json())
 
            connection.send_response(200)
            if self.params.get('format', [''])[0] == 'json':

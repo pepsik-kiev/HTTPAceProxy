@@ -80,7 +80,6 @@ class Allfon(AceProxyPlugin):
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
-        params = parse_qs(connection.query)
 
         if path.startswith('/%s/channel/' % connection.reqtype):
            if not path.endswith('.ts'):
@@ -111,7 +110,7 @@ class Allfon(AceProxyPlugin):
            hostport = connection.headers['Host']
            path = '' if not self.channels else '/%s/channel' % connection.reqtype
            add_ts = True if path.endswith('/ts') else False
-           exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=params.get('fmt', [''])[0])
+           exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=parse_qs(connection.query).get('fmt', [''])[0])
            response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
                                  'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
            try:
@@ -128,7 +127,7 @@ class Allfon(AceProxyPlugin):
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, name, self.picons.get(name), fmt=params.get('fmt', [''])[0])
+        if play: connection.handleRequest(headers_only, channelName=name, channelIcon=self.picons.get(name))
         elif not headers_only:
            self.logger.debug('Exporting AllFon.m3u playlist')
            connection.wfile.write(exported)
