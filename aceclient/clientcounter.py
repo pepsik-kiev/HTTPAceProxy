@@ -26,15 +26,15 @@ class ClientCounter(object):
         Adds client to the list by CID key in broadcast dictionary
         Returns the number of clients of the current broadcast
         '''
-        c = next(iter(self.getClientsList(client.CID)), None) # Get the first client of existing broadcast
-        if c:
-           client.q, client.ace = c.q.copy(), c.ace
+        c_list = self.clients.setdefault(client.CID, []) # Get a list of clients for a given broadcast
+        if c_list:
+           client.q, client.ace = c_list[0].q.copy(), c_list[0].ace
            self.idleAce.destroy()
         else:
            client.ace, self.idleAce = self.idleAce, None
-        self.clients.setdefault(client.CID, []).append(client)
+        c_list.append(client)
 
-        return len(self.getClientsList(client.CID))
+        return len(c_list)
 
     def deleteClient(self, client):
         '''

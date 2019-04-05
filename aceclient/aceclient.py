@@ -125,6 +125,7 @@ class AceClient(object):
         if isinstance(params, dict):
            self._auth = AsyncResult()
            self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
+        else: self._auth.set(params)
 
         try:
            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
@@ -255,7 +256,7 @@ class AceClient(object):
                        params = { k:v for k,v in [x.split('=') for x in self._tempevent if '=' in x] }
                        self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
                        self._started_again.set()
-                    elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(self._gender, self._age))
+                    elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(gender=self._gender, age=self._age))
                     elif 'cansave' in self._tempevent: pass
                     elif 'showurl' in self._tempevent: pass
                     elif 'download_stopped' in self._tempevent: pass

@@ -112,8 +112,8 @@ class AceMessage(object):
         # End GETADURL
 
         @staticmethod
-        def USERDATA(gender, age):
-            return 'USERDATA [{"gender": %s}, {"age": %s}]' % (gender, age)
+        def USERDATA(**params_dict):
+            return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**params_dict)
         # End USERDATA
 
         @staticmethod
