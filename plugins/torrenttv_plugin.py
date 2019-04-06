@@ -89,14 +89,14 @@ class Torrenttv(AceProxyPlugin):
            name = ensure_text(unquote(path[path.rfind('/')+1:]))
            url = self.channels.get('.'.join(name.split('.')[:-1]))
            if url is None:
-              connection.dieWithError(404, 'Unknown channel: ' + name, logging.ERROR)
+              connection.dieWithError(404, 'Unknown channel: %s' % name, logging.ERROR)
               return
            elif url.startswith('acestream://'):
-              connection.path = '/content_id/%s/%s' % (url.split('/')[2], name)
+              connection.path = '/content_id/{pid}/{ch_name}'.format(pid=url.split('/')[2], ch_name=name)
            elif url.startswith('infohash://'):
-              connection.path = '/infohash/%s/%s' % (url.split('/')[2], name)
+              connection.path = '/infohash/{infohash}/{ch_name}'.format(infohash=url.split('/')[2], ch_name=name)
            elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
-              connection.path = '/url/%s/%s' % (quote(url,''), name)
+              connection.path = '/url/{url}/{ch_name}'.format(url=quote(url,''), ch_name=name)
            connection.splittedpath = connection.path.split('/')
            connection.reqtype = connection.splittedpath[1].lower()
            name = name.split('.')[0]

@@ -54,7 +54,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
-        self.handlerGreenlet.kill()
+        try: self.handlerGreenlet.kill()
+        except: pass
 
     def closeConnection(self):
         try: self.connection.shutdown(SHUT_RDWR)
@@ -162,7 +163,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         self.connectionTime = gevent.time.time()
         self.clientInfo = self.transcoder = None
-        self.channelIcon = params.get('channelIcon','http://static.acestream.net/sites/acestream/img/ACE-logo.png')
+        self.channelIcon = params.get('channelIcon')
+        if self.channelIcon is None: self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
 
         try:
            if not AceProxy.clientcounter.idleAce:
@@ -173,6 +175,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
            else:
               self.channelName = params.get('channelName')
+              if self.channelName is None: self.channelName = 'NoNameChannel'
               self.CID = requests.auth.hashlib.sha1(self.channelName.encode('utf-8')).hexdigest()
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None

@@ -236,7 +236,7 @@ class AceClient(object):
                     elif self._tempstatus.startswith('main:loading'): pass
                     elif self._tempstatus.startswith('main:starting'): pass
                     elif self._tempstatus.startswith('main:check'): pass
-                    elif self._tempstatus.startswith('main:err'): pass # err;error_id;error_message
+                    elif self._tempstatus.startswith('main:err'): self.STOP() # err;error_id;error_message
                     elif self._tempstatus.startswith('main:dl'): #dl;
                        stat.extend(map(int, self._tempstatus.split(';')[1:]))
                     elif self._tempstatus.startswith('main:wait'): #wait;time;
