@@ -142,8 +142,7 @@ class AceConfig(acedefconfig.AceDefConfig):
         if not useragent:
             return False
         elif useragent in AceConfig.fakeuas:
-            return True
-       # Samsung ES series
+            return True       # Samsung ES series
         elif useragent == 'Lavf/55.33.100' and headers.get('Range') != 'bytes=0-':
             return True
         # Samsung H series

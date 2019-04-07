@@ -92,11 +92,11 @@ class Torrenttv(AceProxyPlugin):
               connection.dieWithError(404, 'Unknown channel: %s' % name, logging.ERROR)
               return
            elif url.startswith('acestream://'):
-              connection.path = '/content_id/{pid}/{ch_name}'.format(pid=url.split('/')[2], ch_name=name)
+              connection.path = u'/content_id/{pid}/{ch_name}'.format(pid=url.split('/')[2], ch_name=name)
            elif url.startswith('infohash://'):
-              connection.path = '/infohash/{infohash}/{ch_name}'.format(infohash=url.split('/')[2], ch_name=name)
+              connection.path = u'/infohash/{infohash}/{ch_name}'.format(infohash=url.split('/')[2], ch_name=name)
            elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
-              connection.path = '/url/{url}/{ch_name}'.format(url=quote(url,''), ch_name=name)
+              connection.path = u'/url/{url}/{ch_name}'.format(url=quote(url,''), ch_name=name)
            connection.splittedpath = connection.path.split('/')
            connection.reqtype = connection.splittedpath[1].lower()
            name = name.split('.')[0]

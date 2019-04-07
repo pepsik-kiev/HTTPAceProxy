@@ -9,6 +9,7 @@ __author__ = 'Dorik1972, !Joy!'
 
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
+from gevent.pool import Group
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
@@ -118,21 +119,20 @@ class Stat(AceProxyPlugin):
             'total_clients': len(clients),
             }
 
-        statusJSON['clients_data'] = []
-        for c in clients:
+        def _add_client_data(c):
             if not c.clientInfo:
                if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
                   c.clientInfo = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
                else:
                   try:
-                     headers = {'User-Agent':'API Browser'}
+                     headers = {'User-Agent': 'API Browser'}
                      with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
                         if r.encoding is None: r.encoding = 'utf-8'
                         c.clientInfo = json.loads(r.text.split('(', 1)[1].strip(')'))
                         c.clientInfo['vendor'] = ''
                   except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 
-            statusJSON['clients_data'].append({
+            return {
                 'sessionID': c.sessionID,
                 'channelIcon': c.channelIcon,
                 'channelName': c.channelName,
@@ -142,5 +142,7 @@ class Stat(AceProxyPlugin):
                 'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                 'stat': c.ace._status.get(timeout=2)
-                })
+                    }
+
+        statusJSON['clients_data'] = Group().map(_add_client_data, clients)
         return statusJSON
