@@ -53,6 +53,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
+    def handle(self):
+        try: BaseHTTPRequestHandler.handle(self)
+        except: pass
+
     def finish(self):
         try: self.handlerGreenlet.kill()
         except: pass
@@ -82,8 +86,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0] # Connected client IP address
         logging.info('Accepted connection from %s path %s' % (self.clientip, unquote(self.path)))
         logging.debug('Client headers: %s' % dict(self.headers))
-        params = urlparse(self.path)
-        self.query, self.path = params.query, params.path[:-1] if params.path.endswith('/') else params.path
+
+        parse_req = urlparse(self.path)
+        self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.dieWithError(401, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)
@@ -102,8 +107,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  import traceback
                  logger.error(traceback.format_exc())
                  self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-              else: self.closeConnection()
-              finally: return
+              return
 
            elif self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'):
               self.handleRequest(headers_only)
@@ -126,7 +130,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         videoextdefaults = ('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                    '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')
-
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
            self.dieWithError(403, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)
@@ -181,7 +184,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
            AceProxy.clientcounter.idleAce = None
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
            return
-        mimetype = mimetypes.guess_type(self.channelName)[0]
+        ext = self.channelName[self.channelName.rfind(".") + 1:]
+        if ext == self.channelName:
+           ext = parse_qs(self.query).get('ext', ['ts'])[0]
+        mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
            AceProxy.pool.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)

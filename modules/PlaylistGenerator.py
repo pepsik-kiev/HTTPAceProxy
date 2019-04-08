@@ -6,7 +6,7 @@ and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 from gevent.pool import Group
-from urllib3.packages.six.moves.urllib.parse import quote
+from urllib3.packages.six.moves.urllib.parse import quote, urlunparse, parse_qs
 from urllib3.packages.six import ensure_str
 from playlist import PlaylistConfig as config
 
@@ -48,39 +48,42 @@ class PlaylistGenerator(object):
         # Add items
         self.itemlist.append(itemdict)
 
-    def exportm3u(self, hostport, path='', add_ts=False, empty_header=False, archive=False,
-                     parse_url=True, header=None, fmt=None, _bytearray=bytearray):
+    def exportm3u(self, hostport, _bytearray=bytearray, **params):
         '''
         Exports m3u playlist
+        :params: dict with keys: path='', empty_header=False, archive=False, parse_url=True, header=None, query=None
         '''
         def line_generator(item):
             '''
             Generates EXTINF line with url
             '''
             item = item.copy() # {'group': XXX, 'tvg': XXX, 'logo': XXX, 'name': XXX, 'tvgid': XXX, 'url': XXX}
-            name = quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')), '')
+            params.update({'name': quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')), '')})
             url = item['url']
-            if parse_url:
-               if path.endswith('channel'): # For plugins  channel name maping
-                  item['url'] = '%s%s/%s' % (hostport, path, url)
+            if not params.get('parse_url'):
+               if params.get('path').endswith('channel'): # For plugins  channel name maping
+                  params.update({'value': url})
+                  item['url'] = urlunparse(u'{schema};{netloc};{path}/{value}.{ext};;{query};'.format(**params).split(';'))
                elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
-                  item['url'] = '%s/url/%s/%s.ts' % (hostport, quote(url,''), name)
+                  params.update({'value': quote(url,'')})
+                  item['url'] = urlunparse(u'{schema};{netloc};/url/{value}/{name}.{ext};;{query};'.format(**params).split(';'))
                elif url.startswith('infohash://'): # For INFOHASHes
-                  item['url'] = '%s/infohash/%s/%s.ts' % (hostport, url.split('/')[2], name)
+                  params.update({'value': url.split('/')[2]})
+                  item['url'] = urlunparse(u'{schema};{netloc};/infohash/{value}/{name}.{ext};;{query};'.format(**params).split(';'))
                elif url.startswith('acestream://'): # For PIDs
-                  item['url'] = '%s/content_id/%s/%s.ts' % (hostport, url.split('/')[2], name)
-               elif archive and url.isdigit(): # For archive channel id's
-                  item['url'] = '%s/archive/play?id=%s' % (hostport, url)
-               elif not archive and url.isdigit(): # For channel id's
-                  item['url'] = '%s/channels/play?id=%s' % (hostport, url)
-
-            if fmt: item['url'] += ('&fmt=%s' if '?' in item['url'] else '?fmt=%s') % fmt
+                  params.update({'value': url.split('/')[2]})
+                  item['url'] = urlunparse(u'{schema};{netloc};/content_id/{value}/{name}.{ext};;{query};'.format(**params).split(';'))
+               elif params.get('archive') and url.isdigit(): # For archive channel id's
+                  item['url'] = urlunparse(u'{schema};{netloc};/archive/play?id={url};;{query};'.format(**params).split(';'))
+               elif not params.get('archive') and url.isdigit(): # For channel id's
+                  item['url'] = urlunparse(u'{schema};{netloc};/channels/play?id={url};;{query};'.format(**params).split(';'))
 
             return self.m3uchanneltemplate.format(**item)
 
-        hostport = ('http://ts://%s' if add_ts else 'http://%s') % hostport  # Adding ts:// after http:// for some players
-
-        if header is None: header = self.m3uheader if not empty_header else self.m3uemptyheader
+        params.update({'schema': 'http', 'netloc': hostport})  # Adding ts:// after http:// for some players
+        params.update({'ext': parse_qs(params.get('query','')).get('ext', ['ts'])[0]})
+        header = params.get('header')
+        if header is None: header = self.m3uemptyheader if params.get('empty_header') else self.m3uheader
 
         return _bytearray(header + ''.join(Group().map(line_generator, self.sort(self.itemlist) if self.sort else self.itemlist)), 'utf-8')
 

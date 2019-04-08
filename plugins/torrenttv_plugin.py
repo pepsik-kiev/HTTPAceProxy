@@ -7,7 +7,7 @@ http://ip:port/torrenttv
 __author__ = 'AndreyPavlenko, Dorik1972'
 
 import traceback
-import gevent, requests
+import gevent, requests, os
 import logging, zlib
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
 from urllib3.packages.six import ensure_str, ensure_text
@@ -58,7 +58,7 @@ class Torrenttv(AceProxyPlugin):
                     if url.startswith(('acestream://', 'infohash://')) \
                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent'))):
                        self.channels[name] = url
-                       itemdict['url'] = quote(ensure_str('%s.ts' % name), '')
+                       itemdict['url'] = quote(ensure_str(name), '')
 
                     self.playlist.addItem(itemdict)
                     m.update(name.encode('utf-8'))
@@ -81,25 +81,26 @@ class Torrenttv(AceProxyPlugin):
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
-
+        ext = parse_qs(connection.query).get('ext', ['ts'])[0]
         if path.startswith('/%s/channel/' % connection.reqtype):
-           if not path.endswith('.ts'):
+           if not path.endswith(ext):
               connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
               return
-           name = ensure_text(unquote(path[path.rfind('/')+1:]))
-           url = self.channels.get('.'.join(name.split('.')[:-1]))
+           name = ensure_text(unquote(os.path.splitext(os.path.basename(path))[0]))
+           url = self.channels.get(name)
            if url is None:
               connection.dieWithError(404, 'Unknown channel: %s' % name, logging.ERROR)
               return
-           elif url.startswith('acestream://'):
-              connection.path = u'/content_id/{pid}/{ch_name}'.format(pid=url.split('/')[2], ch_name=name)
+           params = {'name': name, 'value': url.split('/')[2], 'ext': ext}
+           if url.startswith('acestream://'):
+              connection.path = u'/content_id/{value}/{name}.{ext}'.format(**params)
            elif url.startswith('infohash://'):
-              connection.path = u'/infohash/{infohash}/{ch_name}'.format(infohash=url.split('/')[2], ch_name=name)
+              connection.path = u'/infohash/{value}/{name}.{ext}'.format(**params)
            elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
-              connection.path = u'/url/{url}/{ch_name}'.format(url=quote(url,''), ch_name=name)
+              params.update({'value': quote(url,'')})
+              connection.path = u'/url/{value}/{name}.{ext}'.format(**params)
            connection.splittedpath = connection.path.split('/')
            connection.reqtype = connection.splittedpath[1].lower()
-           name = name.split('.')[0]
            play = True
         elif self.etag == connection.headers.get('If-None-Match'):
            self.logger.debug('ETag matches - returning 304')
@@ -110,8 +111,7 @@ class Torrenttv(AceProxyPlugin):
         else:
            hostport = connection.headers['Host']
            path = '' if not self.channels else '/%s/channel' % connection.reqtype
-           add_ts = True if path.endswith('/ts') else False
-           exported = self.playlist.exportm3u(hostport=hostport, path=path, add_ts=add_ts, header=config.m3uheadertemplate, fmt=parse_qs(connection.query).get('fmt', [''])[0])
+           exported = self.playlist.exportm3u(hostport=hostport, path=path, header=config.m3uheadertemplate, query=connection.query)
            response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
                                  'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
            try:
