@@ -7,7 +7,7 @@ class ClientCounter(object):
 
     def __init__(self):
         self.clients = {} # existing broadcast dict {'CID':[client1, client2,....]}
-        self.idleAce = None
+        self.idleAce = False
 
     def getAllClientsList(self):
         '''
@@ -26,15 +26,14 @@ class ClientCounter(object):
         Adds client to the list by CID key in broadcast dictionary
         Returns the number of clients of the current broadcast
         '''
-        c_list = self.clients.setdefault(client.CID, []) # Get a list of clients for a given broadcast
-        if c_list:
-           client.q, client.ace = c_list[0].q.copy(), c_list[0].ace
-           self.idleAce.destroy()
+        clients = self.clients.setdefault(client.CID, []) # Get a list of clients for a given broadcast
+        if clients:
+           client.q, client.ace = clients[0].q.copy(), clients[0].ace
+           self.idleAce.SHUTDOWN()
         else:
-           client.ace, self.idleAce = self.idleAce, None
-        c_list.append(client)
-
-        return len(c_list)
+           client.ace, self.idleAce = self.idleAce, False
+        clients.append(client)
+        return len(clients)
 
     def deleteClient(self, client):
         '''
@@ -43,9 +42,9 @@ class ClientCounter(object):
         try:
            (client,) = self.getClientsList(client.CID) # Get the last client of existing broadcast
            try:
-              self.idleAce, client.ace = client.ace, None
-              self.idleAce.STOP(); self.idleAce.reset()
-           except: self.idleAce.destroy()
+              self.idleAce, client.ace = client.ace, False
+              self.idleAce.STOP()
+           except: self.idleAce.SHUTDOWN()
            finally: del self.clients[client.CID]
         except:
            self.clients[client.CID].remove(client)

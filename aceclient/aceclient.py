@@ -5,7 +5,6 @@ import gevent
 import telnetlib
 import logging
 from gevent.event import AsyncResult, Event
-from gevent.util import wrap_errors
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
 from urllib3.packages.six.moves import zip, map
@@ -27,18 +26,15 @@ class Telnet(telnetlib.Telnet, object):
            super(Telnet, self).write(bytes(buffer, 'ascii'))
 
        def expect(self, list, timeout=None):
-           for index, item in enumerate(list):
-              list[index] = bytes(item, 'ascii')
-           match_index, match_object, match_text = super(Telnet, self).expect(list, timeout)
+           match_index, match_object, match_text = super(Telnet, self).expect([bytes(item, 'ascii') for item in list], timeout)
            return match_index, match_object, match_text.decode()
 
 class AceClient(object):
 
-    def __init__(self, clientcounter, ace, connect_timeout=5, result_timeout=10):
-        # Telnet socket response buffer
-        self._recvbuffer = None
+    def __init__(self, ace, connect_timeout=5, result_timeout=10):
         # AceEngine socket
-        self._socket = None
+        self._socket = False
+        self.ok = False
         # AceEngine read result timeout
         self._resulttimeout = result_timeout
         # AceEngine product key
@@ -65,10 +61,24 @@ class AceClient(object):
         self._seekback = None
         # Did we get START command again? For seekback.
         self._started_again = Event()
-        # ClientCounter
-        self._clientcounter = clientcounter
-        # AceConfig.ace
+        # AceConfig start paramerers configiguration
         self._ace = ace
+        # AceEngine API answers
+        self._answers = {
+            'HELLOTS': self._hellots_,
+            'AUTH': self._auth_,
+            'NOTREADY': self._notready_,
+            'LOADRESP': self._loadresp_,
+            'START': self._start_,
+            'STATE': self._state_,
+            'STATUS': self._status_,
+            'EVENT': self._event_,
+            'STOP': self._stop_,
+            'PAUSE': self._pause_,
+            'RESUME': self._resume_,
+            'INFO': self._info_,
+            'SHUTDOWN': self._shutdown_,
+               }
 
         try:
            self._socket = Telnet(self._ace['aceHostIP'], self._ace['aceAPIport'], connect_timeout)
@@ -76,36 +86,18 @@ class AceClient(object):
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
+        else: self.ok = True
 
-    def destroy(self):
-        '''
-        AceClient Destructor
-        '''
-        # Send SHUTDOWN to AceEngine
-        try: self._write(AceMessage.request.SHUTDOWN)
-        except: pass # Ignore exceptions on destroy
-        finally: self._clientcounter.idleAce = None
+    def __bool__(self):
+        return self.ok
 
-    def reset(self):
-        '''
-        Reset initial values
-        '''
-        self._started_again.clear()
-        self._url.set()
-        self._loadasync.set()
-        self._cid.set()
-        self._status.set()
-        self._event.set()
-        self._state.set()
-
-    def _write(self, message):
-        try:
-           self._socket.write('%s\r\n' % message)
-           logging.debug('>>> %s' % message)
-        except gevent.socket.error:
-           raise AceException('Error writing data to AceEngine API port')
+    def __nonzero__(self):  # For Python 2 backward compatible
+        return self.__bool__()
 
     def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
+        '''
+        AceEngine init telnet connection
+        '''
         self._gender = gender
         self._age = age
         self._product_key = product_key
@@ -113,20 +105,10 @@ class AceClient(object):
         self._videotimeout = videotimeout
         self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._recvData), self._videotimeout).link_exception(lambda x: logging.error('Error reading data from AceEngine API port'))
+        gevent.spawn(self._read, self._videotimeout)
 
         self._auth = AsyncResult()
         self._write(AceMessage.request.HELLO) # Sending HELLOBG
-        try: params = self._auth.get(timeout=self._resulttimeout)
-        except gevent.Timeout as t:
-           errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
-           raise AceException(errmsg)
-
-        if isinstance(params, dict):
-           self._auth = AsyncResult()
-           self._write(AceMessage.request.READY(params.get('key',''), self._product_key))
-        else: self._auth.set(params)
-
         try:
            if self._auth.get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
               errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
@@ -135,13 +117,42 @@ class AceClient(object):
            errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
            raise AceException(errmsg)
 
-        if int(params.get('version_code', 0)) >= 3003600: # Display download_stopped massage
-           params_dict = {'use_stop_notifications': '1'}
-           self._write(AceMessage.request.SETOPTIONS(params_dict))
+    def _read(self, timeout=30):
+        '''
+        Read telnet connection method
+        '''
+        while 1:
+           with gevent.Timeout(timeout, False):
+              try:
+                 recvbuffer = self._socket.read_until('\r\n', None).strip().split()
+                 logging.debug('<<< %s'% unquote(' '.join(recvbuffer)))
+                 gevent.spawn(self._answers.get(recvbuffer[0], lambda: self._undefined_), recvbuffer)
+              except gevent.Timeout: self.SHUTDOWN()
+              except gevent.socket.timeout: pass
+              except EOFError: # Telnet connection unexpectedly closed
+                 self.ok = False
+                 break
+
+    def _write(self, message):
+        '''
+        Write telnet connection method
+        '''
+        try:
+           self._socket.write('%s\r\n' % message)
+           logging.debug('>>> %s' % message)
+        except gevent.socket.error:
+           raise AceException('Error writing data to AceEngine API port')
+
+    def SHUTDOWN(self):
+        '''
+        Shutdown telnet connection method
+        '''
+        self._write(AceMessage.request.SHUTDOWN)
 
     def START(self, paramsdict):
         '''
-        Start video method. Get url for play from AceEngine
+        Start video method
+        :return playback url from AceEngine
         '''
         self._url = AsyncResult()
         self._write(AceMessage.request.START(paramsdict))
@@ -156,6 +167,16 @@ class AceClient(object):
         '''
         if self._state:
            self._write(AceMessage.request.STOP)
+        '''
+        Reset existing telnet connection initial values
+        '''
+        self._started_again.clear()
+        self._url.set()
+        self._loadasync.set()
+        self._cid.set()
+        self._status.set()
+        self._event.set()
+        self._state.set()
 
     def LOADASYNC(self, paramsdict):
         self._loadasync = AsyncResult()
@@ -170,7 +191,7 @@ class AceClient(object):
         if contentinfo['status'] in (1, 2):
            self._cid = AsyncResult()
            self._write(AceMessage.request.GETCID(paramsdict.update(contentinfo)))
-           try: return self._cid.get(timeout=self._resulttimeout)[2:] # ##CID
+           try: return self._cid.get(timeout=self._resulttimeout) ## CID
            except gevent.Timeout as t:
               errmsg = 'Engine response time %s exceeded. CID not resived!' % t
               raise AceException(errmsg)
@@ -189,82 +210,90 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def _recvData(self, timeout=30):
+######################################## AceEngine API answers parsers ########################################
+
+    def _hellots_(self, recvbuffer):
         '''
-        Data receiver method for greenlet
+        HELLOTS version=engine_version version_code=version_code key=request_key http_port=http_port
         '''
-        while 1:
-           # Destroy socket connection if AceEngine STATE 0 (IDLE) and we didn't read anything from socket until Nsec
-           with gevent.Timeout(timeout, False):
-              try: self._recvbuffer = self._socket.read_until('\r\n', None).strip()
-              except gevent.Timeout: self.destroy()
-              except gevent.socket.timeout: pass
-              except: raise
-              else:
-                 logging.debug('<<< %s' % unquote(self._recvbuffer))
-                 # Parsing everything only if the string is not empty
-                 # HELLOTS
-                 if self._recvbuffer.startswith('HELLOTS'):
-                    #version=engine_version version_code=version_code key=request_key http_port=http_port
-                    self._auth.set({ k:v for k,v in [x.split('=') for x in self._recvbuffer.split() if '=' in x] })
-                 # NOTREADY
-                 elif self._recvbuffer.startswith('NOTREADY'): self._auth.set('NOTREADY')
-                 # AUTH
-                 elif self._recvbuffer.startswith('AUTH'): self._auth.set(self._recvbuffer.split()[1]) # user_auth_level
-                 # START
-                 elif self._recvbuffer.startswith('START'):
-                    # url [ad=1 [interruptable=1]] [stream=1] [pos=position]
-                    params = { k:v for k,v in [x.split('=') for x in self._recvbuffer.split() if '=' in x] }
-                    if not self._seekback or self._started_again.ready() or params.get('stream','') is not '1':
-                       # If seekback is disabled, we use link in first START command.
-                       # If seekback is enabled, we wait for first START command and
-                       # ignore it, then do seekback in first EVENT position command
-                       # AceStream sends us STOP and START again with new link.
-                       # We use only second link then.
-                       self._url.set(self._recvbuffer.split()[1]) # url for play
-                 # LOADRESP
-                 elif self._recvbuffer.startswith('LOADRESP'):
-                    self._loadasync.set(json.loads(unquote(''.join(self._recvbuffer.split()[2:]))))
-                 # STATE
-                 elif self._recvbuffer.startswith('STATE'):
-                    self._state.set(self._recvbuffer.split()[1]) # STATE state_id -> STATE_NAME
-                 # STATUS
-                 elif self._recvbuffer.startswith('STATUS'):
-                    self._tempstatus = self._recvbuffer.split()[1]
-                    stat = [self._tempstatus.split(';')[0].split(':')[1]] # main:????
-                    if self._tempstatus.startswith('main:idle'): pass
-                    elif self._tempstatus.startswith('main:loading'): pass
-                    elif self._tempstatus.startswith('main:starting'): pass
-                    elif self._tempstatus.startswith('main:check'): pass
-                    elif self._tempstatus.startswith('main:err'): self.STOP() # err;error_id;error_message
-                    elif self._tempstatus.startswith('main:dl'): #dl;
-                       stat.extend(map(int, self._tempstatus.split(';')[1:]))
-                    elif self._tempstatus.startswith('main:wait'): #wait;time;
-                       stat.extend(map(int, self._tempstatus.split(';')[2:]))
-                    elif self._tempstatus.startswith(('main:prebuf','main:buf')): #buf;progress;time;
-                       stat.extend(map(int, self._tempstatus.split(';')[3:]))
-                    try: self._status.set({k:v for k,v in zip(AceConst.STATUS, stat)}) # dl, wait, buf, prebuf
-                    except: self._status.set({'status': stat[0]}) # idle, loading, starting, check
-                 # CID
-                 elif self._recvbuffer.startswith('##'): self._cid.set(self._recvbuffer)
-                 # INFO
-                 elif self._recvbuffer.startswith('INFO'): pass
-                 # EVENT
-                 elif self._recvbuffer.startswith('EVENT'):
-                    self._tempevent = self._recvbuffer.split()
-                    if self._seekback and not self._started_again.ready() and 'livepos' in self._tempevent:
-                       params = { k:v for k,v in [x.split('=') for x in self._tempevent if '=' in x] }
-                       self._write(AceMessage.request.LIVESEEK(int(params['last']) - self._seekback))
-                       self._started_again.set()
-                    elif 'getuserdata' in self._tempevent: self._write(AceMessage.request.USERDATA(gender=self._gender, age=self._age))
-                    elif 'cansave' in self._tempevent: pass
-                    elif 'showurl' in self._tempevent: pass
-                    elif 'download_stopped' in self._tempevent: pass
-                 # PAUSE
-                 elif self._recvbuffer.startswith('PAUSE'): pass #self._write(AceMessage.request.EVENT('pause'))
-                 # RESUME
-                 elif self._recvbuffer.startswith('RESUME'): pass #self._write(AceMessage.request.EVENT('play'))
-                 # STOP
-                 elif self._recvbuffer.startswith('STOP'): pass #self._write(AceMessage.request.EVENT('stop'))
-                 # SHUTDOWN
-                 elif self._recvbuffer.startswith('SHUTDOWN'): self._socket.close(); break
+        paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[1:]]}
+        self._write(AceMessage.request.READY(paramsdict.get('key'), self._product_key))
+        if int(paramsdict.get('version_code', 0)) >= 3003600:
+           self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
+
+    def _auth_(self, recvbuffer):
+        '''
+        AUTH user_auth_level
+        '''
+        self._auth.set(recvbuffer[1])
+
+    def _notready_(self, recvbuffer):
+        '''
+        NOTREADY
+        '''
+        self._auth.set(recvbuffer[0])
+
+    def _start_(self, recvbuffer):
+        '''
+        START url [ad=1 [interruptable=1]] [stream=1] [pos=position]
+        '''
+        paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[2:]]}
+        if not self._seekback or self._started_again.ready() or paramsdict.get('stream','') is not '1':
+           # If seekback is disabled, we use link in first START command.
+           # If seekback is enabled, we wait for first START command and
+           # ignore it, then do seekback in first EVENT position command
+           # AceStream sends us STOP and START again with new link.
+           # We use only second link then.
+           self._url.set(recvbuffer[1]) # url for play
+           self._started_again.clear()
+
+    def _loadresp_(self, recvbuffer):
+        '''
+        LOADARESP request_id {'status': status, 'files': [["Name", idx], [....]], 'infohash': infohash, 'checksum': checksum}
+        '''
+        self._loadasync.set(json.loads(unquote(''.join(recvbuffer[2:]))))
+
+    def _state_(self, recvbuffer):
+        '''
+        STATE state_id
+        '''
+        self._state.set(recvbuffer[1])
+
+    def _status_(self, recvbuffer):
+        '''
+        STATUS main:status_description|ad:status_description
+        total_progress;immediate_progress;speed_down;http_speed_down;speed_up;peers;http_peers;downloaded;http_downloaded;uploaded
+        '''
+        recvbuffer = recvbuffer[1].split(';')
+        if 'main:wait' in recvbuffer: del recvbuffer[1] #wait;time;
+        elif any(x in ['main:buf','main:prebuf'] for x in recvbuffer): del recvbuffer[1:3] #buf/prebuf;progress;time;
+        self._status.set({k:v.split(':')[1] if 'main' in v else v for k,v in zip(AceConst.STATUS, recvbuffer)})
+
+    def _event_(self, recvbuffer):
+        '''
+        EVENT livepos last=xxx live_first=xxx pos=xxx first_ts=xxx last_ts=xxx is_live=1 live_last=xxx buffer_pieces=xx
+        EVENT cansave infohash=infohash index=index format=format
+        EVENT showurl type=type url=url [width=width] [height=height]
+        EVENT download_stopped reason=reason option=option
+        '''
+        paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[2:]]}
+        if 'livepos' in recvbuffer and self._seekback and not self._started_again.ready():
+           self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
+           self._started_again.set()
+        elif 'getuserdata' in recvbuffer: self._write(AceMessage.request.USERDATA(gender=self._gender, age=self._age))
+        elif any(x in ['cansave', 'showurl', 'download_stopped'] for x in recvbuffer): pass
+
+    def _stop_(self, recvbuffer): pass
+    def _pause_(self, recvbuffer): pass
+    def _resume_(self, recvbuffer): pass
+    def _info_(self, recvbuffer): pass
+    def _shutdown_(self, recvbuffer): pass
+
+    def _undefined_(self, recvbuffer):
+        '''
+        Undefined/unknown/NonStanard commands
+        '''
+        if '##' in recvbuffer[0]:
+           self._cid.set(recvbuffer[0][2:]) # ##cid
+        else: pass
+######################################## END AceEngine API answers parsers ########################################

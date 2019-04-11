@@ -7,6 +7,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 import hashlib
 
 class AceConst(object):
+
     APIVERSION = 3
 
     AGE_LT_13 = 1
@@ -21,13 +22,15 @@ class AceConst(object):
     SEX_MALE = 1
     SEX_FEMALE = 2
 
-    STATE = {'0': 'IDLE',
+    STATE = {
+             '0': 'IDLE',
              '1': 'PREBUFFERING',
              '2': 'DOWNLOADING',
              '3': 'BUFFERING',
              '4': 'COMPLETED',
              '5': 'CHECKING',
-             '6': 'ERROR'}
+             '6': 'ERROR',
+            }
 
     STATUS = ('status',
               'total_progress',
@@ -46,6 +49,22 @@ class AceConst(object):
                     'affiliate_id',
                     'zone_id',
                     'stream_id')
+
+    LOADASYNC = {
+                 'url': 'LOADASYNC {request_id} TORRENT {url} {developer_id} {affiliate_id} {zone_id}',
+                 'infohash': 'LOADASYNC {request_id} INFOHASH {infohash} {developer_id} {affiliate_id} {zone_id}',
+                 'data': 'LOADASYNC {request_id} RAW {data} {developer_id} {affiliate_id} {zone_id}',
+                 'content_id': 'LOADASYNC {request_id} PID {content_id}',
+                 }
+
+    START = {
+             'url': 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} {stream_type}',
+             'infohash': 'START INFOHASH {infohash} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}',
+             'content_id': 'START PID {content_id} {file_indexes} {stream_type}',
+             'data': 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}',
+             'direct_url': 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}',
+             'efile_url': 'START EFILE {efile_url} {stream_type}',
+             }
 
 class AceMessage(object):
 
@@ -66,38 +85,11 @@ class AceMessage(object):
 
         @staticmethod
         def LOADASYNC(params_dict):
-            if 'url' in params_dict:
-                return 'LOADASYNC {request_id} TORRENT {url} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
-
-            elif 'infohash' in params_dict:
-                return 'LOADASYNC {request_id} INFOHASH {infohash} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
-
-            elif 'data' in params_dict:
-                return 'LOADASYNC {request_id} RAW {data} {developer_id} {affiliate_id} {zone_id}'.format(**params_dict)
-
-            elif 'content_id' in params_dict:
-                return 'LOADASYNC {request_id} PID {content_id}'.format(**params_dict)
-        # End LOADASYNC
+            return AceConst.LOADASYNC.get((AceConst.LOADASYNC.keys()&params_dict.keys()).pop()).format(**params_dict)
 
         @staticmethod
         def START(params_dict):
-            if 'url' in params_dict:
-                return 'START TORRENT {url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_id} {stream_type}'.format(**params_dict)
-
-            elif 'infohash' in params_dict:
-                return 'START INFOHASH {infohash} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
-
-            elif 'content_id' in params_dict:
-                return 'START PID {content_id} {file_indexes} {stream_type}'.format(**params_dict)
-
-            elif 'data' in params_dict:
-                return 'START RAW {data} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
-
-            elif 'direct_url' in params_dict:
-                return 'START URL {direct_url} {file_indexes} {developer_id} {affiliate_id} {zone_id} {stream_type}'.format(**params_dict)
-
-            elif 'efile_url' in params_dict:
-                return 'START EFILE {efile_url} {stream_type}'.format(**params_dict)
+            return AceConst.START.get((AceConst.START.keys()&params_dict.keys()).pop()).format(**params_dict)
         # End START
 
         STOP = 'STOP'

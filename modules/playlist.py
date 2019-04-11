@@ -11,7 +11,6 @@ class PlaylistConfig():
        u'#EXTINF:-1 group-title="{group}" tvg-name="{tvg}" tvg-id="{tvgid}" tvg-logo="{logo}",{name}\n#EXTGRP:{group}\n{url}\n'
 
     # Playlist sorting options.
-    sort = False
     sortByName = False
     sortByGroup = False
 
@@ -260,8 +259,7 @@ class PlaylistConfig():
     def _changeItemByDict(item, key, replacementsDict, setKey=None):
         if len(replacementsDict) > 0:
            value = replacementsDict.get(item.get(key))
-           if not setKey: setKey = key
-           if value: item[setKey] = ensure_text(value)
+           if value: item[key if setKey is None else setKey] = ensure_text(value)
 
     xml_template = """<?xml version="1.0" encoding="utf-8"?>
     <items>

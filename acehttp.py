@@ -172,7 +172,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection to AceEngine.....')
-              AceProxy.clientcounter.idleAce = aceclient.AceClient(AceProxy.clientcounter, AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
+              AceProxy.clientcounter.idleAce = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
@@ -185,8 +185,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
            return
         ext = self.channelName[self.channelName.rfind(".") + 1:]
-        if ext == self.channelName:
-           ext = parse_qs(self.query).get('ext', ['ts'])[0]
+        if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
            AceProxy.pool.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
@@ -320,8 +319,7 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
        except: logger.error("Can't find acestream!"); sys.exit(1)
        else:
           engine = QueryValueEx(key, 'EnginePath')
-          AceProxy.acedir = os.path.dirname(engine[0])
-          cmd = engine[0].split()
+          cmd, AceProxy.acedir = engine[0].split(), os.path.dirname(engine[0])
     try:
        logger.debug('AceEngine start up .....')
        AceProxy.ace = gevent.event.AsyncResult()
@@ -334,7 +332,7 @@ def checkAce(chekinterval=AceConfig.acestartuptimeout):
     while 1:
        gevent.sleep(chekinterval)
        if AceConfig.acespawn and not isRunning(AceProxy.ace):
-          if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.destroy()
+          if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.SHUTDOWN()
           if hasattr(AceProxy, 'ace'): del AceProxy.ace
           if spawnAce():
              logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
@@ -388,7 +386,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceProxy.ace):
        if AceProxy.clientcounter.idleAce:
-          AceProxy.clientcounter.idleAce.destroy(); gevent.sleep(1)
+          AceProxy.clientcounter.idleAce.SHUTDOWN(); gevent.sleep(1)
        AceProxy.ace.terminate()
        if AceConfig.osplatform == 'Windows' and os.path.isfile(AceProxy.acedir + '\\acestream.port'):
           try:

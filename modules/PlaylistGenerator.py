@@ -17,13 +17,13 @@ class PlaylistGenerator(object):
                  m3uheader=config.m3uheader,
                  m3uchanneltemplate=config.m3uchanneltemplate,
                  changeItem=config.changeItem,
-                 sort=config.sortItems if config.sort else None):
+                 sort=config.sortItems):
         self.itemlist = list()
         self.m3uemptyheader = m3uemptyheader
         self.m3uheader = m3uheader
         self.m3uchanneltemplate = m3uchanneltemplate
         self.changeItem = changeItem
-        self.sort = sort
+        self.sort=sort
 
     def addItem(self, itemdict):
         '''
@@ -84,8 +84,7 @@ class PlaylistGenerator(object):
         params.update({'ext': parse_qs(params.get('query','')).get('ext', ['ts'])[0]})
         header = params.get('header')
         if header is None: header = self.m3uemptyheader if params.get('empty_header') else self.m3uheader
-
-        return _bytearray(header + ''.join(Group().map(line_generator, self.sort(self.itemlist) if self.sort else self.itemlist)), 'utf-8')
+        return _bytearray(header + ''.join(Group().map(line_generator, self.sort(self.itemlist))), 'utf-8')
 
     def exportxml(self, hostport, path='',):
 
