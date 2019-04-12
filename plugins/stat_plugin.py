@@ -141,7 +141,7 @@ class Stat(AceProxyPlugin):
                 #'clientBuff': c.q.qsize()*100/self.config.videotimeout,
                 'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
-                'stat': c.ace._status.get(timeout=2)
+                'stat': c.ace._result.get('STATUS').get(timeout=2)
                     }
 
         statusJSON['clients_data'] = Group().map(_add_client_data, clients)

@@ -221,13 +221,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.response_use_chunked = False if (self.transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
            drop_headers = []
            proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=15, max=100', 'Accept-Ranges': 'none',
-                             'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype,
-                             'Pragma': 'no-cache', 'Cache-Control': 'max-age=0, no-cache, no-store' }
+                             'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype }
 
            if not self.response_use_chunked:
               self.protocol_version = 'HTTP/1.0'
               proxy_headers['Connection'] = 'Close'
-              drop_headers.extend(['Transfer-Encoding', 'Keep-Alive', 'Cache-Control'])
+              drop_headers.extend(['Transfer-Encoding', 'Keep-Alive'])
 
            response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
            self.send_response(200)
