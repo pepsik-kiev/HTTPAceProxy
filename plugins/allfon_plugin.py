@@ -127,7 +127,7 @@ class Allfon(AceProxyPlugin):
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
 
-        if play: connection.handleRequest(headers_only, channelName=name, channelIcon=self.picons.get(name))
+        if play: connection.handleRequest(headers_only=headers_only, channelName=name, channelIcon=self.picons.get(name))
         elif not headers_only:
            self.logger.debug('Exporting AllFon.m3u playlist')
            connection.wfile.write(exported)

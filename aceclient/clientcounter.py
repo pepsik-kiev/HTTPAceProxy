@@ -29,7 +29,7 @@ class ClientCounter(object):
         clients = self.clients.setdefault(client.CID, []) # Get a list of clients for a given broadcast
         if clients:
            client.q, client.ace = clients[0].q.copy(), clients[0].ace
-           self.idleAce.SHUTDOWN()
+           self.idleAce.ShutdownAce()
         else:
            client.ace, self.idleAce = self.idleAce, False
         clients.append(client)
@@ -43,8 +43,8 @@ class ClientCounter(object):
            (client,) = self.getClientsList(client.CID) # Get the last client of existing broadcast
            try:
               self.idleAce, client.ace = client.ace, False
-              self.idleAce.STOP()
-           except: self.idleAce.SHUTDOWN()
+              self.idleAce.StopBroadcast()
+           except: self.idleAce.ShutdownAce()
            finally: del self.clients[client.CID]
         except:
            self.clients[client.CID].remove(client)

@@ -87,7 +87,7 @@ class P2pproxy(AceProxyPlugin):
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
-                connection.handleRequest(headers_only, channelName=name, channelIcon=logo, fmt=self.params.get('fmt', [''])[0])
+                connection.handleRequest(headers_only=headers_only, channelName=name, channelIcon=logo, fmt=self.params.get('fmt', [''])[0])
 
             # /channels/?filter=[filter]&group=[group]&type=m3u
             elif connection.reqtype == 'channels.m3u' or self.params.get('type', [''])[0] == 'm3u':
@@ -203,7 +203,7 @@ class P2pproxy(AceProxyPlugin):
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
                     playlistgen.addItem({'group': '', 'tvg': '', 'name': dfmt, 'url': url})
                     d -= delta
-                exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0])
+                exported = playlistgen.exportm3u(hostport, empty_header=True, parse_url=False, fmt=self.params.get('fmt', [''])[0])
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 try:
@@ -254,7 +254,7 @@ class P2pproxy(AceProxyPlugin):
                             url = 'http://%s/archive/?type=m3u&date=%s&channel_id=%s%s' % (hostport, d, epg_id, suffix)
                             playlistgen.addItem({'group': name, 'tvg': '', 'name': n, 'url': url, 'logo': logo})
 
-                exported = playlistgen.exportm3u(hostport, empty_header=True, process_url=False, fmt=self.params.get('fmt', [''])[0])
+                exported = playlistgen.exportm3u(hostport, empty_header=True, parse_url=False, fmt=self.params.get('fmt', [''])[0])
                 try:
                      h = connection.headers.get('Accept-Encoding').split(',')[0]
                      exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
@@ -312,7 +312,7 @@ class P2pproxy(AceProxyPlugin):
 
                 connection.splittedpath = connection.path.split('/')
                 connection.reqtype = connection.splittedpath[1].lower()
-                connection.handleRequest(headers_only, fmt=self.params.get('fmt', [''])[0])
+                connection.handleRequest(headers_only=headers_only, fmt=self.params.get('fmt', [''])[0])
 
             # /archive/?type=m3u&date=[param_date]&channel_id=[param_channel]
             elif self.params.get('type', [''])[0] == 'm3u':

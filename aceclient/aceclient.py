@@ -45,8 +45,6 @@ class AceClient(object):
         self._gender = self._age = None
         # Seekback seconds.
         self._seekback = None
-        # Result (Created with AsyncResult() on call)
-        self._result = {}.fromkeys(['HELLOTS', 'AUTH', 'LOADRESP', 'START', 'STATUS', 'EVENT', 'STATE', 'CID'], AsyncResult())
         # Did we get START command again? For seekback.
         self._started_again = Event()
         # AceConfig start paramerers configiguration
@@ -66,7 +64,10 @@ class AceClient(object):
             'RESUME': self._resume_,
             'INFO': self._info_,
             'SHUTDOWN': self._shutdown_,
+            'UNDEFINED': self._undefined_,
                }
+        # Result (Created with AsyncResult() on call)
+        self._result = {}.fromkeys(self._answers.keys(), AsyncResult())
 
         try:
            self._socket = Telnet(self._ace['aceHostIP'], self._ace['aceAPIport'], connect_timeout)
@@ -82,7 +83,7 @@ class AceClient(object):
     def __nonzero__(self):  # For Python 2 backward compatible
         return self.__bool__()
 
-    def aceInit(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
+    def GetAUTH(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
         '''
         AceEngine init telnet connection
         '''
@@ -95,18 +96,27 @@ class AceClient(object):
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
         gevent.spawn(self._read, self._videotimeout)
 
-        self._result['AUTH'] = AsyncResult()
-        self._write(AceMessage.request.HELLO) # Sending HELLOBG
         try:
-           if self._result.get('AUTH').get(timeout=self._resulttimeout) == 'NOTREADY': # Get NOTREADY instead AUTH user_auth_level
-              errmsg = 'NOTREADY recived from AceEngine! Wrong acekey?'
-              raise AceException(errmsg)
+           self._result['HELLOTS'] = AsyncResult()
+           self._write(AceMessage.request.HELLO) # Sending HELLOBG
+           self._result['HELLOTS'].get(timeout=self._resulttimeout)
         except gevent.Timeout as t:
-           errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
+           errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
 
-        if int(self._result.get('HELLOTS').get(timeout=self._resulttimeout).get('version_code', 0)) >= 3003600:
-           self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
+        try:
+           self._result['NOTREADY'] = AsyncResult()
+           self._result['AUTH'] = AsyncResult()
+           self._result['AUTH'].get(timeout=self._resulttimeout)
+           if int(self._result['HELLOTS'].value.get('version_code', 0)) >= 3003600:
+              self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
+        except gevent.Timeout as t:
+           if self._result['NOTREADY'].value:
+              errmsg = 'Engine response time %s exceeded. %s resived!' % (t,self._result['NOTREADY'].value)
+              raise AceException(errmsg)
+           else:
+              errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
+              raise AceException(errmsg)
 
     def _read(self, timeout=30):
         '''
@@ -117,8 +127,8 @@ class AceClient(object):
               try:
                  recvbuffer = self._socket.read_until('\r\n', None).strip().split()
                  logging.debug('<<< %s'% unquote(' '.join(recvbuffer)))
-                 gevent.spawn(self._answers.get(recvbuffer[0], lambda: self._undefined_), recvbuffer)
-              except gevent.Timeout: self.SHUTDOWN()
+                 gevent.spawn(self._answers.get(recvbuffer[0], lambda: self._undefined_), recvbuffer).link(self._result[recvbuffer[0]])
+              except gevent.Timeout: self.ShutdownAce()
               except gevent.socket.timeout: pass
               except EOFError: # Telnet connection unexpectedly closed
                  self.ok = False
@@ -134,51 +144,57 @@ class AceClient(object):
         except gevent.socket.error:
            raise AceException('Error writing data to AceEngine API port')
 
-    def SHUTDOWN(self):
+    def ShutdownAce(self):
         '''
         Shutdown telnet connection method
         '''
         self._write(AceMessage.request.SHUTDOWN)
 
-    def START(self, paramsdict):
+    def GetStartURL(self, paramsdict):
         '''
         Start video method
         :return playback url from AceEngine
         '''
-        self._result['START'] = AsyncResult()
-        self._write(AceMessage.request.START(paramsdict))
-        try: return self._result.get('START').get(timeout=self._videotimeout)
+        try:
+           self._result['START'] = AsyncResult()
+           self._write(AceMessage.request.START(paramsdict))
+           return self._result['START'].get(timeout=self._videotimeout) # playback_url
         except gevent.Timeout as t:
            errmsg = 'START URL not received! Engine response time %s exceeded' % t
            raise AceException(errmsg)
 
-    def STOP(self):
+    def StopBroadcast(self):
         '''
         Stop video method
         '''
-        if self._result.get('STATE').get(timeout=self._resulttimeout):
-           self._write(AceMessage.request.STOP)
+        self._write(AceMessage.request.STOP)
         '''
         Reset existing telnet connection initial values
         '''
         self._started_again.clear()
-        self._result = {}.fromkeys(['HELLOTS', 'AUTH', 'LOADRESP', 'START', 'STATUS', 'EVENT', 'STATE', 'CID'], AsyncResult())
 
-    def LOADASYNC(self, paramsdict):
-        self._result['LOADRESP'] = AsyncResult()
-        self._write(AceMessage.request.LOADASYNC(paramsdict))
-        try: return self._result.get('LOADRESP').get(timeout=self._resulttimeout) # Get _contentinfo json
+    def GetLOADASYNC(self, paramsdict):
+        try:
+           self._result['LOADRESP'] = AsyncResult()
+           self._write(AceMessage.request.LOADASYNC(paramsdict))
+           return self._result['LOADRESP'].get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            errmsg = 'Engine response %s time exceeded. LOADRESP not resived!' % t
            raise AceException(errmsg)
 
-    def GETCID(self, paramsdict):
-        contentinfo = self.LOADASYNC(paramsdict)
-        if contentinfo.get('status') in (1, 2):
-           paramsdict.update(contentinfo)
-           self._result['CID'] = AsyncResult()
-           self._write(AceMessage.request.GETCID(paramsdict))
-           try: return self._result.get('CID').get(timeout=self._resulttimeout) ## CID
+    def GetSTATUS(self):
+        try:
+           self._result['STATUS'] = AsyncResult()
+           return self._result['STATUS'].get(timeout=self._resulttimeout) # Get status
+        except: return {'status': 'error'}
+
+    def GetCID(self, paramsdict):
+        paramsdict.update(self.GetLOADASYNC(paramsdict))
+        if paramsdict.get('status') in (1, 2):
+           try:
+              self._result['UNDEFINED'] = AsyncResult()
+              self._write(AceMessage.request.GETCID(paramsdict))
+              return self._result['UNDEFINED'].get(timeout=self._resulttimeout) ## CID
            except gevent.Timeout as t:
               errmsg = 'Engine response time %s exceeded. CID not resived!' % t
               raise AceException(errmsg)
@@ -186,8 +202,8 @@ class AceClient(object):
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
            raise AceException(errmsg)
 
-    def GETCONTENTINFO(self, paramsdict):
-        contentinfo = self.LOADASYNC(paramsdict)
+    def GetCONTENTINFO(self, paramsdict):
+        contentinfo = self.GetLOADASYNC(paramsdict)
         if contentinfo.get('status') in (1, 2):
            return contentinfo.get('infohash'), next(iter([x[0] for x in contentinfo.get('files') if x[1] == int(paramsdict.get('file_indexes', 0))]), None)
         elif contentinfo.get('status') == 0:
@@ -205,19 +221,19 @@ class AceClient(object):
         '''
         paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[1:]]}
         self._write(AceMessage.request.READY(paramsdict.get('key'), self._product_key))
-        self._result[recvbuffer[0]].set(paramsdict)
+        return paramsdict
 
     def _auth_(self, recvbuffer):
         '''
         AUTH user_auth_level
         '''
-        self._result[recvbuffer[0]].set(recvbuffer[1])
+        return recvbuffer[1]
 
     def _notready_(self, recvbuffer):
         '''
         NOTREADY
         '''
-        self._result['AUTH'].set(recvbuffer[0])
+        return recvbuffer[0]
 
     def _start_(self, recvbuffer):
         '''
@@ -231,19 +247,19 @@ class AceClient(object):
            # AceStream sends us STOP and START again with new link.
            # We use only second link then.
            self._started_again.clear()
-           self._result[recvbuffer[0]].set(recvbuffer[1]) # url for play
+           return recvbuffer[1] # url for play
 
     def _loadresp_(self, recvbuffer):
         '''
         LOADRESP request_id {'status': status, 'files': [["Name", idx], [....]], 'infohash': infohash, 'checksum': checksum}
         '''
-        self._result[recvbuffer[0]].set(json.loads(unquote(''.join(recvbuffer[2:]))))
+        return json.loads(unquote(''.join(recvbuffer[2:])))
 
     def _state_(self, recvbuffer):
         '''
         STATE state_id
         '''
-        self._result[recvbuffer[0]].set(recvbuffer[1])
+        pass
 
     def _status_(self, recvbuffer):
         '''
@@ -253,7 +269,7 @@ class AceClient(object):
         paramslist = recvbuffer[1].split(';')
         if 'main:wait' in recvbuffer: del paramslist[1] #wait;time;
         elif any(x in ['main:buf','main:prebuf'] for x in paramslist): del paramslist[1:3] #buf/prebuf;progress;time;
-        self._result[recvbuffer[0]].set({k:v.split(':')[1] if 'main' in v else v for k,v in zip(AceConst.STATUS, paramslist)})
+        return {k:v.split(':')[1] if 'main' in v else v for k,v in zip(AceConst.STATUS, paramslist)}
 
     def _event_(self, recvbuffer):
         '''
@@ -280,6 +296,6 @@ class AceClient(object):
         Undefined/unknown/NonStanard commands
         '''
         if '##' in recvbuffer[0]:
-           self._result['CID'].set(recvbuffer[0][2:]) # ##cid
+           return recvbuffer[0][2:] # ##cid
         else: pass
 ######################################## END AceEngine API answers parsers ########################################

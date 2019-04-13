@@ -110,7 +110,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               return
 
            elif self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'):
-              self.handleRequest(headers_only)
+              self.handleRequest(headers_only=headers_only)
 
            else:
               self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
@@ -120,9 +120,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
            return
 
-    def handleRequest(self, headers_only, **params):
+    def handleRequest(self, **params):
         '''
-        :params: dict() with keys: channelName, channelIcon
+        :params: dict() with keys: headers_only, channelName, channelIcon
         '''
 
         logger = logging.getLogger('HandleRequest')
@@ -173,9 +173,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection to AceEngine.....')
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-              AceProxy.clientcounter.idleAce.aceInit(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+              AceProxy.clientcounter.idleAce.GetAUTH(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
            if self.reqtype not in ('direct_url', 'efile_url'):
-              self.CID, self.channelName = AceProxy.clientcounter.idleAce.GETCONTENTINFO(paramsdict)
+              self.CID, self.channelName = AceProxy.clientcounter.idleAce.GetCONTENTINFO(paramsdict)
            else:
               self.channelName = params.get('channelName')
               if self.channelName is None: self.channelName = 'NoNameChannel'
@@ -213,7 +213,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              AceProxy.pool.spawn(StreamReader, self.ace.START(paramsdict), self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
+              AceProxy.pool.spawn(StreamReader, self.ace.GetStartURL(paramsdict), self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            # Sending videostream headers to client
@@ -330,7 +330,7 @@ def checkAce(chekinterval=AceConfig.acestartuptimeout):
     while 1:
        gevent.sleep(chekinterval)
        if AceConfig.acespawn and not isRunning(AceProxy.ace):
-          if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.SHUTDOWN()
+          if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.ShutdownAce()
           if hasattr(AceProxy, 'ace'): del AceProxy.ace
           if spawnAce():
              logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
@@ -384,7 +384,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceProxy.ace):
        if AceProxy.clientcounter.idleAce:
-          AceProxy.clientcounter.idleAce.SHUTDOWN(); gevent.sleep(1)
+          AceProxy.clientcounter.idleAce.ShutdownAce(); gevent.sleep(1)
        AceProxy.ace.terminate()
        if AceConfig.osplatform == 'Windows' and os.path.isfile(AceProxy.acedir + '\\acestream.port'):
           try:
