@@ -5,6 +5,7 @@ Minimal Ace Stream client library to use with HTTP Proxy
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import hashlib
+from urllib3.packages.six import viewkeys
 
 class AceConst(object):
 
@@ -85,11 +86,11 @@ class AceMessage(object):
 
         @staticmethod
         def LOADASYNC(params_dict):
-            return AceConst.LOADASYNC.get(set(AceConst.LOADASYNC.keys()).intersection(params_dict.keys()).pop()).format(**params_dict)
+            return AceConst.LOADASYNC.get( (viewkeys(AceConst.LOADASYNC) & viewkeys(params_dict)).pop() ).format(**params_dict)
 
         @staticmethod
         def START(params_dict):
-            return AceConst.START.get(set(AceConst.START.keys()).intersection(params_dict.keys()).pop()).format(**params_dict)
+            return AceConst.START.get( (viewkeys(AceConst.START) & viewkeys(params_dict)).pop() ).format(**params_dict)
         # End START
 
         STOP = 'STOP'
