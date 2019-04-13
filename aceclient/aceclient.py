@@ -99,7 +99,7 @@ class AceClient(object):
         try:
            self._result['HELLOTS'] = AsyncResult()
            self._write(AceMessage.request.HELLO) # Sending HELLOBG
-           self._result['HELLOTS'].get(timeout=self._resulttimeout)
+           paramsdict = self._result['HELLOTS'].get(timeout=self._resulttimeout)
         except gevent.Timeout as t:
            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
@@ -107,8 +107,8 @@ class AceClient(object):
         try:
            self._result['NOTREADY'] = AsyncResult()
            self._result['AUTH'] = AsyncResult()
-           self._result['AUTH'].get(timeout=self._resulttimeout)
-           if int(self._result['HELLOTS'].value.get('version_code', 0)) >= 3003600:
+           auth_level = self._result['AUTH'].get(timeout=self._resulttimeout)
+           if int(paramsdict.get('version_code', 0)) >= 3003600:
               self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
         except gevent.Timeout as t:
            if self._result['NOTREADY'].value:
