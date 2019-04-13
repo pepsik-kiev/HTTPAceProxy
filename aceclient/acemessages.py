@@ -85,11 +85,11 @@ class AceMessage(object):
 
         @staticmethod
         def LOADASYNC(params_dict):
-            return AceConst.LOADASYNC.get((AceConst.LOADASYNC.keys()&params_dict.keys()).pop()).format(**params_dict)
+            return AceConst.LOADASYNC.get(set(AceConst.LOADASYNC.keys()).intersection(params_dict.keys()).pop()).format(**params_dict)
 
         @staticmethod
         def START(params_dict):
-            return AceConst.START.get((AceConst.START.keys()&params_dict.keys()).pop()).format(**params_dict)
+            return AceConst.START.get(set(AceConst.START.keys()).intersection(params_dict.keys()).pop()).format(**params_dict)
         # End START
 
         STOP = 'STOP'

@@ -174,9 +174,10 @@ class AceClient(object):
 
     def GETCID(self, paramsdict):
         contentinfo = self.LOADASYNC(paramsdict)
-        if contentinfo['status'] in (1, 2):
+        if contentinfo.get('status') in (1, 2):
+           paramsdict.update(contentinfo)
            self._result['CID'] = AsyncResult()
-           self._write(AceMessage.request.GETCID(paramsdict.update(contentinfo)))
+           self._write(AceMessage.request.GETCID(paramsdict))
            try: return self._result.get('CID').get(timeout=self._resulttimeout) ## CID
            except gevent.Timeout as t:
               errmsg = 'Engine response time %s exceeded. CID not resived!' % t
@@ -229,8 +230,8 @@ class AceClient(object):
            # ignore it, then do seekback in first EVENT position command
            # AceStream sends us STOP and START again with new link.
            # We use only second link then.
-           self._result[recvbuffer[0]].set(recvbuffer[1]) # url for play
            self._started_again.clear()
+           self._result[recvbuffer[0]].set(recvbuffer[1]) # url for play
 
     def _loadresp_(self, recvbuffer):
         '''

@@ -213,8 +213,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              playback_url = self.ace.START(paramsdict)
-              AceProxy.pool.spawn(StreamReader, playback_url, self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
+              AceProxy.pool.spawn(StreamReader, self.ace.START(paramsdict), self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            # Sending videostream headers to client
