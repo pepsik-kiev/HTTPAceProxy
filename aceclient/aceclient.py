@@ -49,26 +49,22 @@ class AceClient(object):
         self._started_again = Event()
         # AceConfig start paramerers configiguration
         self._ace = ace
-        # AceEngine API answers
-        self._answers = {
-            'HELLOTS': self._hellots_,
-            'AUTH': self._auth_,
-            'NOTREADY': self._notready_,
-            'LOADRESP': self._loadresp_,
-            'START': self._start_,
-            'STATE': self._state_,
-            'STATUS': self._status_,
-            'EVENT': self._event_,
-            'STOP': self._stop_,
-            'PAUSE': self._pause_,
-            'RESUME': self._resume_,
-            'INFO': self._info_,
-            'SHUTDOWN': self._shutdown_,
-            'UNDEFINED': self._undefined_,
-               }
-        # Result (Created with AsyncResult() on call)
-        self._result = {}.fromkeys(self._answers.keys(), AsyncResult())
-
+        # AceEngine API result answers (Created with AsyncResult() on call)
+        self._result = {
+            'HELLOTS'  : [self._hellots_, AsyncResult()],
+            'AUTH'     : [self._auth_, AsyncResult()],
+            'NOTREADY' : [self._notready_, AsyncResult()],
+            'LOADRESP' : [self._loadresp_, AsyncResult()],
+            'START'    : [self._start_, AsyncResult()],
+            'STATE'    : [self._state_, AsyncResult()],
+            'STATUS'   : [self._status_, AsyncResult()],
+            'EVENT'    : [self._event_, AsyncResult()],
+            'STOP'     : [self._stop_, AsyncResult()],
+            'PAUSE'    : [self._pause_, AsyncResult()],
+            'RESUME'   : [self._resume_, AsyncResult()],
+            'INFO'     : [self._info_, AsyncResult()],
+            'SHUTDOWN' : [self._shutdown_, AsyncResult()],
+                       }
         try:
            self._socket = Telnet(self._ace['aceHostIP'], self._ace['aceAPIport'], connect_timeout)
            logging.debug('Successfully connected to AceStream on {aceHostIP}:{aceAPIport}'.format(**self._ace))
@@ -97,21 +93,21 @@ class AceClient(object):
         gevent.spawn(self._read, self._videotimeout)
 
         try:
-           self._result['HELLOTS'] = AsyncResult()
+           self._result['HELLOTS'][1] = AsyncResult()
            self._write(AceMessage.request.HELLO) # Sending HELLOBG
-           paramsdict = self._result['HELLOTS'].get(timeout=self._resulttimeout)
+           paramsdict = self._result['HELLOTS'][1].get(timeout=self._resulttimeout)
         except gevent.Timeout as t:
            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
 
         try:
-           self._result['NOTREADY'] = AsyncResult()
-           self._result['AUTH'] = AsyncResult()
-           auth_level = self._result['AUTH'].get(timeout=self._resulttimeout)
+           self._result['NOTREADY'][1] = AsyncResult()
+           self._result['AUTH'][1] = AsyncResult()
+           auth_level = self._result['AUTH'][1].get(timeout=self._resulttimeout)
            if int(paramsdict.get('version_code', 0)) >= 3003600:
               self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
         except gevent.Timeout as t:
-           if self._result['NOTREADY'].value:
+           if self._result['NOTREADY'][1].value:
               errmsg = 'Engine response time %s exceeded. %s resived!' % (t,self._result['NOTREADY'].value)
               raise AceException(errmsg)
            else:
@@ -127,8 +123,10 @@ class AceClient(object):
               try:
                  recvbuffer = self._socket.read_until('\r\n', None).strip().split()
                  logging.debug('<<< %s'% unquote(' '.join(recvbuffer)))
-                 gevent.spawn(self._answers.get(recvbuffer[0], lambda: self._undefined_), recvbuffer).link(self._result[recvbuffer[0]])
+                 gevent.spawn(self._result[recvbuffer[0]][0], recvbuffer).link(self._result[recvbuffer[0]][1])
               except gevent.Timeout: self.ShutdownAce()
+              except KeyError:
+                 logging.error('Unknown response received from AceEngine %s' % recvbuffer[0])
               except gevent.socket.timeout: pass
               except EOFError: # Telnet connection unexpectedly closed
                  self.ok = False
@@ -156,9 +154,9 @@ class AceClient(object):
         :return playback url from AceEngine
         '''
         try:
-           self._result['START'] = AsyncResult()
+           self._result['START'][1] = AsyncResult()
            self._write(AceMessage.request.START(paramsdict))
-           return self._result['START'].get(timeout=self._videotimeout) # playback_url
+           return self._result['START'][1].get(timeout=self._videotimeout) # playback_url
         except gevent.Timeout as t:
            errmsg = 'START URL not received! Engine response time %s exceeded' % t
            raise AceException(errmsg)
@@ -175,26 +173,26 @@ class AceClient(object):
 
     def GetLOADASYNC(self, paramsdict):
         try:
-           self._result['LOADRESP'] = AsyncResult()
+           self._result['LOADRESP'][1] = AsyncResult()
            self._write(AceMessage.request.LOADASYNC(paramsdict))
-           return self._result['LOADRESP'].get(timeout=self._resulttimeout) # Get _contentinfo json
+           return self._result['LOADRESP'][1].get(timeout=self._resulttimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            errmsg = 'Engine response %s time exceeded. LOADRESP not resived!' % t
            raise AceException(errmsg)
 
     def GetSTATUS(self):
         try:
-           self._result['STATUS'] = AsyncResult()
-           return self._result['STATUS'].get(timeout=self._resulttimeout) # Get status
+           self._result['STATUS'][1] = AsyncResult()
+           return self._result['STATUS'][1].get(timeout=self._resulttimeout) # Get status
         except: return {'status': 'error'}
 
     def GetCID(self, paramsdict):
         paramsdict.update(self.GetLOADASYNC(paramsdict))
         if paramsdict.get('status') in (1, 2):
            try:
-              self._result['UNDEFINED'] = AsyncResult()
+              self._result['UNDEFINED'][1] = AsyncResult()
               self._write(AceMessage.request.GETCID(paramsdict))
-              return self._result['UNDEFINED'].get(timeout=self._resulttimeout) ## CID
+              return self._result['UNDEFINED'][1].get(timeout=self._resulttimeout) ## CID
            except gevent.Timeout as t:
               errmsg = 'Engine response time %s exceeded. CID not resived!' % t
               raise AceException(errmsg)
@@ -291,11 +289,4 @@ class AceClient(object):
     def _info_(self, recvbuffer): pass
     def _shutdown_(self, recvbuffer): pass
 
-    def _undefined_(self, recvbuffer):
-        '''
-        Undefined/unknown/NonStanard commands
-        '''
-        if '##' in recvbuffer[0]:
-           return recvbuffer[0][2:] # ##cid
-        else: pass
 ######################################## END AceEngine API answers parsers ########################################
