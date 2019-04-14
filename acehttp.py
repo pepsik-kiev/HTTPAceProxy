@@ -213,7 +213,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              AceProxy.pool.spawn(StreamReader, self.ace.GetStartURL(paramsdict), self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
+              AceProxy.pool.spawn(StreamReader, self.ace.GetBroadcastURL(paramsdict), self.CID).link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
 
            logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
            # Sending videostream headers to client
@@ -321,7 +321,7 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
     try:
        logger.debug('AceEngine start up .....')
        AceProxy.ace = gevent.event.AsyncResult()
-       gevent.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
+       AceProxy.pool.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
        AceProxy.ace = AceProxy.ace.get(timeout=delay if delay>=0 else 0.1)
        return isRunning(AceProxy.ace)
     except: return False
@@ -475,6 +475,7 @@ if AceConfig.osplatform != 'Windows' and AceConfig.aceproxyuser and os.getuid() 
       sys.exit(1)
 
 # Creating ClientCounter
+AceProxy.pool = Pool()
 AceProxy.clientcounter = ClientCounter()
 #### AceEngine startup
 AceProxy.ace = findProcess('ace_engine.exe' if AceConfig.osplatform == 'Windows' else os.path.basename(AceConfig.acecmd))
@@ -516,7 +517,6 @@ def add_handler(i):
     logger.debug('Plugin loaded: %s' % plugname)
     return {j:plugininstance for j in plugininstance.handlers}
 
-AceProxy.pool = Pool()
 # Creating dict of handlers
 AceProxy.pluginshandlers = {key:val for k in AceProxy.pool.map(add_handler, pluginslist) for key,val in k.items()}
 # Server setup

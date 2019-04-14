@@ -45,8 +45,6 @@ class AceClient(object):
         self._gender = self._age = None
         # Seekback seconds.
         self._seekback = None
-        # Did we get START command again? For seekback.
-        self._started_again = Event()
         # AceConfig start paramerers configiguration
         self._ace = ace
         # AceEngine API result answers (Created with AsyncResult() on call)
@@ -88,7 +86,6 @@ class AceClient(object):
         self._product_key = product_key
         self._seekback = videoseekback
         self._videotimeout = videotimeout
-        self._started_again.clear()
         # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
         gevent.spawn(self._read, self._videotimeout)
 
@@ -103,6 +100,7 @@ class AceClient(object):
         try:
            self._result['NOTREADY'][1] = AsyncResult()
            self._result['AUTH'][1] = AsyncResult()
+           self._write(AceMessage.request.READY(paramsdict.get('key'), self._product_key))
            auth_level = self._result['AUTH'][1].get(timeout=self._resulttimeout)
            if int(paramsdict.get('version_code', 0)) >= 3003600:
               self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
@@ -148,7 +146,7 @@ class AceClient(object):
         '''
         self._write(AceMessage.request.SHUTDOWN)
 
-    def GetStartURL(self, paramsdict):
+    def GetBroadcastURL(self, paramsdict):
         '''
         Start video method
         :return playback url from AceEngine
@@ -156,7 +154,26 @@ class AceClient(object):
         try:
            self._result['START'][1] = AsyncResult()
            self._write(AceMessage.request.START(paramsdict))
-           return self._result['START'][1].get(timeout=self._videotimeout) # playback_url
+           playback_url, paramsdict = self._result['START'][1].get(timeout=self._videotimeout)
+           if self._seekback and paramsdict.get('stream'):
+              # EVENT livepos only for live translation | stream=1
+              # If seekback is disabled, we use link in first START command.
+              # If seekback is enabled, we wait for first START command and
+              # ignore it, then do seekback in first EVENT position command
+              # AceStream sends us STOP and START again with new link.
+              # We use only second link then.
+              try:
+                 self._result['EVENT'][1] = AsyncResult()
+                 paramsdict = self._result['EVENT'][1].get(timeout=self._resulttimeout)
+                 self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
+              except gevent.Timeout as t:
+                 errmsg = 'EVENT livepos not received! Engine response time %s exceeded' % t
+                 raise AceException(errmsg)
+              else:
+                 self._result['START'][1] = AsyncResult()
+                 playback_url, _ = self._result['START'][1].get(timeout=self._videotimeout)
+
+           return playback_url
         except gevent.Timeout as t:
            errmsg = 'START URL not received! Engine response time %s exceeded' % t
            raise AceException(errmsg)
@@ -166,10 +183,6 @@ class AceClient(object):
         Stop video method
         '''
         self._write(AceMessage.request.STOP)
-        '''
-        Reset existing telnet connection initial values
-        '''
-        self._started_again.clear()
 
     def GetLOADASYNC(self, paramsdict):
         try:
@@ -185,20 +198,6 @@ class AceClient(object):
            self._result['STATUS'][1] = AsyncResult()
            return self._result['STATUS'][1].get(timeout=self._resulttimeout) # Get status
         except: return {'status': 'error'}
-
-    def GetCID(self, paramsdict):
-        paramsdict.update(self.GetLOADASYNC(paramsdict))
-        if paramsdict.get('status') in (1, 2):
-           try:
-              self._result['UNDEFINED'][1] = AsyncResult()
-              self._write(AceMessage.request.GETCID(paramsdict))
-              return self._result['UNDEFINED'][1].get(timeout=self._resulttimeout) ## CID
-           except gevent.Timeout as t:
-              errmsg = 'Engine response time %s exceeded. CID not resived!' % t
-              raise AceException(errmsg)
-        else:
-           errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
-           raise AceException(errmsg)
 
     def GetCONTENTINFO(self, paramsdict):
         contentinfo = self.GetLOADASYNC(paramsdict)
@@ -217,9 +216,7 @@ class AceClient(object):
         '''
         HELLOTS version=engine_version version_code=version_code key=request_key http_port=http_port
         '''
-        paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[1:]]}
-        self._write(AceMessage.request.READY(paramsdict.get('key'), self._product_key))
-        return paramsdict
+        return {k:v for k,v in [x.split('=') for x in recvbuffer[1:] if '=' in x]}
 
     def _auth_(self, recvbuffer):
         '''
@@ -237,15 +234,7 @@ class AceClient(object):
         '''
         START url [ad=1 [interruptable=1]] [stream=1] [pos=position]
         '''
-        paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[2:]]}
-        if not self._seekback or self._started_again.ready() or paramsdict.get('stream','') is not '1':
-           # If seekback is disabled, we use link in first START command.
-           # If seekback is enabled, we wait for first START command and
-           # ignore it, then do seekback in first EVENT position command
-           # AceStream sends us STOP and START again with new link.
-           # We use only second link then.
-           self._started_again.clear()
-           return recvbuffer[1] # url for play
+        return recvbuffer[1], {k:v for k,v in [x.split('=') for x in recvbuffer[2:] if '=' in x]}
 
     def _loadresp_(self, recvbuffer):
         '''
@@ -264,29 +253,47 @@ class AceClient(object):
         STATUS main:status_description|ad:status_description
         total_progress;immediate_progress;speed_down;http_speed_down;speed_up;peers;http_peers;downloaded;http_downloaded;uploaded
         '''
-        paramslist = recvbuffer[1].split(';')
-        if 'main:wait' in recvbuffer: del paramslist[1] #wait;time;
-        elif any(x in ['main:buf','main:prebuf'] for x in paramslist): del paramslist[1:3] #buf/prebuf;progress;time;
-        return {k:v.split(':')[1] if 'main' in v else v for k,v in zip(AceConst.STATUS, paramslist)}
+        recvbuffer = recvbuffer[1].split(';')
+        if any(x in ['main:wait', 'main:seekprebuf'] for x in recvbuffer): del recvbuffer[1] #wait;time; / main:seekprebuf;progress
+        elif any(x in ['main:buf','main:prebuf'] for x in recvbuffer): del recvbuffer[1:3] #buf/prebuf;progress;time;
+        return {k:v.split(':')[1] if 'main' in v else v for k,v in zip(AceConst.STATUS, recvbuffer)}
 
     def _event_(self, recvbuffer):
         '''
-        EVENT livepos last=xxx live_first=xxx pos=xxx first_ts=xxx last_ts=xxx is_live=1 live_last=xxx buffer_pieces=xx
+        EVENT getuserdata
         EVENT cansave infohash=infohash index=index format=format
         EVENT showurl type=type url=url [width=width] [height=height]
+        EVENT livepos last=xxx live_first=xxx pos=xxx first_ts=xxx last_ts=xxx is_live=1 live_last=xxx buffer_pieces=xx | for live translation only!
         EVENT download_stopped reason=reason option=option
         '''
-        paramsdict = {k:v for k,v in [x.split('=') for x in recvbuffer[2:]]}
-        if 'livepos' in recvbuffer and self._seekback and not self._started_again.ready():
-           self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
-           self._started_again.set()
-        elif 'getuserdata' in recvbuffer: self._write(AceMessage.request.USERDATA(gender=self._gender, age=self._age))
+        if 'getuserdata' in recvbuffer: self._write(AceMessage.request.USERDATA(gender=self._gender, age=self._age))
         elif any(x in ['cansave', 'showurl', 'download_stopped'] for x in recvbuffer): pass
+        return {k:v for k,v in [x.split('=') for x in recvbuffer[2:] if '=' in x]}
 
-    def _stop_(self, recvbuffer): pass
-    def _pause_(self, recvbuffer): pass
-    def _resume_(self, recvbuffer): pass
-    def _info_(self, recvbuffer): pass
-    def _shutdown_(self, recvbuffer): pass
+    def _stop_(self, recvbuffer):
+        '''
+        STOP
+        '''
+        pass
+    def _pause_(self, recvbuffer):
+        '''
+        PAUSE
+        '''
+        pass
+    def _resume_(self, recvbuffer):
+        '''
+        RESUME
+        '''
+        pass
+    def _info_(self, recvbuffer):
+        '''
+        INFO
+        '''
+        pass
+    def _shutdown_(self, recvbuffer):
+        '''
+        SHUTDOWN
+        '''
+        pass
 
 ######################################## END AceEngine API answers parsers ########################################
