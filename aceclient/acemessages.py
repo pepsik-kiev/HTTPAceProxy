@@ -73,11 +73,13 @@ class AceMessage(object):
         # Events form client to engine
         @staticmethod
         def EVENT(command, params_dict={}):
-            return 'EVENT %s %s' % (command, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
+            return 'EVENT {} {}'.format(command, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
         # End EVENT
 
         # Commands from client to acestream
-        HELLO = 'HELLOBG version=%s' % AceConst.APIVERSION
+        @staticmethod
+        def HELLOBG(api_version=AceConst.APIVERSION):
+            return 'HELLOBG version={}'.format(api_version)
 
         @staticmethod
         def READY(request_key='', product_key=''):
@@ -101,7 +103,8 @@ class AceMessage(object):
         # End GETCID
 
         @staticmethod
-        def GETADURL(width, height, infohash, action): pass
+        def GETADURL(params_dict):
+            return 'GETADURL width={width} height={height} infohash={infohash} action={action}'.format(**params_dict)
         # End GETADURL
 
         @staticmethod
@@ -110,17 +113,18 @@ class AceMessage(object):
         # End USERDATA
 
         @staticmethod
-        def SAVE(infohash, index, path): pass
+        def SAVE(**params_dict):
+            return 'SAVE infohash={infohash} index={index} path={path}'.format(**params_dict)
         # End SAVE
 
         @staticmethod
         def LIVESEEK(timestamp):
-            return 'LIVESEEK %s' % timestamp
+            return 'LIVESEEK {}'.format(timestamp)
         # End LIVESEEK
 
         SHUTDOWN = 'SHUTDOWN'
 
         @staticmethod
         def SETOPTIONS(params_dict):
-            return 'SETOPTIONS %s' % ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()])
+            return 'SETOPTIONS {}'.format(' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
         # End SETOPTIONS

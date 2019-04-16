@@ -33,7 +33,7 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Ace Stream Engine connection timeout
     aceconntimeout = 5
     # Ace Stream Engine authentication result & API port answers timeout
-    aceresulttimeout = 10
+    aceresulttimeout = 10.0
     # ----------------------------------------------------
     # Ace Stream Engine stream type hls or http
     # ----------------------------------------------------

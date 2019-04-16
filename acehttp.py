@@ -120,7 +120,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
            return
 
-    def handleRequest(self, **params):
+    def handleRequest(self, _bytearray=bytearray, **params):
         '''
         :params: dict() with keys: headers_only, channelName, channelIcon
         '''
@@ -156,13 +156,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.closeConnection()
            return
 
-        # Make dict with parameters
+        # Make parameters dict
         paramsdict = {self.reqtype: unquote(self.splittedpath[2])} # {command: value}
         paramsdict.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         paramsdict.update({ k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))] })
         paramsdict.update({ 'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()]) }) # request http or hls from AceEngine
         paramsdict['request_id'] = self.sessionID = str(uuid4().int)[:8]
-        #End parameters dict
+        # End parameters dict
 
         self.connectionTime = gevent.time.time()
         self.clientInfo = self.transcoder = None
@@ -171,7 +171,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         try:
            if not AceProxy.clientcounter.idleAce:
-              logger.debug('Create connection to AceEngine.....')
+              logger.debug('Create connection with AceStream on {aceHostIP}:{aceAPIport}'.format(**AceConfig.ace))
               AceProxy.clientcounter.idleAce = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
               AceProxy.clientcounter.idleAce.GetAUTH(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
            if self.reqtype not in ('direct_url', 'efile_url'):
@@ -184,7 +184,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            AceProxy.clientcounter.idleAce = None
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
            return
-        ext = self.channelName[self.channelName.rfind(".") + 1:]
+        ext = self.channelName[self.channelName.rfind('.') + 1:]
         if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
@@ -233,10 +233,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
            # write data to client while he is alive
-           for chunk in self.q: self.out.write(chunk)
+           for chunk in self.q:
+              self.out.write(_bytearray('%x\r\n' % len(chunk), 'utf-8') + chunk + b'\r\n' if self.response_use_chunked else chunk)
 
         except aceclient.AceException as e:
-           AceProxy.pool.map(lambda x: x.dieWithError(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
+           _ =AceProxy.pool.map(lambda x: x.dieWithError(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
@@ -279,15 +280,14 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 
 def StreamReader(playback_url, cid):
 
-    def write_chunk(client, data, timeout=15.0, _bytearray=bytearray):
-        try:
-           client.q.put(_bytearray('%x\r\n' % len(data), 'utf-8') + data + b'\r\n' if client.response_use_chunked else data, timeout=timeout)
+    def write_chunk(client, chunk, timeout=15.0):
+        try: client.q.put(chunk, timeout=timeout)
         except gevent.queue.Full:
            client.dieWithError(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
     def StreamWriter(url):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
-           AceProxy.pool.map(lambda x: write_chunk(x, chunk), AceProxy.clientcounter.getClientsList(cid))
+           _ = AceProxy.pool.map(lambda x: write_chunk(x, chunk), AceProxy.clientcounter.getClientsList(cid))
 
     try:
        if not AceProxy.ace:
@@ -307,7 +307,7 @@ def StreamReader(playback_url, cid):
           else: StreamWriter(playback_url) #AceStream return link for HTTP stream
     except TypeError: pass
     except Exception as err:
-       AceProxy.pool.map(lambda x: x.dieWithError(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(cid))
+       _ = AceProxy.pool.map(lambda x: x.dieWithError(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(cid))
 
 # Spawning procedures
 def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):

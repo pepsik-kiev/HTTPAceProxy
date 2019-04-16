@@ -35,20 +35,18 @@ class AceClient(object):
         # AceEngine socket
         self._socket = False
         self.ok = False
-        # AceEngine read result timeout
-        self._resulttimeout = result_timeout
         # AceEngine product key
         self._product_key = None
-        # Response time from AceEngine to get URL or DATA
-        self._videotimeout = None
         # Current auth
         self._gender = self._age = None
         # Seekback seconds.
         self._seekback = None
-        # AceConfig start paramerers configiguration
-        self._ace = ace
-        # AceEngine API result answers (Created with AsyncResult() on call)
-        self._result = {
+        # AceEngine API maximum allowable response read delay to receive playback URL
+        self._videotimeout = None
+        # AceEngine API maximum allowable response read delay
+        self._responsetimeout = result_timeout
+        # AceEngine API responses (Created with AsyncResult() on call)
+        self._response = {
             'HELLOTS'  : [self._hellots_, AsyncResult()],
             'AUTH'     : [self._auth_, AsyncResult()],
             'NOTREADY' : [self._notready_, AsyncResult()],
@@ -63,9 +61,7 @@ class AceClient(object):
             'INFO'     : [self._info_, AsyncResult()],
             'SHUTDOWN' : [self._shutdown_, AsyncResult()],
                        }
-        try:
-           self._socket = Telnet(self._ace['aceHostIP'], self._ace['aceAPIport'], connect_timeout)
-           logging.debug('Successfully connected to AceStream on {aceHostIP}:{aceAPIport}'.format(**self._ace))
+        try: self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
@@ -90,23 +86,23 @@ class AceClient(object):
         gevent.spawn(self._read, self._videotimeout)
 
         try:
-           self._result['HELLOTS'][1] = AsyncResult()
-           self._write(AceMessage.request.HELLO) # Sending HELLOBG
-           paramsdict = self._result['HELLOTS'][1].get(timeout=self._resulttimeout)
+           self._response['HELLOTS'][1] = AsyncResult()
+           self._write(AceMessage.request.HELLOBG())
+           paramsdict = self._response['HELLOTS'][1].get(timeout=self._responsetimeout)
         except gevent.Timeout as t:
            errmsg = 'Engine response time %s exceeded. HELLOTS not resived!' % t
            raise AceException(errmsg)
 
         try:
-           self._result['NOTREADY'][1] = AsyncResult()
-           self._result['AUTH'][1] = AsyncResult()
+           self._response['AUTH'][1] = AsyncResult()
+           self._response['NOTREADY'][1] = AsyncResult()
            self._write(AceMessage.request.READY(paramsdict.get('key'), self._product_key))
-           auth_level = self._result['AUTH'][1].get(timeout=self._resulttimeout)
+           auth_level = self._response['AUTH'][1].get(timeout=self._responsetimeout)
            if int(paramsdict.get('version_code', 0)) >= 3003600:
               self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
         except gevent.Timeout as t:
-           if self._result['NOTREADY'][1].value:
-              errmsg = 'Engine response time %s exceeded. %s resived!' % (t,self._result['NOTREADY'].value)
+           if self._response['NOTREADY'][1].value:
+              errmsg = 'Engine response time %s exceeded. %s resived!' % (t, self._response['NOTREADY'].value)
               raise AceException(errmsg)
            else:
               errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
@@ -121,12 +117,12 @@ class AceClient(object):
               try:
                  recvbuffer = self._socket.read_until('\r\n', None).strip().split()
                  logging.debug('<<< %s'% unquote(' '.join(recvbuffer)))
-                 gevent.spawn(self._result[recvbuffer[0]][0], recvbuffer).link(self._result[recvbuffer[0]][1])
+                 gevent.spawn(self._response[recvbuffer[0]][0], recvbuffer).link(self._response[recvbuffer[0]][1])
               except gevent.Timeout: self.ShutdownAce()
               except KeyError:
                  logging.error('Unknown response received from AceEngine %s' % recvbuffer[0])
               except gevent.socket.timeout: pass
-              except EOFError: # Telnet connection unexpectedly closed
+              except: # Telnet connection unexpectedly closed
                  self.ok = False
                  break
 
@@ -152,9 +148,9 @@ class AceClient(object):
         :return playback url from AceEngine
         '''
         try:
-           self._result['START'][1] = AsyncResult()
+           self._response['START'][1] = AsyncResult()
            self._write(AceMessage.request.START(paramsdict))
-           playback_url, paramsdict = self._result['START'][1].get(timeout=self._videotimeout)
+           playback_url, paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
            if self._seekback and paramsdict.get('stream'):
               # EVENT livepos only for live translation | stream=1
               # If seekback is disabled, we use link in first START command.
@@ -163,15 +159,15 @@ class AceClient(object):
               # AceStream sends us STOP and START again with new link.
               # We use only second link then.
               try:
-                 self._result['EVENT'][1] = AsyncResult()
-                 paramsdict = self._result['EVENT'][1].get(timeout=self._resulttimeout)
+                 self._response['EVENT'][1] = AsyncResult()
+                 paramsdict = self._response['EVENT'][1].get(timeout=self._responsetimeout)
                  self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
               except gevent.Timeout as t:
                  errmsg = 'EVENT livepos not received! Engine response time %s exceeded' % t
                  raise AceException(errmsg)
               else:
-                 self._result['START'][1] = AsyncResult()
-                 playback_url, _ = self._result['START'][1].get(timeout=self._videotimeout)
+                 self._response['START'][1] = AsyncResult()
+                 playback_url, _ = self._response['START'][1].get(timeout=self._videotimeout)
 
            return playback_url
         except gevent.Timeout as t:
@@ -186,17 +182,17 @@ class AceClient(object):
 
     def GetLOADASYNC(self, paramsdict):
         try:
-           self._result['LOADRESP'][1] = AsyncResult()
+           self._response['LOADRESP'][1] = AsyncResult()
            self._write(AceMessage.request.LOADASYNC(paramsdict))
-           return self._result['LOADRESP'][1].get(timeout=self._resulttimeout) # Get _contentinfo json
+           return self._response['LOADRESP'][1].get(timeout=self._responsetimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            errmsg = 'Engine response %s time exceeded. LOADRESP not resived!' % t
            raise AceException(errmsg)
 
     def GetSTATUS(self):
         try:
-           self._result['STATUS'][1] = AsyncResult()
-           return self._result['STATUS'][1].get(timeout=self._resulttimeout) # Get status
+           self._response['STATUS'][1] = AsyncResult()
+           return self._response['STATUS'][1].get(timeout=self._responsetimeout) # Get status
         except: return {'status': 'error'}
 
     def GetCONTENTINFO(self, paramsdict):
