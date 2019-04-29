@@ -7,6 +7,9 @@ To use it, go to http://acehttp_proxy_ip:port/stat
 
 __author__ = 'Dorik1972, !Joy!'
 
+import time, zlib
+import psutil, requests
+import logging
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
 from gevent.pool import Group
@@ -14,13 +17,7 @@ from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
 from requests.compat import json
-import time, zlib
-import psutil, requests
-import logging
-
-localnetranges = ( '192.168.0.0/16', '10.0.0.0/8',
-                   '172.16.0.0/12', '224.0.0.0/4',
-                   '240.0.0.0/5', '127.0.0.0/8', )
+from requests.utils import re
 
 class Stat(AceProxyPlugin):
     handlers = ('stat',)
@@ -30,6 +27,14 @@ class Stat(AceProxyPlugin):
         self.config = AceConfig
         self.stuff = AceProxy
         self.params = None
+
+    def ip_is_local(self, ip_string):
+        if not ip_string:
+           return False
+        if ip_string == '127.0.0.1':
+           return True
+        combined_regex = '(^10\\.)|(^172\\.1[6-9]\\.)|(^172\\.2[0-9]\\.)|(^172\\.3[0-1]\\.)|(^192\\.168\\.)'
+        return re.match(combined_regex, ip_string) is not None
 
     def get_vendor_Info(self, ip_address):
         try:
@@ -121,7 +126,7 @@ class Stat(AceProxyPlugin):
 
         def _add_client_data(c):
             if not c.clientInfo:
-               if any([requests.utils.address_in_network(c.clientip,i) for i in localnetranges]):
+               if self.ip_is_local(c.clientip):
                   c.clientInfo = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
                else:
                   try:

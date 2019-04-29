@@ -120,7 +120,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
            return
 
-    def handleRequest(self, _bytearray=bytearray, **params):
+    def handleRequest(self, **params):
         '''
         :params: dict() with keys: headers_only, channelName, channelIcon
         '''
@@ -128,8 +128,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger = logging.getLogger('HandleRequest')
         self.path = self.path[:-1] if self.path.endswith('/') else self.path
 
-        videoextdefaults = ('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
-                                   '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
            self.dieWithError(403, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)
@@ -138,7 +136,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #                                                     |_________|
         # And if it ends with regular video extension
         try:
-           if not self.path.endswith(videoextdefaults):
+           if not self.path.endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+                                      '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
               self.dieWithError(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
               return
         except IndexError:
@@ -204,7 +203,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                        #transcoder = gevent.event.AsyncResult()
                        AceProxy.pool.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
                        out = transcoder.get(timeout=2.0).stdin
-                       logger.info('Transcoding for %s started' % self.clientip)
+                       logger.info('Transcoding for {clientip} started'.format(**self.__dict__))
                     except:
                        logger.error('Error starting transcoding! Is Ffmpeg or VLC installed?')
                  else:
@@ -216,9 +215,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if AceProxy.clientcounter.addClient(self) == 1:
               playback_url = self.ace.GetBroadcastURL(params)
               self.broadcast = AceProxy.pool.spawn(StreamReader, playback_url, self.CID)
-              self.broadcast.link(lambda x: logging.debug('Broadcast "%s" stoped. Last client disconnected' % self.channelName))
+              self.broadcast.link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
 
-           logger.info('Streaming "%s" to %s started' % (self.channelName, self.clientip))
+           logger.info('Streaming "{channelName}" to {clientip} started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
            drop_headers = []
@@ -237,16 +236,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            # write data to client while he is alive
            for chunk in self.q:
-              out.write(_bytearray('%x\r\n' % len(chunk), 'utf-8') + chunk + b'\r\n' if response_use_chunked else chunk)
+              out.write(b'%x\r\n' % len(chunk) + chunk + b'\r\n' if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
            _ = AceProxy.pool.map(lambda x: x.dieWithError(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
-           logging.info('Streaming "%s" to %s finished' % (self.channelName, self.clientip))
+           logging.info('Streaming "{channelName}" to {clientip} finished'.format(**self.__dict__))
            if transcoder.value:
-              try: transcoder.value.kill(); logging.info('Transcoding for %s stoped' % self.clientip)
+              try: transcoder.value.kill(); logging.info('Transcoding for {clientip} stoped'.format(**self.__dict__))
               except: pass
            self.closeConnection()
            return
@@ -305,6 +304,7 @@ def StreamReader(playback_url, cid):
                 for url in s.get(playback_url, timeout=(5, AceConfig.videotimeout)).iter_lines():
                    if url.startswith(b'download not found'): return
                    if url.startswith(b'http://') and url not in used_urls:
+                      print(url)
                       StreamWriter(url)
                       used_urls.append(url)
                       if len(used_urls) > 15: used_urls.pop(0)
@@ -376,7 +376,7 @@ def detectPort():
        except IOError:
            logger.error("Couldn't detect port! acestream.port file doesn't exist?")
            clean_proc(); sys.exit(1)
-       else: logger.info("Detected ace port: %s" % AceConfig.ace['aceAPIport'])
+       else: logger.info('Detected ace port: {aceAPIport}'.format(**AceConfig.ace))
 
 def isRunning(process):
     return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
