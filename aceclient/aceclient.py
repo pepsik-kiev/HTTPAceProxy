@@ -116,7 +116,7 @@ class AceClient(object):
            with gevent.Timeout(timeout, False):
               try:
                  recvbuffer = self._socket.read_until('\r\n', None).strip().split()
-                 logging.debug('<<< %s'% unquote(' '.join(recvbuffer)))
+                 logging.debug('<<< %s' % unquote(' '.join(recvbuffer)))
                  gevent.spawn(self._response[recvbuffer[0]][0], recvbuffer).link(self._response[recvbuffer[0]][1])
               except gevent.Timeout: self.ShutdownAce()
               except KeyError:
@@ -142,15 +142,15 @@ class AceClient(object):
         '''
         self._write(AceMessage.request.SHUTDOWN)
 
-    def GetBroadcastURL(self, paramsdict):
+    def GetBroadcastStartParams(self, paramsdict):
         '''
         Start video method
-        :return playback url from AceEngine
+        :return START params dict from AceEngine
         '''
         try:
            self._response['START'][1] = AsyncResult()
            self._write(AceMessage.request.START(paramsdict))
-           playback_url, paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
+           start_paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
            if self._seekback and paramsdict.get('stream'):
               # EVENT livepos only for live translation | stream=1
               # If seekback is disabled, we use link in first START command.
@@ -167,9 +167,9 @@ class AceClient(object):
                  raise AceException(errmsg)
               else:
                  self._response['START'][1] = AsyncResult()
-                 playback_url, _ = self._response['START'][1].get(timeout=self._videotimeout)
+                 start_paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
 
-           return playback_url
+           return start_paramsdict
         except gevent.Timeout as t:
            errmsg = 'START URL not received! Engine response time %s exceeded' % t
            raise AceException(errmsg)
@@ -190,9 +190,7 @@ class AceClient(object):
            raise AceException(errmsg)
 
     def GetSTATUS(self):
-        try:
-           self._response['STATUS'][1] = AsyncResult()
-           return self._response['STATUS'][1].get(timeout=self._responsetimeout) # Get status
+        try: return self._response['STATUS'][1].get(timeout=self._responsetimeout) # Get status
         except: return {'status': 'error'}
 
     def GetCONTENTINFO(self, paramsdict):
@@ -228,9 +226,9 @@ class AceClient(object):
 
     def _start_(self, recvbuffer):
         '''
-        START url [ad=1 [interruptable=1]] [stream=1] [pos=position]
+        START [url=] [file_index=] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
         '''
-        return recvbuffer[1], {k:v for k,v in [x.split('=') for x in recvbuffer[2:] if '=' in x]}
+        return {k:v for k,v in [x.split('=') for x in recvbuffer[1:] if '=' in x]}
 
     def _loadresp_(self, recvbuffer):
         '''
