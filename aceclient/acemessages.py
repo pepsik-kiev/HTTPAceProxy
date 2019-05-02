@@ -9,7 +9,7 @@ from urllib3.packages.six import viewkeys
 
 class AceConst(object):
 
-    APIVERSION = 3
+    APIVERSION = 4
 
     AGE_LT_13 = 1
     AGE_13_17 = 2
