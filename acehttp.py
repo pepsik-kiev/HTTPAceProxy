@@ -303,7 +303,6 @@ def StreamReader(playback_url, cid):
                 for url in s.get(playback_url, timeout=(5, AceConfig.videotimeout)).iter_lines():
                    if url.startswith(b'download not found'): return
                    if url.startswith(b'http://') and url not in used_urls:
-                      print(url)
                       StreamWriter(url)
                       used_urls.append(url)
                       if len(used_urls) > 15: used_urls.pop(0)
