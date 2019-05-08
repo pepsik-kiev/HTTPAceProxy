@@ -39,6 +39,7 @@ class Torrenttelik(AceProxyPlugin):
            with s.get(config.url, headers=self.headers, proxies=config.proxies, stream=False, timeout=30) as playlist:
               if playlist.status_code != 304:
                  if playlist.encoding is None: playlist.encoding = 'utf-8'
+                 playlist = playlist.json()
                  self.headers['If-Modified-Since'] = gevent.time.strftime('%a, %d %b %Y %H:%M:%S %Z', gevent.time.gmtime(self.playlisttime))
                  self.playlist = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
                  self.picons = picons.logomap
@@ -46,7 +47,7 @@ class Torrenttelik(AceProxyPlugin):
                  m = requests.auth.hashlib.md5()
                  self.logger.info('Playlist %s downloaded' % config.url)
                  try:
-                    for channel in playlist.json()['channels']:
+                    for channel in playlist['channels']:
                        channel['name'] = name = channel.get('name', '')
                        channel['url'] = url = 'acestream://{url}'.format(**channel)
                        channel['group'] = channel.get('cat')
@@ -63,15 +64,14 @@ class Torrenttelik(AceProxyPlugin):
 
                  except Exception as e:
                     self.logger.error("Can't parse JSON! %s" % repr(e))
-                    return
+                    return False
 
                  self.etag = '"' + m.hexdigest() + '"'
                  self.logger.debug('torrent-telik.m3u playlist generated')
 
               self.playlisttime = gevent.time.time()
 
-        except requests.exceptions.RequestException: self.logger.error("Can't download %s playlist!" % config.url); return False
-        except: self.logger.error(traceback.format_exc()); return False
+        except: self.logger.error("Can't download %s playlist or received json is broken!" % config.url); return False
 
         return True
 
