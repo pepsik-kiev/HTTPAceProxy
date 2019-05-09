@@ -8,7 +8,7 @@ from gevent.event import AsyncResult, Event
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
 from urllib3.packages.six.moves import zip, map
-from urllib3.packages.six import PY3
+from urllib3.packages.six import PY3, ensure_str
 from .acemessages import *
 
 class AceException(Exception):
@@ -196,7 +196,7 @@ class AceClient(object):
     def GetCONTENTINFO(self, paramsdict):
         contentinfo = self.GetLOADASYNC(paramsdict)
         if contentinfo.get('status') in (1, 2):
-           return contentinfo.get('infohash'), next(iter([x[0] for x in contentinfo.get('files') if x[1] == int(paramsdict.get('file_indexes', 0))]), None)
+           return contentinfo.get('infohash'), ensure_str(next(iter([x[0] for x in contentinfo.get('files') if x[1] == int(paramsdict.get('file_indexes', 0))]), None))
         elif contentinfo.get('status') == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
            raise AceException(errmsg)
