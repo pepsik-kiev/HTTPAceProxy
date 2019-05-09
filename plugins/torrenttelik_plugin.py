@@ -48,9 +48,9 @@ class Torrenttelik(AceProxyPlugin):
                  self.logger.info('Playlist %s downloaded' % config.url)
                  try:
                     for channel in playlist['channels']:
-                       channel['name'] = name = channel.get('name', '')
-                       channel['url'] = url = 'acestream://{url}'.format(**channel)
-                       channel['group'] = channel.get('cat')
+                       name = channel['name']
+                       url = 'acestream://{url}'.format(**channel)
+                       channel['group'] = channel.pop('cat')
                        if not 'logo' in channel: channel['logo'] = picons.logomap.get(name)
                        self.picons[name] = channel['logo']
 
