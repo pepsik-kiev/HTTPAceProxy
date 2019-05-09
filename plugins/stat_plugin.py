@@ -16,6 +16,7 @@ from gevent.pool import Group
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
+from urllib3.packages.six import ensure_text
 from requests.compat import json
 from requests.utils import re
 
@@ -140,7 +141,7 @@ class Stat(AceProxyPlugin):
             return {
                 'sessionID': c.sessionID,
                 'channelIcon': c.channelIcon,
-                'channelName': c.channelName,
+                'channelName': ensure_text(c.channelName),
                 'clientIP': c.clientip,
                 'clientInfo': c.clientInfo,
                 #'clientBuff': c.q.qsize()*100/self.config.videotimeout,
