@@ -62,18 +62,16 @@ class AceClient(object):
                 }
         # AceEngine socket
         try:
-           self._ok = False
            self._socket = Telnet(params.get('ace')['aceHostIP'], params.get('ace')['aceAPIport'], params.get('connect_timeout', 10))
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
         else:
            # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-           gevent.spawn(self._read, self._videotimeout)
-           self._ok = True
+           self._read = gevent.spawn(self._read, self._videotimeout)
 
     def __bool__(self):
-        return self._ok
+        return self._read.started
 
     def __nonzero__(self):  # For Python 2 backward compatible
         return self.__bool__()
@@ -120,7 +118,6 @@ class AceClient(object):
                  logging.error('Unknown response received from AceEngine %s' % recvbuffer[0])
               except gevent.socket.timeout: pass
               except: # Telnet connection unexpectedly closed
-                 self._ok = False
                  break
 
     def _write(self, message):
