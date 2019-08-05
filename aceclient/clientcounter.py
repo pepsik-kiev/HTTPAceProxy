@@ -27,13 +27,14 @@ class ClientCounter(object):
         Returns the number of clients of the current broadcast
         '''
         clients = self.clients.setdefault(client.CID, []) # Get a list of clients for a given broadcast
-        if clients:
+        try:
            client.ace, client.broadcast = clients[0].ace, clients[0].broadcast
            self.idleAce.ShutdownAce()
-        else:
+        except:
            client.ace, self.idleAce = self.idleAce, False
-        clients.append(client)
-        return len(clients)
+        finally:
+           clients.append(client)
+           return len(clients)
 
     def deleteClient(self, client):
         '''

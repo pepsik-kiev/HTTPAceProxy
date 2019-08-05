@@ -160,6 +160,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         params.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         params.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))]})
         params.update({'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()])}) # request http or hls from AceEngine
+        params.update({'ace': AceConfig.ace, 'connect_timeout': AceConfig.aceconntimeout, 'result_timeout': AceConfig.aceresulttimeout})
+        params.update({'acesex': AceConfig.acesex, 'aceage': AceConfig.aceage, 'acekey': AceConfig.acekey, 'videoseekback': AceConfig.videoseekback, 'videotimeout': AceConfig.videotimeout})
         params['request_id'] = self.sessionID = str(uuid4().int)[:8]
         # End parameters dict
 
@@ -171,8 +173,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection with AceStream on {aceHostIP}:{aceAPIport}'.format(**AceConfig.ace))
-              AceProxy.clientcounter.idleAce = aceclient.AceClient(AceConfig.ace, AceConfig.aceconntimeout, AceConfig.aceresulttimeout)
-              AceProxy.clientcounter.idleAce.GetAUTH(AceConfig.acesex, AceConfig.aceage, AceConfig.acekey, AceConfig.videoseekback, AceConfig.videotimeout)
+              AceProxy.clientcounter.idleAce = aceclient.AceClient(**params)
+              AceProxy.clientcounter.idleAce.GetAUTH()
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.CID, self.channelName = AceProxy.clientcounter.idleAce.GetCONTENTINFO(params)
            else:
@@ -213,8 +215,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              START = self.ace.GetBroadcastStartParams(params)
-              self.broadcast = AceProxy.pool.spawn(StreamReader, START['url'], START['infohash'])
+              params = self.ace.GetBroadcastStartParams(params)
+              self.broadcast = AceProxy.pool.spawn(StreamReader, **params)
               self.broadcast.link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
 
            logger.info('Streaming "{channelName}" to {clientip} started'.format(**self.__dict__))
@@ -281,7 +283,12 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
        return True
     return False
 
-def StreamReader(playback_url, cid):
+def StreamReader(**params):
+    '''
+    [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
+    '''
+
+    cid = params.get('infohash')
 
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
@@ -293,7 +300,7 @@ def StreamReader(playback_url, cid):
            _ = AceProxy.pool.map(lambda client: write_chunk(client, chunk), AceProxy.clientcounter.getClientsList(cid))
 
     try:
-       playback_url = urlparse(unquote(playback_url))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
+       playback_url = urlparse(unquote(params.get('url')))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
        with requests.session() as s:
           s.verify = False
           s.stream = True
@@ -426,12 +433,13 @@ def get_ip_address():
 
 def check_compatibility(gevent_version, psutil_version):
 
-    # Check gevent for compatibility.
-    major, minor, patch = map(int, gevent_version.split('.')[:3])
-    # gevent >= 1.3.3
-    assert major == 1
-    assert minor >= 3
-    assert minor >= 3
+    if not 'dev' in gevent_version:
+       # Check gevent for compatibility.
+       major, minor, patch = map(int, gevent_version.split('.')[:3])
+       # gevent >= 1.3.3
+       assert major == 1
+       assert minor >= 3
+       assert minor >= 3
 
     # Check psutil for compatibility.
     major, minor, patch = map(int, psutil_version.split('.')[:3])

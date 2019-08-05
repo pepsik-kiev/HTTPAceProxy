@@ -31,20 +31,19 @@ class Telnet(telnetlib.Telnet, object):
 
 class AceClient(object):
 
-    def __init__(self, ace, connect_timeout=5, result_timeout=10):
-        # AceEngine socket
-        self._socket = False
-        self.ok = False
+    def __init__(self, **params):
+
         # AceEngine product key
-        self._product_key = None
+        self._product_key = params.get('acekey')
         # Current auth
-        self._gender = self._age = None
+        self._gender = params.get('acesex', AceConst.SEX_MALE)
+        self._age = params.get('aceage', AceConst.AGE_25_34)
         # Seekback seconds.
-        self._seekback = None
+        self._seekback = params.get('videoseekback', 0)
         # AceEngine API maximum allowable response read delay to receive playback URL
-        self._videotimeout = None
+        self._videotimeout = params.get('videotimeout', 30)
         # AceEngine API maximum allowable response read delay
-        self._responsetimeout = result_timeout
+        self._responsetimeout = params.get('result_timeout', 5)
         # AceEngine API responses (Created with AsyncResult() on call)
         self._response = {
             'HELLOTS'  : [self._hellots_, AsyncResult()],
@@ -60,31 +59,29 @@ class AceClient(object):
             'RESUME'   : [self._resume_, AsyncResult()],
             'INFO'     : [self._info_, AsyncResult()],
             'SHUTDOWN' : [self._shutdown_, AsyncResult()],
-                       }
-        try: self._socket = Telnet(ace['aceHostIP'], ace['aceAPIport'], connect_timeout)
+                }
+        # AceEngine socket
+        try:
+           self._ok = False
+           self._socket = Telnet(params.get('ace')['aceHostIP'], params.get('ace')['aceAPIport'], params.get('connect_timeout', 10))
         except:
            errmsg = 'The are no alive AceStream Engines found!'
            raise AceException(errmsg)
-        else: self.ok = True
+        else:
+           # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
+           gevent.spawn(self._read, self._videotimeout)
+           self._ok = True
 
     def __bool__(self):
-        return self.ok
+        return self._ok
 
     def __nonzero__(self):  # For Python 2 backward compatible
         return self.__bool__()
 
-    def GetAUTH(self, gender=AceConst.SEX_MALE, age=AceConst.AGE_25_34, product_key=None, videoseekback=0, videotimeout=30):
+    def GetAUTH(self):
         '''
-        AceEngine init telnet connection
+        AUTH
         '''
-        self._gender = gender
-        self._age = age
-        self._product_key = product_key
-        self._seekback = videoseekback
-        self._videotimeout = videotimeout
-        # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-        gevent.spawn(self._read, self._videotimeout)
-
         try:
            self._response['HELLOTS'][1] = AsyncResult()
            self._write(AceMessage.request.HELLOBG())
@@ -123,7 +120,7 @@ class AceClient(object):
                  logging.error('Unknown response received from AceEngine %s' % recvbuffer[0])
               except gevent.socket.timeout: pass
               except: # Telnet connection unexpectedly closed
-                 self.ok = False
+                 self._ok = False
                  break
 
     def _write(self, message):
@@ -146,30 +143,34 @@ class AceClient(object):
         '''
         Start video method
         :return START params dict from AceEngine
+
+        If seekback is disabled, we use link in first START command recived from AceEngine.
+        If seekback is enabled, we wait for first START command and ignore it,
+        then do seekback in first EVENT livepos command (EVENT livepos only for live translation (stream=1) and url not in hls).
+        AceEngine sends us STOP and START again with new link. We use only second link then.
         '''
+
         try:
            self._response['START'][1] = AsyncResult()
            self._write(AceMessage.request.START(paramsdict))
-           start_paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
-           if self._seekback and paramsdict.get('stream'):
-              # EVENT livepos only for live translation | stream=1
-              # If seekback is disabled, we use link in first START command.
-              # If seekback is enabled, we wait for first START command and
-              # ignore it, then do seekback in first EVENT position command
-              # AceStream sends us STOP and START again with new link.
-              # We use only second link then.
+           paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
+           if self._seekback and paramsdict.get('stream') and not paramsdict['url'].endswith('.m3u8'):
               try:
                  self._response['EVENT'][1] = AsyncResult()
                  paramsdict = self._response['EVENT'][1].get(timeout=self._responsetimeout)
-                 self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
               except gevent.Timeout as t:
                  errmsg = 'EVENT livepos not received! Engine response time %s exceeded' % t
                  raise AceException(errmsg)
               else:
-                 self._response['START'][1] = AsyncResult()
-                 start_paramsdict = self._response['START'][1].get(timeout=self._videotimeout)
+                 try:
+                    self._response['START'][1] = AsyncResult()
+                    self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
+                    paramsdict = self._response['START'][1].get(timeout=self._responsetimeout)
+                 except gevent.Timeout as t:
+                    errmsg = 'START URL not received after LIVESEEK! Engine response time %s exceeded' % t
+                    raise AceException(errmsg)
 
-           return start_paramsdict
+           return paramsdict
         except gevent.Timeout as t:
            errmsg = 'START URL not received! Engine response time %s exceeded' % t
            raise AceException(errmsg)
@@ -194,10 +195,11 @@ class AceClient(object):
         except: return {'status': 'error'}
 
     def GetCONTENTINFO(self, paramsdict):
-        contentinfo = self.GetLOADASYNC(paramsdict)
-        if contentinfo.get('status') in (1, 2):
-           return contentinfo.get('infohash'), ensure_str(next(iter([x[0] for x in contentinfo.get('files') if x[1] == int(paramsdict.get('file_indexes', 0))]), None))
-        elif contentinfo.get('status') == 0:
+        file_idx = int(paramsdict.get('file_indexes', 0))
+        paramsdict = self.GetLOADASYNC(paramsdict)
+        if paramsdict.get('status') in (1, 2):
+           return paramsdict.get('infohash'), ensure_str(next(iter([ x[0] for x in paramsdict.get('files') if x[1] == file_idx ]), None))
+        elif paramsdict.get('status') == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
            raise AceException(errmsg)
         else:
