@@ -51,8 +51,7 @@ class Allfon(AceProxyPlugin):
                     itemdict = match.groupdict()
                     name = itemdict.get('name', '').replace(' (allfon)','')
                     url = itemdict['url']
-                    if not 'logo' in itemdict: itemdict['logo'] = picons.logomap.get(name)
-                    self.picons[name] = itemdict['logo']
+                    itemdict['logo'] = self.picons[name] = itemdict.get('logo', picons.logomap.get(name))
 
                     if url.startswith(('acestream://', 'infohash://')) \
                          or (url.startswith(('http://','https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent'))):

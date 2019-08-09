@@ -26,6 +26,7 @@ import stat
 import locale
 
 class FileAdapter(BaseAdapter):
+
     def send(self, request, **kwargs):
         """ Wraps a file, described in request, in a Response object.
             :param request: The PreparedRequest` being "sent".

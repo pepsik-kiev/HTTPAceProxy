@@ -51,8 +51,7 @@ class Torrenttelik(AceProxyPlugin):
                        name = channel['name']
                        url = 'acestream://{url}'.format(**channel)
                        channel['group'] = channel.pop('cat')
-                       if not 'logo' in channel: channel['logo'] = picons.logomap.get(name)
-                       self.picons[name] = channel['logo']
+                       channel['logo'] = self.picons[name] = channel.get('logo', picons.logomap.get(name))
 
                        if url.startswith(('acestream://', 'infohash://')) \
                             or (url.startswith(('http://','https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent'))):

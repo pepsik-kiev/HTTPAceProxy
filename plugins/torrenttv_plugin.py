@@ -51,8 +51,7 @@ class Torrenttv(AceProxyPlugin):
                  for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
                     itemdict = match.groupdict()
                     name = itemdict.get('name', '')
-                    if not 'logo' in itemdict: itemdict['logo'] = picons.logomap.get(name)
-                    self.picons[name] = itemdict['logo']
+                    itemdict['logo'] = self.picons[name] = itemdict.get('logo', picons.logomap.get(name))
 
                     url = itemdict['url']
                     if url.startswith(('acestream://', 'infohash://')) \
