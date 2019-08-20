@@ -3,6 +3,8 @@ Client counter for BroadcastStreamer
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
+from itertools import chain
+
 class ClientCounter(object):
 
     def __init__(self):
@@ -13,28 +15,28 @@ class ClientCounter(object):
         '''
         List of all connected clients for all CID
         '''
-        return [item for sublist in self.clients.values() for item in sublist]
+        return list(chain.from_iterable(self.clients.values()))
 
     def getClientsList(self, cid):
         '''
         List of Clients by CID
         '''
-        return self.clients.get(cid,[])
+        return self.clients.setdefault(cid, set())
 
     def addClient(self, client):
         '''
         Adds client to the list by CID key in broadcast dictionary
         Returns the number of clients of the current broadcast
         '''
-        clients = self.clients.setdefault(client.CID, []) # Get a list of clients for a given broadcast
         try:
-           client.ace, client.broadcast = clients[0].ace, clients[0].broadcast
+           c, *_ = self.getClientsList(client.CID) # Get the first client of existing broadcast
+           client.ace, client.q, client.b = c.ace, c.q.copy(), c.b
            self.idleAce.ShutdownAce()
         except:
            client.ace, self.idleAce = self.idleAce, False
         finally:
-           clients.append(client)
-           return len(clients)
+           self.clients[client.CID].add(client)
+           return len(self.clients[client.CID])
 
     def deleteClient(self, client):
         '''
@@ -45,8 +47,9 @@ class ClientCounter(object):
            try:
               self.idleAce = client.ace
               self.idleAce.StopBroadcast()
-              client.broadcast.kill()
            except: self.idleAce.ShutdownAce()
-           finally: del self.clients[client.CID]
+           finally:
+              del self.clients[client.CID]
+              if hasattr(client, 'b'): client.b.kill()
         except:
-           self.clients[client.CID].remove(client)
+           self.clients[client.CID].discard(client)

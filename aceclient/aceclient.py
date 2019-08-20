@@ -6,8 +6,8 @@ import telnetlib
 import logging
 from gevent.event import AsyncResult, Event
 from requests.compat import json
-from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
-from urllib3.packages.six.moves import zip, map
+from urllib3.packages.six.moves.urllib.parse import unquote
+from urllib3.packages.six.moves import zip
 from urllib3.packages.six import PY3, ensure_str
 from .acemessages import *
 
@@ -78,7 +78,7 @@ class AceClient(object):
 
     def GetAUTH(self):
         '''
-        AUTH
+        AUTH method
         '''
         try:
            self._response['HELLOTS'][1] = AsyncResult()
@@ -146,7 +146,6 @@ class AceClient(object):
         then do seekback in first EVENT livepos command (EVENT livepos only for live translation (stream=1) and url not in hls).
         AceEngine sends us STOP and START again with new link. We use only second link then.
         '''
-
         try:
            self._response['START'][1] = AsyncResult()
            self._write(AceMessage.request.START(paramsdict))
@@ -225,9 +224,9 @@ class AceClient(object):
 
     def _start_(self, recvbuffer):
         '''
-        START [url=] [file_index=] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
+        START [url=] [infohash=] [file_index=] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
         '''
-        return {k:v for k,v in [x.split('=') for x in recvbuffer[1:] if '=' in x]}
+        return  {k:v for k,v in [x.split('=') for x in recvbuffer[1:] if '=' in x]}
 
     def _loadresp_(self, recvbuffer):
         '''

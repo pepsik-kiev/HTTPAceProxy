@@ -69,7 +69,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         Close connection with error
         '''
-        if logmsg: logging.log(loglevel, logmsg)
+        logging.log(loglevel, logmsg)
         try:
            self.send_error(errorcode)
            self.end_headers()
@@ -84,14 +84,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0] # Connected client IP address
-        logging.info('Accepted connection from %s path %s' % (self.clientip, unquote(self.path)))
+        logging.info('Accepted connection from {} path {}'.format(self.clientip, unquote(self.path)))
         logging.debug('Client headers: %s' % dict(self.headers))
 
         parse_req = urlparse(self.path)
         self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
-           self.dieWithError(401, 'Dropping connection from %s due to firewall rules' % self.clientip, logging.ERROR)
+           self.dieWithError(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
            return
         try:
            self.splittedpath = self.path.split('/')
@@ -130,7 +130,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-           self.dieWithError(403, "Maximum client connections reached, can't serve request from %s" % self.clientip, logging.ERROR)
+           self.dieWithError(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
            return
         # Check if third parameter exists…/pid/blablablablabla/video.mpg
         #                                                     |_________|
@@ -177,10 +177,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
               AceProxy.clientcounter.idleAce.GetAUTH()
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.CID, self.channelName = AceProxy.clientcounter.idleAce.GetCONTENTINFO(params)
+              if not self.channelName: self.channelName = params.get('channelName')
            else:
               self.channelName = params.get('channelName')
-              if self.channelName is None: self.channelName = 'NoNameChannel'
               self.CID = requests.auth.hashlib.sha1(self.channelName.encode('utf-8')).hexdigest()
+           if self.channelName is None: self.channelName = 'NoNameChannel'
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.dieWithError(404, '%s' % repr(e), logging.ERROR)
@@ -215,10 +216,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              params = self.ace.GetBroadcastStartParams(params)
-              self.broadcast = AceProxy.pool.spawn(StreamReader, **params)
-              self.broadcast.link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
-
+              self.b = AceProxy.pool.spawn(StreamReader, **self.ace.GetBroadcastStartParams(params))
+              self.b.link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
            logger.info('Streaming "{channelName}" to {clientip} started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
@@ -288,8 +287,6 @@ def StreamReader(**params):
     [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
     '''
 
-    cid = params.get('infohash')
-
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
         except gevent.queue.Full:
@@ -297,27 +294,27 @@ def StreamReader(**params):
 
     def StreamWriter(url):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
-           _ = AceProxy.pool.map(lambda client: write_chunk(client, chunk), AceProxy.clientcounter.getClientsList(cid))
+           _ = AceProxy.pool.map(lambda client: write_chunk(client, chunk), AceProxy.clientcounter.getClientsList(params['infohash']))
 
     try:
-       playback_url = urlparse(unquote(params.get('url')))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
+       params['url'] = urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
        with requests.session() as s:
           s.verify = False
           s.stream = True
-          if playback_url.endswith('.m3u8'): # AceEngine return link for HLS stream
+          if params['url'].endswith('.m3u8'): # AceEngine return link for HLS stream
              used_urls = []
              while 1:
-                for url in s.get(playback_url, timeout=(5, AceConfig.videotimeout)).iter_lines():
+                for url in s.get(params['url'], timeout=(5, AceConfig.videotimeout)).iter_lines():
                    if url.startswith(b'download not found'): return
                    if url.startswith(b'http://') and url not in used_urls:
                       StreamWriter(url)
                       used_urls.append(url)
                       if len(used_urls) > 15: used_urls.pop(0)
 
-          else: StreamWriter(playback_url) #AceStream return link for HTTP stream
+          else: StreamWriter(params['url']) #AceStream return link for HTTP stream
     except TypeError: pass
     except Exception as err:
-       _ = AceProxy.pool.map(lambda x: x.dieWithError(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(cid))
+       _ = AceProxy.pool.map(lambda x: x.dieWithError(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(params['infohash']))
 
 # Spawning procedures
 def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):

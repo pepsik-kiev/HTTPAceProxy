@@ -83,7 +83,7 @@ class Torrenttelik(AceProxyPlugin):
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
         ext = parse_qs(connection.query).get('ext', ['ts'])[0]
-        if path.startswith('/%s/channel/' % connection.reqtype):
+        if path.startswith('/{reqtype}/channel/'.format(**connection.__dict__)):
            if not path.endswith(ext):
               connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
               return
@@ -111,7 +111,7 @@ class Torrenttelik(AceProxyPlugin):
            return
         else:
            hostport = connection.headers['Host']
-           path = '' if not self.channels else '/%s/channel' % connection.reqtype
+           path = '' if not self.channels else '/{reqtype}/channel'.format(**connection.__dict__)
            exported = self.playlist.exportm3u(hostport=hostport, path=path, header=config.m3uheadertemplate, query=connection.query)
            response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
                                 'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
