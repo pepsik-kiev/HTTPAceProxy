@@ -216,8 +216,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              self.b = AceProxy.pool.spawn(StreamReader, **self.ace.GetBroadcastStartParams(params))
-              self.b.link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
+              AceProxy.pool.spawn(StreamReader, **self.ace.GetBroadcastStartParams(params)).link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
            logger.info('Streaming "{channelName}" to {clientip} started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
@@ -287,6 +286,15 @@ def StreamReader(**params):
     [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
     '''
 
+    broadcast = gevent.getcurrent()
+
+    def checkBroadcast(chekinterval=0.5):
+        while 1:
+           if not AceProxy.clientcounter.getClientsList(params['infohash']):
+              broadcast.kill()
+              break
+           gevent.sleep(chekinterval)
+
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
         except gevent.queue.Full:
@@ -298,6 +306,7 @@ def StreamReader(**params):
 
     try:
        params['url'] = urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
+       AceProxy.pool.spawn(checkBroadcast)
        with requests.session() as s:
           s.verify = False
           s.stream = True

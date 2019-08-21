@@ -15,7 +15,7 @@ class ClientCounter(object):
         '''
         List of all connected clients for all CID
         '''
-        return list(chain.from_iterable(self.clients.values()))
+        return set(chain.from_iterable(self.clients.values()))
 
     def getClientsList(self, cid):
         '''
@@ -29,8 +29,8 @@ class ClientCounter(object):
         Returns the number of clients of the current broadcast
         '''
         try:
-           c, *_ = self.getClientsList(client.CID) # Get the first client of existing broadcast
-           client.ace, client.q, client.b = c.ace, c.q.copy(), c.b
+           c = next(iter(self.getClientsList(client.CID)), None) # Get the first client of existing broadcast
+           client.ace, client.q = c.ace, c.q.copy()
            self.idleAce.ShutdownAce()
         except:
            client.ace, self.idleAce = self.idleAce, False
@@ -43,13 +43,12 @@ class ClientCounter(object):
         Remove client from the list by CID key in broadcast dictionary
         '''
         try:
-           (client,) = self.getClientsList(client.CID) # Get the last client of existing broadcast
+           client, = self.getClientsList(client.CID) # Get the last client of existing broadcast
            try:
               self.idleAce = client.ace
               self.idleAce.StopBroadcast()
            except: self.idleAce.ShutdownAce()
            finally:
               del self.clients[client.CID]
-              if hasattr(client, 'b'): client.b.kill()
         except:
            self.clients[client.CID].discard(client)
