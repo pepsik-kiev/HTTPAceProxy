@@ -13,6 +13,7 @@ from urllib3.packages.six import ensure_str, ensure_text
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 from requests_file import FileAdapter
+from utils import schedule
 import config.torrenttelik as config
 import config.picons.torrenttelik as picons
 
@@ -25,12 +26,7 @@ class Torrenttelik(AceProxyPlugin):
         self.picons = self.channels = self.playlist = self.etag = self.last_modified = None
         self.playlisttime = gevent.time.time()
         self.headers = {'User-Agent': 'Magic Browser'}
-        if config.updateevery: gevent.spawn(self.playlistTimedDownloader)
-
-    def playlistTimedDownloader(self):
-        while 1:
-            self.Playlistparser()
-            gevent.sleep(config.updateevery * 60)
+        if config.updateevery: schedule(config.updateevery * 60, self.Playlistparser)
 
     def Playlistparser(self):
         try:

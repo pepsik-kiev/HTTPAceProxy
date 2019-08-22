@@ -14,6 +14,7 @@ import gevent
 import zlib
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from PluginInterface import AceProxyPlugin
+from utils import schedule
 import config.torrentfilms as config
 
 class Torrentfilms(AceProxyPlugin):
@@ -27,14 +28,7 @@ class Torrentfilms(AceProxyPlugin):
         self.videoextdefaults = ('.3gp','.aac','.ape','.asf','.avi','.dv','.divx','.flac','.flc','.flv','.m2ts','.m4a','.mka','.mkv',
                                  '.mpeg','.mpeg4','.mpegts','.mpg4','.mp3','.mp4','.mpg','.mov','.m4v','.ogg','.ogm','.ogv','.oga',
                                  '.ogx','.qt','.rm','.swf','.ts','.vob','.wmv','.wav','.webm')
-
-        if config.updateevery:
-            gevent.spawn(self.playlistTimedDownloader)
-
-    def playlistTimedDownloader(self):
-        while 1:
-            self.playlistdata()
-            gevent.sleep(config.updateevery * 60)
+        if config.updateevery: schedule(config.updateevery * 60, self.playlistdata)
 
     def playlistdata(self):
         self.playlist = []

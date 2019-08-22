@@ -41,7 +41,7 @@ import aceclient
 from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
-
+from utils import schedule
 
 class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
@@ -286,14 +286,9 @@ def StreamReader(**params):
     [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
     '''
 
-    broadcast = gevent.getcurrent()
-
-    def checkBroadcast(chekinterval=0.5):
-        while 1:
-           if not AceProxy.clientcounter.getClientsList(params['infohash']):
-              broadcast.kill()
-              break
-           gevent.sleep(chekinterval)
+    def checkBroadcast():
+        if not AceProxy.clientcounter.getClientsList(params['infohash']):
+           gevent.getcurrent().kill()
 
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
@@ -306,7 +301,7 @@ def StreamReader(**params):
 
     try:
        params['url'] = urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
-       AceProxy.pool.spawn(checkBroadcast)
+       schedule(0.5, checkBroadcast)
        with requests.session() as s:
           s.verify = False
           s.stream = True
@@ -342,21 +337,19 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
        return isRunning(AceProxy.ace)
     except: return False
 
-def checkAce(chekinterval=AceConfig.acestartuptimeout):
-    while 1:
-       gevent.sleep(chekinterval)
-       if AceConfig.acespawn and not isRunning(AceProxy.ace):
-          if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.ShutdownAce()
-          if hasattr(AceProxy, 'ace'): del AceProxy.ace
-          if spawnAce():
-             logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
-             # refresh the acestream.port file for Windows only after full loading...
-             if AceConfig.osplatform == 'Windows': detectPort()
-             else: gevent.sleep(AceConfig.acestartuptimeout)
-             # Creating ClientCounter
-             AceProxy.clientcounter = ClientCounter()
-          else:
-             logger.error("Can't spawn Ace Stream!")
+def checkAce():
+    if AceConfig.acespawn and not isRunning(AceProxy.ace):
+       if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.ShutdownAce()
+       if hasattr(AceProxy, 'ace'): del AceProxy.ace
+       if spawnAce():
+          logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
+          # refresh the acestream.port file for Windows only after full loading...
+          if AceConfig.osplatform == 'Windows': detectPort()
+          else: gevent.sleep(AceConfig.acestartuptimeout)
+          # Creating ClientCounter
+          AceProxy.clientcounter = ClientCounter()
+       else:
+          logger.error("Can't spawn Ace Stream!")
 
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
@@ -499,7 +492,7 @@ AceProxy.ace = findProcess('ace_engine.exe' if AceConfig.osplatform == 'Windows'
 if not AceProxy.ace and AceConfig.acespawn:
    if spawnAce():
       logger.info('Local AceStream engine spawned with pid %s' % AceProxy.ace.pid)
-      gevent.spawn(checkAce) # Start AceEngine alive watchdog
+      schedule(AceConfig.acestartuptimeout, checkAce) # Start AceEngine alive watchdog
 elif AceProxy.ace:
    AceProxy.ace = psutil.Process(AceProxy.ace)
    logger.info('Local AceStream engine found with pid %s' % AceProxy.ace.pid)
