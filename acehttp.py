@@ -190,7 +190,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
-           AceProxy.pool.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            out = self.wfile
            # If &fmt transcode key present in request
@@ -204,7 +204,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                                      'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                     try:
                        #transcoder = gevent.event.AsyncResult()
-                       AceProxy.pool.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
+                       gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
                        out = transcoder.get(timeout=2.0).stdin
                        logger.info('Transcoding for {clientip} started'.format(**self.__dict__))
                     except:
@@ -216,7 +216,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              AceProxy.pool.spawn(StreamReader, **self.ace.GetBroadcastStartParams(params)).link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
+              gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(params)).link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
            logger.info('Streaming "{channelName}" to {clientip} started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
@@ -332,7 +332,7 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
     try:
        logger.debug('AceEngine start up .....')
        AceProxy.ace = gevent.event.AsyncResult()
-       AceProxy.pool.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
+       gevent.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
        AceProxy.ace = AceProxy.ace.get(timeout=delay if delay>=0 else 0.1)
        return isRunning(AceProxy.ace)
     except: return False
@@ -386,8 +386,8 @@ def isRunning(process):
     return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
 
 def findProcess(name):
-    pinfo = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]
-    return pinfo[0]['pid'] if pinfo else None
+    pinfo = next(iter([p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]), None)
+    return pinfo['pid'] if pinfo else pinfo
 
 def clean_proc():
     # Trying to close all spawned processes gracefully
@@ -405,8 +405,8 @@ def clean_proc():
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
     logger.info('Shutdown server.....')
-    clean_proc()
     server.stop()
+    clean_proc()
     logger.info('Bye Bye .....')
     sys.exit()
 
@@ -532,10 +532,11 @@ AceProxy.pluginshandlers = {key:val for k in AceProxy.pool.map(add_handler, plug
 # Server setup
 server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler, spawn=AceProxy.pool)
 # Setting signal handlers
+gevent.signal(signal.SIGQUIT, shutdown)
 gevent.signal(signal.SIGTERM, shutdown)
 gevent.signal(signal.SIGINT, shutdown)
 if AceConfig.osplatform != 'Windows': gevent.signal(signal.SIGHUP, _reloadconfig)
 server.start()
-logger.info('Server started at %s:%s Use <Ctrl-C> to stop' % (server.server_host, server.server_port))
+logger.info('Server started at {}:{} Use <Ctrl-C> to stop'.format(AceConfig.httphost, AceConfig.httpport))
 # Start complite. Wating for requests
 gevent.wait()
