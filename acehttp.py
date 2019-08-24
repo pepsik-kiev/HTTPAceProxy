@@ -20,7 +20,7 @@ from gevent import monkey; monkey.patch_all()
 from gevent.pywsgi import WSGIServer
 from gevent.pool import Pool
 from gevent.util import wrap_errors
-from gevent.socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR
+from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -54,27 +54,24 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def handle(self):
-        try: BaseHTTPRequestHandler.handle_one_request(self)
+        try: BaseHTTPRequestHandler.handle(self)
         except: pass
 
     def finish(self):
-        try: self.handlerGreenlet.kill()
-        except: pass
-
-    def closeConnection(self):
-        try: self.connection.shutdown(SHUT_RDWR)
+        try: BaseHTTPRequestHandler.finish(self)
         except: pass
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
         Close connection with error
         '''
-        logging.log(loglevel, logmsg)
         try:
            self.send_error(errorcode)
            self.end_headers()
         except: pass
-        self.closeConnection()
+        finally:
+           logging.log(loglevel, logmsg)
+           if hasattr(self, 'handlerGreenlet'): self.handlerGreenlet.kill()
 
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
@@ -107,18 +104,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  import traceback
                  logger.error(traceback.format_exc())
                  self.dieWithError(500, 'Plugin exception: %s' % repr(e))
-              return
 
            elif self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'):
               self.handleRequest(headers_only=headers_only)
 
            else:
               self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-           return
 
         except IndexError:
            self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-           return
+        finally: return
 
     def handleRequest(self, **params):
         '''
@@ -152,7 +147,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.send_header('Content-Type', 'video/mp2t')
            self.send_header('Connection', 'Close')
            self.end_headers()
-           self.closeConnection()
            return
 
         # Make parameters dict
@@ -190,7 +184,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.finish()) # Client disconection watchdog
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            out = self.wfile
            # If &fmt transcode key present in request
@@ -203,7 +197,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
                                      'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                     try:
-                       #transcoder = gevent.event.AsyncResult()
                        gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
                        out = transcoder.get(timeout=2.0).stdin
                        logger.info('Transcoding for {clientip} started'.format(**self.__dict__))
@@ -247,7 +240,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if transcoder.value:
               try: transcoder.value.kill(); logging.info('Transcoding for {clientip} stoped'.format(**self.__dict__))
               except: pass
-           self.closeConnection()
            return
 
 class AceProxy(object):
