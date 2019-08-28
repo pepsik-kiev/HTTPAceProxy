@@ -33,6 +33,7 @@ import psutil, requests, signal
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
 from urllib3.packages.six.moves import range, map
+from urllib3.packages.six import ensure_binary
 try:
    from ipaddress import ip_network as IPNetwork, ip_address as IPAddress
 except:
@@ -177,7 +178,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               if not self.channelName: self.channelName = params.get('channelName')
            else:
               self.channelName = params.get('channelName')
-              self.CID = requests.auth.hashlib.sha1(self.channelName.encode('utf-8')).hexdigest()
+              self.CID = requests.auth.hashlib.sha1(ensure_binary(self.channelName)).hexdigest()
            if self.channelName is None: self.channelName = 'NoNameChannel'
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
@@ -527,10 +528,11 @@ AceProxy.pluginshandlers = {key:val for k in AceProxy.pool.map(add_handler, plug
 # Server setup
 server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler, spawn=AceProxy.pool)
 # Setting signal handlers
-gevent.signal(signal.SIGQUIT, shutdown)
 gevent.signal(signal.SIGTERM, shutdown)
 gevent.signal(signal.SIGINT, shutdown)
-if AceConfig.osplatform != 'Windows': gevent.signal(signal.SIGHUP, _reloadconfig)
+if AceConfig.osplatform != 'Windows':
+   gevent.signal(signal.SIGQUIT, shutdown)
+   gevent.signal(signal.SIGHUP, _reloadconfig)
 server.start()
 logger.info('Server started at {}:{} Use <Ctrl-C> to stop'.format(AceConfig.httphost, AceConfig.httpport))
 # Start complite. Wating for requests

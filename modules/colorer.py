@@ -46,14 +46,14 @@ if (hasattr(sys.stderr, "isatty") and sys.stderr.isatty()) or \
             # STD_ERROR_HANDLE = -12
 
             # wincon.h
-            # FOREGROUND_BLACK = 0x0000
+            FOREGROUND_BLACK = 0x0000
             FOREGROUND_BLUE = 0x0001
             FOREGROUND_GREEN = 0x0002
-            # FOREGROUND_CYAN = 0x0003
+            FOREGROUND_CYAN = 0x0003
             FOREGROUND_RED = 0x0004
             FOREGROUND_MAGENTA = 0x0005
             FOREGROUND_YELLOW = 0x0006
-            # FOREGROUND_GREY = 0x0007
+            FOREGROUND_GREY = 0x0007
             FOREGROUND_INTENSITY = 0x0008  # foreground color is intensified.
 
             # BACKGROUND_BLACK = 0x0000

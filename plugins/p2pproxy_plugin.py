@@ -22,6 +22,7 @@ from torrenttv_api import TorrentTvApi
 from datetime import timedelta, datetime
 from urllib3.packages.six.moves.urllib.parse import parse_qs, quote, unquote
 from urllib3.packages.six.moves import range
+from urllib3.packages.six import ensure_binary
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
@@ -446,13 +447,13 @@ class P2pproxy(AceProxyPlugin):
            connection.send_response(200)
            if self.params.get('format', [''])[0] == 'json':
               from requests.compat import json
-              exported = json.dumps(logomap, ensure_ascii=False).encode('utf-8')
+              exported = ensure_binary(json.dumps(logomap, ensure_ascii=False))
               connection.send_header('Content-Type', 'application/json')
            else:
               exported = "logobase = '%s'\nlogomap = {\n" % config.logobase
               exported += ''.join("    u'%s': logobase + '%s',\n" % (name, logo) for name, logo in logomap.items())
               exported += '}\n'
-              exported = exported.encode('utf-8')
+              exported = ensure_binary(exported)
               connection.send_header('Content-Type', 'text/plain;charset=utf-8')
            try:
               h = connection.headers.get('Accept-Encoding').split(',')[0]

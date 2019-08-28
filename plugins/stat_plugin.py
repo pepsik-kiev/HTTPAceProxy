@@ -16,7 +16,7 @@ from gevent.pool import Group
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb
-from urllib3.packages.six import ensure_text
+from urllib3.packages.six import ensure_text, ensure_binary
 from requests.compat import json
 from requests.utils import re
 
@@ -56,7 +56,7 @@ class Stat(AceProxyPlugin):
 
         if connection.path == '/stat':
            if self.params.get('action', [''])[0] == 'get_status':
-              self.SendResponse(200, 'json', json.dumps(self.getStatusJSON(), ensure_ascii=False).encode('utf-8'), connection)
+              self.SendResponse(200, 'json', ensure_binary(json.dumps(self.getStatusJSON(), ensure_ascii=False)), connection)
            else:
               try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
               except:

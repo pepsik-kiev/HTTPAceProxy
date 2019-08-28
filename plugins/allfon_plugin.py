@@ -10,7 +10,7 @@ import traceback
 import gevent, requests, os
 import logging, zlib
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
-from urllib3.packages.six import ensure_str, ensure_text
+from urllib3.packages.six import ensure_str, ensure_text, ensure_binary
 from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 from requests_file import FileAdapter
@@ -55,7 +55,7 @@ class Allfon(AceProxyPlugin):
                        itemdict['url'] = quote(ensure_str(name),'')
 
                     self.playlist.addItem(itemdict)
-                    m.update(name.encode('utf-8'))
+                    m.update(ensure_binary(name))
 
                  self.etag = '"' + m.hexdigest() + '"'
                  self.logger.debug('AllFon.m3u playlist generated')

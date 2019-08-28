@@ -5,8 +5,7 @@ Minimal Ace Stream client library to use with HTTP Proxy
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import hashlib
-from urllib3.packages.six import viewkeys
-
+from urllib3.packages.six import viewkeys, ensure_binary
 class AceConst(object):
 
     APIVERSION = 4
@@ -83,7 +82,7 @@ class AceMessage(object):
 
         @staticmethod
         def READY(request_key='', product_key=''):
-            return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1((request_key+product_key).encode('utf-8')).hexdigest())
+            return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(ensure_binary(request_key+product_key)).hexdigest())
         # End READY
 
         @staticmethod
