@@ -5,6 +5,7 @@ import gevent
 import telnetlib
 import logging
 from gevent.event import AsyncResult, Event
+from gevent.util import wrap_errors
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import unquote
 from urllib3.packages.six.moves import zip
@@ -59,7 +60,8 @@ class AceClient(object):
             'RESUME'   : [self._resume_, AsyncResult()],
             'INFO'     : [self._info_, AsyncResult()],
             'SHUTDOWN' : [self._shutdown_, AsyncResult()],
-                }
+            'CLOSE'    : [self._close_, AsyncResult()],
+                         }
         # AceEngine socket
         try:
            self._socket = Telnet(params.get('ace')['aceHostIP'], params.get('ace')['aceAPIport'], params.get('connect_timeout', 10))
@@ -68,7 +70,7 @@ class AceClient(object):
            raise AceException(errmsg)
         else:
            # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
-           self._read = gevent.spawn(self._read, self._videotimeout)
+           self._read = gevent.spawn(wrap_errors((EOFError, gevent.socket.error), self._read), self._videotimeout)
 
     def __bool__(self):
         return self._read.started
@@ -108,17 +110,9 @@ class AceClient(object):
         Read telnet connection method
         '''
         while 1:
-           with gevent.Timeout(timeout, False):
-              try:
-                 recvbuffer = self._socket.read_until('\r\n', None).strip().split()
-                 logging.debug('<<< %s' % unquote(' '.join(recvbuffer)))
-                 gevent.spawn(self._response[recvbuffer[0]][0], recvbuffer).link(self._response[recvbuffer[0]][1])
-              except gevent.Timeout: self.ShutdownAce()
-              except KeyError:
-                 logging.error('Unknown response received from AceEngine %s' % recvbuffer[0])
-              except gevent.socket.timeout: pass
-              except: # Telnet connection unexpectedly closed
-                 break
+            recvbuffer = gevent.with_timeout(timeout, self._socket.read_until, '\r\n', None, timeout_value='CLOSE telnet connetcion').strip().split()
+            logging.debug('<<< %s' % unquote(' '.join(recvbuffer)))
+            gevent.spawn(self._response[recvbuffer[0]][0], recvbuffer).link(self._response[recvbuffer[0]][1])
 
     def _write(self, message):
         '''
@@ -286,6 +280,12 @@ class AceClient(object):
         '''
         SHUTDOWN
         '''
-        pass
+        self._read.kill()
+
+    def _close_(self, recvbuffer):
+        '''
+        Close telnet connection
+        '''
+        self.ShutdownAce()
 
 ######################################## END AceEngine API answers parsers ########################################

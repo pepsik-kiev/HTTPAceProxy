@@ -33,7 +33,10 @@ import psutil, requests, signal
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
 from urllib3.packages.six.moves import range, map
-from ipaddr import IPNetwork, IPAddress
+try:
+   from ipaddress import ip_network as IPNetwork, ip_address as IPAddress
+except:
+   from ipaddr import IPNetwork, IPAddress
 from uuid import uuid4
 import mimetypes
 from modules.PluginInterface import AceProxyPlugin
