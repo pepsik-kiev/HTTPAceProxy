@@ -327,7 +327,7 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
 
 def checkAce():
     if AceConfig.acespawn and not isRunning(AceProxy.ace):
-       if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.wShutdownAce()
+       if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.ShutdownAce()
        if hasattr(AceProxy, 'ace'): del AceProxy.ace
        if spawnAce():
           logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
