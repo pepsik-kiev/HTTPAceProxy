@@ -17,7 +17,7 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 import gevent
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
-from gevent.pywsgi import WSGIServer
+from gevent.server import StreamServer
 from gevent.pool import Pool
 from gevent.util import wrap_errors
 from gevent.socket import socket, AF_INET, SOCK_DGRAM
@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.join(ROOT_DIR, 'modules'))
 for wheel in glob.glob(os.path.join(ROOT_DIR, 'modules', 'wheels', '*.whl')): sys.path.insert(0, wheel)
 
 import logging
-import psutil, requests, signal
+import psutil, requests
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
 from urllib3.packages.six.moves import range, map
@@ -38,7 +38,7 @@ try:
    from ipaddress import ip_network as IPNetwork, ip_address as IPAddress
 except:
    from ipaddr import IPNetwork, IPAddress
-from uuid import uuid4
+from random import randint
 import mimetypes
 from modules.PluginInterface import AceProxyPlugin
 import aceclient
@@ -48,22 +48,19 @@ from aceconfig import AceConfig
 from utils import schedule
 
 class HTTPHandler(BaseHTTPRequestHandler):
+
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
+
+    def __init__(self, request, client_address):
+        try: BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+        except: pass # unexpectedly interrupted by Ctl+C , broken pipe etc.
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, unquote(self.path).decode('utf8')))
 
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
-
-    def handle(self):
-        try: BaseHTTPRequestHandler.handle(self)
-        except: pass
-
-    def finish(self):
-        try: BaseHTTPRequestHandler.finish(self)
-        except: pass
 
     def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -98,9 +95,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.splittedpath = self.path.split('/')
            self.reqtype = self.splittedpath[1].lower()
            # backward compatibility
-           old2newUrlParts = {'torrent': 'url', 'pid': 'content_id'}
-           if self.reqtype in old2newUrlParts: self.reqtype = old2newUrlParts[self.reqtype]
-
+           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype)
            # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
            if self.reqtype in AceProxy.pluginshandlers:
               try: AceProxy.pluginshandlers.get(self.reqtype).handle(self, headers_only)
@@ -123,7 +118,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         :params: dict() with keys: headers_only, channelName, channelIcon
         '''
-
         logger = logging.getLogger('HandleRequest')
         self.path = self.path[:-1] if self.path.endswith('/') else self.path
 
@@ -160,14 +154,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
         params.update({'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()])}) # request http or hls from AceEngine
         params.update({'ace': AceConfig.ace, 'connect_timeout': AceConfig.aceconntimeout, 'result_timeout': AceConfig.aceresulttimeout})
         params.update({'acesex': AceConfig.acesex, 'aceage': AceConfig.aceage, 'acekey': AceConfig.acekey, 'videoseekback': AceConfig.videoseekback, 'videotimeout': AceConfig.videotimeout})
-        params['request_id'] = self.sessionID = str(uuid4().int)[:8]
+        params['request_id'] = self.sessionID = str(randint(10000000, 99999999))
         # End parameters dict
 
         self.connectionTime = gevent.time.time()
         self.clientInfo = None
         self.channelIcon = params.get('channelIcon')
         if self.channelIcon is None: self.channelIcon = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
-
         try:
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection with AceStream on {aceHostIP}:{aceAPIport}'.format(**AceConfig.ace))
@@ -231,7 +224,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
-           # write data to client while he is alive
+           # write data to client while it is alive
            for chunk in self.q:
               out.write(b'%x\r\n' % len(chunk) + chunk + b'\r\n' if response_use_chunked else chunk)
 
@@ -281,10 +274,11 @@ def StreamReader(**params):
     '''
     [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
     '''
+    broadcast = gevent.getcurrent()
 
     def checkBroadcast():
         if not AceProxy.clientcounter.getClientsList(params['infohash']):
-           gevent.getcurrent().kill()
+           broadcast.kill()
 
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
@@ -292,24 +286,22 @@ def StreamReader(**params):
            client.dieWithError(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
     def StreamWriter(url):
-        for chunk in s.get(url, timeout=(5, AceConfig.videotimeout)).iter_content(chunk_size=1048576):
+        for chunk in s.get(url, timeout=(5, AceConfig.videotimeout), stream=True).iter_content(chunk_size=1048576):
            _ = AceProxy.pool.map(lambda client: write_chunk(client, chunk), AceProxy.clientcounter.getClientsList(params['infohash']))
 
     try:
        params['url'] = urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
        schedule(0.5, checkBroadcast)
        with requests.session() as s:
-          s.verify = False
-          s.stream = True
           if params['url'].endswith('.m3u8'): # AceEngine return link for HLS stream
-             used_urls = []
-             while 1:
-                for url in s.get(params['url'], timeout=(5, AceConfig.videotimeout)).iter_lines():
-                   if url.startswith(b'download not found'): return
-                   if url.startswith(b'http://') and url not in used_urls:
+             import m3u8; urls = []
+             while broadcast:
+                for url in m3u8.load(params['url']).segments.uri:
+                   if url in urls: continue
+                   else:
                       StreamWriter(url)
-                      used_urls.append(url)
-                      if len(used_urls) > 15: used_urls.pop(0)
+                      urls.append(url)
+                      if len(urls)>50: urls.pop(0)
 
           else: StreamWriter(params['url']) #AceStream return link for HTTP stream
     except TypeError: pass
@@ -329,13 +321,13 @@ def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.
        logger.debug('AceEngine start up .....')
        AceProxy.ace = gevent.event.AsyncResult()
        gevent.spawn(lambda: psutil.Popen(cmd, stdout=DEVNULL, stderr=DEVNULL)).link(AceProxy.ace)
-       AceProxy.ace = AceProxy.ace.get(timeout=delay if delay>=0 else 0.1)
+       AceProxy.ace = AceProxy.ace.get(timeout=delay if delay>=0 else 0.5)
        return isRunning(AceProxy.ace)
     except: return False
 
 def checkAce():
     if AceConfig.acespawn and not isRunning(AceProxy.ace):
-       if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.ShutdownAce()
+       if AceProxy.clientcounter.idleAce: AceProxy.clientcounter.idleAce.wShutdownAce()
        if hasattr(AceProxy, 'ace'): del AceProxy.ace
        if spawnAce():
           logger.error('Ace Stream died, respawned with pid %s' % AceProxy.ace.pid)
@@ -389,7 +381,7 @@ def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceProxy.ace):
        if AceProxy.clientcounter.idleAce:
-          AceProxy.clientcounter.idleAce.ShutdownAce(); gevent.sleep(1)
+          AceProxy.clientcounter.idleAce.ShutdownAce(); gevent.sleep(0.5)
        AceProxy.ace.terminate()
        if AceConfig.osplatform == 'Windows' and os.path.isfile(AceProxy.acedir + '\\acestream.port'):
           try:
@@ -400,9 +392,9 @@ def clean_proc():
 
 # This is what we call to stop the server completely
 def shutdown(signum=0, frame=0):
-    logger.info('Shutdown server.....')
-    server.stop()
+    logging.info('Received CTL+C, shutting down Ace Stream HTTP Proxy server.....')
     clean_proc()
+    server.stop()
     logger.info('Bye Bye .....')
     sys.exit()
 
@@ -512,28 +504,28 @@ else:
 try: os.chdir(ROOT_DIR)
 except: pass
 sys.path.insert(0, 'plugins')
-logger.info("Load Ace Stream HTTP Proxy plugins .....")
+logger.info('Load Ace Stream HTTP Proxy plugins .....')
 pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]
 
 def add_handler(i):
-    plugin = __import__(i)
-    plugname = i.split('_')[0].capitalize()
-    try: plugininstance = getattr(plugin, plugname)(AceConfig, AceProxy)
+    try:
+       plugname = i.split('_')[0].capitalize()
+       plugininstance = getattr(__import__(i), plugname)(AceConfig, AceProxy)
     except Exception as err: logger.error("Can't load plugin %s: %s" % (plugname, repr(err)))
-    logger.debug('Plugin loaded: %s' % plugname)
-    return {j:plugininstance for j in plugininstance.handlers}
+    else:
+       logger.debug('Plugin loaded: %s' % plugname)
+       return {j:plugininstance for j in plugininstance.handlers}
 
 # Creating dict of handlers
-AceProxy.pluginshandlers = {key:val for k in AceProxy.pool.map(add_handler, pluginslist) for key,val in k.items()}
+AceProxy.pluginshandlers = {key:val for k in map(add_handler, pluginslist) for key,val in k.items()}
 # Server setup
-server = WSGIServer((AceConfig.httphost, AceConfig.httpport), handler_class=HTTPHandler, spawn=AceProxy.pool)
-# Setting signal handlers
-gevent.signal(signal.SIGTERM, shutdown)
-gevent.signal(signal.SIGINT, shutdown)
+server = StreamServer((AceConfig.httphost, AceConfig.httpport), handle=HTTPHandler, spawn=AceProxy.pool)
+# Capture  signal handlers (SIGINT, SIGQUIT etc.)
+gevent.signal(gevent.signal.SIGTERM, shutdown)
+gevent.signal(gevent.signal.SIGINT, shutdown)
 if AceConfig.osplatform != 'Windows':
-   gevent.signal(signal.SIGQUIT, shutdown)
-   gevent.signal(signal.SIGHUP, _reloadconfig)
-server.start()
+   gevent.signal(gevent.signal.SIGQUIT, shutdown)
+   gevent.signal(gevent.signal.SIGHUP, _reloadconfig)
 logger.info('Server started at {}:{} Use <Ctrl-C> to stop'.format(AceConfig.httphost, AceConfig.httpport))
 # Start complite. Wating for requests
-gevent.wait()
+server.serve_forever()

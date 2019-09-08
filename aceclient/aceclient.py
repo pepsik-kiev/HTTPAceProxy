@@ -4,12 +4,12 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 import gevent
 import telnetlib
 import logging
-from gevent.event import AsyncResult, Event
+from gevent.event import AsyncResult
 from gevent.util import wrap_errors
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import unquote
 from urllib3.packages.six.moves import zip
-from urllib3.packages.six import PY3, ensure_str
+from urllib3.packages.six import PY2, ensure_str
 from .acemessages import *
 
 class AceException(Exception):
@@ -19,7 +19,7 @@ class AceException(Exception):
     pass
 
 class Telnet(telnetlib.Telnet, object):
-    if PY3:
+    if not PY2:
        def read_until(self, expected, timeout=None):
            return super(Telnet, self).read_until(bytes(expected, 'ascii'), timeout).decode()
 
@@ -100,10 +100,9 @@ class AceClient(object):
         except gevent.Timeout as t:
            if self._response['NOTREADY'][1].value:
               errmsg = 'Engine response time %s exceeded. %s resived!' % (t, self._response['NOTREADY'].value)
-              raise AceException(errmsg)
            else:
               errmsg = 'Engine response time %s exceeded. AUTH not resived!' % t
-              raise AceException(errmsg)
+           raise AceException(errmsg)
 
     def _read(self, timeout=30):
         '''
@@ -191,10 +190,9 @@ class AceClient(object):
            return paramsdict.get('infohash'), ensure_str(next(iter([ x[0] for x in paramsdict.get('files') if x[1] == file_idx ]), None))
         elif paramsdict.get('status') == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
-           raise AceException(errmsg)
         else:
            errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
-           raise AceException(errmsg)
+        raise AceException(errmsg)
 
 ######################################## AceEngine API answers parsers ########################################
 

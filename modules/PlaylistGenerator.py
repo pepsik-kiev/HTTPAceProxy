@@ -5,8 +5,8 @@ This module can generate .m3u playlists with tv guide
 and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
-from gevent.pool import Group
 from urllib3.packages.six.moves.urllib.parse import quote, urlunparse, parse_qs
+from urllib3.packages.six.moves import map
 from urllib3.packages.six import ensure_str
 from playlist import PlaylistConfig as config
 
@@ -38,6 +38,8 @@ class PlaylistGenerator(object):
         group - channel playlist group-title (optional)
         logo - channel picon file tvg-logo (optional)
         '''
+        # Check is channel alive
+
         # Remap items
         self.changeItem(itemdict)
         # Check and add missing items and their values
@@ -82,9 +84,7 @@ class PlaylistGenerator(object):
 
         params.update({'schema': 'http', 'netloc': hostport})  # Adding ts:// after http:// for some players
         params.update({'ext': parse_qs(params.get('query','')).get('ext', ['ts'])[0]})
-        header = params.get('header')
-        if header is None: header = self.m3uemptyheader if params.get('empty_header') else self.m3uheader
-        return _bytearray(header + ''.join(Group().map(line_generator, self.sort(self.itemlist))), 'utf-8')
+        return _bytearray(params.get('header', self.m3uemptyheader if params.get('empty_header') else self.m3uheader) + ''.join(map(line_generator, self.sort(self.itemlist))), 'utf-8')
 
     def exportxml(self, hostport, path='',):
 

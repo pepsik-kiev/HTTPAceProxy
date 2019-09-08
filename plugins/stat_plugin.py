@@ -12,10 +12,9 @@ import psutil, requests
 import logging
 from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
-from gevent.pool import Group
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
-from urllib3.packages.six.moves import getcwdb
+from urllib3.packages.six.moves import getcwdb, map
 from urllib3.packages.six import ensure_text, ensure_binary
 from requests.compat import json
 from requests.utils import re
@@ -150,5 +149,5 @@ class Stat(AceProxyPlugin):
                 'stat': c.ace.GetSTATUS(),
                     }
 
-        statusJSON['clients_data'] = Group().map(_add_client_data, clients)
+        statusJSON['clients_data'] = list(map(_add_client_data, clients))
         return statusJSON
