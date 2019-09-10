@@ -1,7 +1,7 @@
 HTTPAceProxy
 ===========================================
 HTTPAceProxy allows you to watch [Ace Stream](http://acestream.org/) live streams or BitTorrent files over HTTP.
-It's written in Python and work on any OS where a Python2 (>=2.7.10) or Python3 (>=3.4) with required dependencies [gevent](https://github.com/gevent/gevent) (>=1.3.3), 
+It's written in Python and work on any OS where a Python2 (>=2.7.10) or Python3 (>=3.4), or [PyPy2.7(3.6)](https://pypy.org) with required dependencies [gevent](https://github.com/gevent/gevent) (>=1.3.3), 
 [psutil](https://github.com/giampaolo/psutil) (>= 5.3.0) are installed.
 Installed ffmpeg or VLC is an optional, but highly recommended, for fine tuning for yourself.
 
