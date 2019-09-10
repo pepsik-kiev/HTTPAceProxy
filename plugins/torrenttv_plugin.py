@@ -72,19 +72,19 @@ class Torrenttv(AceProxyPlugin):
         play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
-           if not self.Playlistparser(): connection.dieWithError(); return
+           if not self.Playlistparser(): connection.send_error(); return
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
         ext = parse_qs(connection.query).get('ext', ['ts'])[0]
         if path.startswith('/{reqtype}/channel/'.format(**connection.__dict__)):
            if not path.endswith(ext):
-              connection.dieWithError(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
+              connection.send_error(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
               return
            name = ensure_text(unquote(os.path.splitext(os.path.basename(path))[0]))
            url = self.channels.get(name)
            if url is None:
-              connection.dieWithError(404, 'Unknown channel: %s' % name, logging.ERROR)
+              connection.send_error(404, 'Unknown channel: %s' % name, logging.ERROR)
               return
            params = {'name': name, 'value': url.split('/')[2], 'ext': ext}
            if url.startswith('acestream://'):

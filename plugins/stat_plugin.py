@@ -59,16 +59,16 @@ class Stat(AceProxyPlugin):
            else:
               try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
               except:
-                 connection.dieWithError(404, 'Not Found')
+                 connection.send_error(404, 'Not Found')
                  return
 
         elif path_file_ext:
            try: self.SendResponse(200, path_file_ext, self.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
            except:
-              connection.dieWithError(404, 'Not Found')
+              connection.send_error(404, 'Not Found')
               return
         else:
-           connection.dieWithError(404, 'Not Found')
+           connection.send_error(404, 'Not Found')
            return
 
     def getReqFileContent(self, path):
@@ -87,7 +87,7 @@ class Stat(AceProxyPlugin):
             'svg': 'image/svg+xml' }
 
         if f_ext not in mimetype:
-           connection.dieWithError(404, 'Not Found')
+           connection.send_error(404, 'Not Found')
            return
 
         connection.send_response(status_code)

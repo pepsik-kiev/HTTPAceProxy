@@ -52,7 +52,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
     server_version = 'HTTPAceProxy'
     protocol_version = 'HTTP/1.1'
 
-    def __init__(self, request, client_address):
+    def __init__(self,  request, client_address):
+        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         try: BaseHTTPRequestHandler.__init__(self, request, client_address, server)
         except: pass # unexpectedly interrupted by Ctl+C , broken pipe etc.
 
@@ -62,17 +63,23 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def log_request(self, code='-', size='-'): pass
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
-    def dieWithError(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
+    def finish(self):
+        logging.debug('Client {clientip} disconnected'.format(**self.__dict__))
+
+    def send_error(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
         Close connection with error
         '''
         try:
-           self.send_error(errorcode)
+           self.send_response(errorcode)
+           self.send_header('Content-Type', 'text/plain')
+           self.send_header('Content-Length', len(logmsg))
            self.end_headers()
+           self.wfile.write(logmsg)
         except: pass
         finally:
            logging.log(loglevel, logmsg)
-           if hasattr(self, 'handlerGreenlet'): self.handlerGreenlet.kill()
+           self.handlerGreenlet.kill()
 
     def do_HEAD(self): return self.do_GET(headers_only=True)
 
@@ -80,7 +87,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
+        gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0] # Connected client IP address
         logging.info('Accepted connection from {} path {}'.format(self.clientip, unquote(self.path)))
         logging.debug('Client headers: %s' % dict(self.headers))
@@ -89,7 +96,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
-           self.dieWithError(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
+           self.send_error(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
            return
         try:
            self.splittedpath = self.path.split('/')
@@ -102,16 +109,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except Exception as e:
                  import traceback
                  logger.error(traceback.format_exc())
-                 self.dieWithError(500, 'Plugin exception: %s' % repr(e))
+                 self.send_error(500, 'Plugin exception: %s' % repr(e))
 
            elif self.reqtype in ('content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'):
               self.handleRequest(headers_only=headers_only)
 
            else:
-              self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
+              self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
 
         except IndexError:
-           self.dieWithError(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
+           self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
         finally: return
 
     def handleRequest(self, **params):
@@ -123,7 +130,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-           self.dieWithError(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
+           self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
            return
         # Check if third parameter exists…/pid/blablablablabla/video.mpg
         #                                                     |_________|
@@ -131,10 +138,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
            if not self.path.endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                       '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
-              self.dieWithError(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
+              self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
               return
         except IndexError:
-           self.dieWithError(400, 'Bad Request', logging.WARNING) # 400 Bad Request
+           self.send_error(400, 'Bad Request', logging.WARNING) # 400 Bad Request
            return
         # Pretend to work fine with Fake or HEAD request.
         if params.get('headers_only') or AceConfig.isFakeRequest(self.path, self.query, self.headers):
@@ -175,13 +182,12 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if self.channelName is None: self.channelName = 'NoNameChannel'
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
-           self.dieWithError(404, '%s' % repr(e), logging.ERROR)
+           self.send_error(404, '%s' % repr(e), logging.ERROR)
            return
         ext = self.channelName[self.channelName.rfind('.') + 1:]
         if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            out = self.wfile
            # If &fmt transcode key present in request
@@ -229,7 +235,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               out.write(b'%x\r\n' % len(chunk) + chunk + b'\r\n' if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
-           _ = AceProxy.pool.map(lambda x: x.dieWithError(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
+           _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
@@ -283,7 +289,7 @@ def StreamReader(**params):
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
         except gevent.queue.Full:
-           client.dieWithError(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
+           client.send_error(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
     def StreamWriter(url):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout), stream=True).iter_content(chunk_size=1048576):
@@ -306,7 +312,7 @@ def StreamReader(**params):
           else: StreamWriter(params['url']) #AceStream return link for HTTP stream
     except TypeError: pass
     except Exception as err:
-       _ = AceProxy.pool.map(lambda x: x.dieWithError(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(params['infohash']))
+       _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(params['infohash']))
 
 # Spawning procedures
 def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):
