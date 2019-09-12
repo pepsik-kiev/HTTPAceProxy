@@ -21,6 +21,7 @@ class AceConst(object):
 
     SEX_MALE = 1
     SEX_FEMALE = 2
+    ACE_KEY = 'n51LvQoTlJzNGaFxseRK-uvnvX-sD4Vm5Axwmc4UcoD-jruxmKsuJaH0eVgE'
 
     STATE = {
              '0': 'IDLE',
@@ -81,7 +82,7 @@ class AceMessage(object):
             return 'HELLOBG version={}'.format(api_version)
 
         @staticmethod
-        def READY(request_key='', product_key=''):
+        def READY(request_key='', product_key=AceConst.ACE_KEY):
             return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(ensure_binary(request_key+product_key)).hexdigest())
         # End READY
 
