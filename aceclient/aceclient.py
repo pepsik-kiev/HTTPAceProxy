@@ -160,7 +160,9 @@ class AceClient(object):
            raise AceException('Engine response %s time exceeded. LOADRESP not resived!' % t)
 
     def GetSTATUS(self):
-        try: return self._response['STATUS'].get(timeout=self._responsetimeout) # Get status
+        try:
+           self._response['STATUS'] = AsyncResult()
+           return self._response['STATUS'].get(timeout=self._responsetimeout) # Get status
         except: return {'status': 'error'}
 
     def GetCONTENTINFO(self, paramsdict):
