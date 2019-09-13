@@ -93,9 +93,9 @@ class AceClient(object):
         Read telnet connection method
         '''
         while 1:
-            recvbuffer = gevent.with_timeout(timeout, self._socket.read_until, '\r\n', None, timeout_value='CLOSE telnet connetcion').strip().split()
-            logging.debug('<<< %s' % unquote(' '.join(recvbuffer)))
-            gevent.spawn(getattr(globals()['AceClient'], '_%s_' % recvbuffer[0].lower()), self, recvbuffer).link(self._response[recvbuffer[0]])
+           recvbuffer = gevent.with_timeout(timeout, self._socket.read_until, '\r\n', None, timeout_value='CLOSE telnet connetcion').strip().split()
+           logging.debug('<<< %s' % unquote(' '.join(recvbuffer)))
+           gevent.spawn(getattr(globals()[self.__class__.__name__], '_%s_' % recvbuffer[0].lower(), '_close_'), self, recvbuffer).link_value(self._response[recvbuffer[0]])
 
     def _write(self, message):
         '''
