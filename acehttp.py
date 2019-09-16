@@ -386,6 +386,7 @@ def findProcess(name):
 def clean_proc():
     # Trying to close all spawned processes gracefully
     if AceConfig.acespawn and isRunning(AceProxy.ace):
+       _ = AceProxy.pool.map(lambda x: x.send_error(500, 'Client {clientip} abnormal termination!'.format(**x.__dict__), logging.ERROR), AceProxy.clientcounter.getAllClientsList())
        if AceProxy.clientcounter.idleAce:
           AceProxy.clientcounter.idleAce.ShutdownAce(); gevent.sleep(0.5)
        AceProxy.ace.terminate()

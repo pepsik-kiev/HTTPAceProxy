@@ -67,64 +67,63 @@ class AceConst(object):
              'efile_url': 'START EFILE {efile_url} {stream_type}',
              }
 
-class AceMessage(object):
+class AceRequest(object):
 
-    class request(object):
-        # Events form client to engine
-        @staticmethod
-        def EVENT(command, params_dict={}):
-            return 'EVENT {} {}'.format(command, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
-        # End EVENT
+    # Events form client to engine
+    @staticmethod
+    def EVENT(command, params_dict={}):
+        return 'EVENT {} {}'.format(command, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
+    # End EVENT
 
-        # Commands from client to acestream
-        @staticmethod
-        def HELLOBG(api_version=AceConst.APIVERSION):
-            return 'HELLOBG version={}'.format(api_version)
+    # Commands from client to acestream
+    @staticmethod
+    def HELLOBG(api_version=AceConst.APIVERSION):
+        return 'HELLOBG version={}'.format(api_version)
 
-        @staticmethod
-        def READY(request_key='', product_key=AceConst.ACE_KEY):
-            return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(ensure_binary(request_key+product_key)).hexdigest())
-        # End READY
+    @staticmethod
+    def READY(request_key='', product_key=AceConst.ACE_KEY):
+        return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(ensure_binary(request_key+product_key)).hexdigest())
+    # End READY
 
-        @staticmethod
-        def LOADASYNC(params_dict):
-            return AceConst.LOADASYNC.get( (viewkeys(AceConst.LOADASYNC) & viewkeys(params_dict)).pop() ).format(**params_dict)
+    @staticmethod
+    def LOADASYNC(params_dict):
+        return AceConst.LOADASYNC.get((viewkeys(AceConst.LOADASYNC) & viewkeys(params_dict)).pop()).format(**params_dict)
 
-        @staticmethod
-        def START(params_dict):
-            return AceConst.START.get( (viewkeys(AceConst.START) & viewkeys(params_dict)).pop() ).format(**params_dict)
-        # End START
+    @staticmethod
+    def START(params_dict):
+        return AceConst.START.get((viewkeys(AceConst.START) & viewkeys(params_dict)).pop()).format(**params_dict)
+    # End START
 
-        STOP = 'STOP'
+    STOP = 'STOP'
 
-        @staticmethod
-        def GETCID(params_dict):
-            return 'GETCID checksum={checksum} infohash={infohash} developer={developer_id} affiliate={affiliate_id} zone={zone_id}'.format(**params_dict)
-        # End GETCID
+    @staticmethod
+    def GETCID(params_dict):
+        return 'GETCID checksum={checksum} infohash={infohash} developer={developer_id} affiliate={affiliate_id} zone={zone_id}'.format(**params_dict)
+    # End GETCID
 
-        @staticmethod
-        def GETADURL(params_dict):
-            return 'GETADURL width={width} height={height} infohash={infohash} action={action}'.format(**params_dict)
-        # End GETADURL
+    @staticmethod
+    def GETADURL(params_dict):
+        return 'GETADURL width={width} height={height} infohash={infohash} action={action}'.format(**params_dict)
+    # End GETADURL
 
-        @staticmethod
-        def USERDATA(**params_dict):
-            return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**params_dict)
-        # End USERDATA
+    @staticmethod
+    def USERDATA(**params_dict):
+        return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**params_dict)
+    # End USERDATA
 
-        @staticmethod
-        def SAVE(**params_dict):
-            return 'SAVE infohash={infohash} index={index} path={path}'.format(**params_dict)
-        # End SAVE
+    @staticmethod
+    def SAVE(**params_dict):
+        return 'SAVE infohash={infohash} index={index} path={path}'.format(**params_dict)
+    # End SAVE
 
-        @staticmethod
-        def LIVESEEK(timestamp):
-            return 'LIVESEEK {}'.format(timestamp)
-        # End LIVESEEK
+    @staticmethod
+    def LIVESEEK(timestamp):
+        return 'LIVESEEK {}'.format(timestamp)
+    # End LIVESEEK
 
-        SHUTDOWN = 'SHUTDOWN'
+    SHUTDOWN = 'SHUTDOWN'
 
-        @staticmethod
-        def SETOPTIONS(params_dict):
-            return 'SETOPTIONS {}'.format(' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
-        # End SETOPTIONS
+    @staticmethod
+    def SETOPTIONS(params_dict):
+        return 'SETOPTIONS {}'.format(' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
+    # End SETOPTIONS

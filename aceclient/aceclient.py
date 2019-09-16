@@ -69,7 +69,7 @@ class AceClient(object):
         '''
         try:
            self._response['HELLOTS'] = AsyncResult()
-           self._write(AceMessage.request.HELLOBG())
+           self._write(AceRequest.HELLOBG())
            paramsdict = self._response['HELLOTS'].get(timeout=self._responsetimeout)
         except gevent.Timeout as t:
            raise AceException('Engine response time %s exceeded. HELLOTS not resived!' % t)
@@ -77,10 +77,10 @@ class AceClient(object):
         try:
            self._response['AUTH'] = AsyncResult()
            self._response['NOTREADY'] = AsyncResult()
-           self._write(AceMessage.request.READY(paramsdict.get('key'), self._product_key))
+           self._write(AceRequest.READY(paramsdict.get('key'), self._product_key))
            auth_level = self._response['AUTH'].get(timeout=self._responsetimeout)
            if int(paramsdict.get('version_code', 0)) >= 3003600:
-              self._write(AceMessage.request.SETOPTIONS({'use_stop_notifications': '1'}))
+              self._write(AceRequest.SETOPTIONS({'use_stop_notifications': '1'}))
         except gevent.Timeout as t:
            if self._response['NOTREADY'].value:
               errmsg = 'Engine response time %s exceeded. %s resived!' % (t, self._response['NOTREADY'].value)
@@ -111,7 +111,7 @@ class AceClient(object):
         '''
         Shutdown telnet connection method
         '''
-        self._write(AceMessage.request.SHUTDOWN)
+        self._write(AceRequest.SHUTDOWN)
 
     def GetBroadcastStartParams(self, paramsdict):
         '''
@@ -125,7 +125,7 @@ class AceClient(object):
         '''
         try:
            self._response['START'] = AsyncResult()
-           self._write(AceMessage.request.START(paramsdict))
+           self._write(AceRequest.START(paramsdict))
            paramsdict = self._response['START'].get(timeout=self._videotimeout)
            if self._seekback and paramsdict.get('stream') and not paramsdict['url'].endswith('.m3u8'):
               try:
@@ -136,7 +136,7 @@ class AceClient(object):
               else:
                  try:
                     self._response['START'] = AsyncResult()
-                    self._write(AceMessage.request.LIVESEEK(int(paramsdict['last']) - self._seekback))
+                    self._write(AceRequest.LIVESEEK(int(paramsdict['last']) - self._seekback))
                     paramsdict = self._response['START'].get(timeout=self._responsetimeout)
                  except gevent.Timeout as t:
                     raise AceException('START URL not received after LIVESEEK! Engine response time %s exceeded' % t)
@@ -149,12 +149,12 @@ class AceClient(object):
         '''
         Stop video method
         '''
-        self._write(AceMessage.request.STOP)
+        self._write(AceRequest.STOP)
 
     def GetLOADASYNC(self, paramsdict):
         try:
            self._response['LOADRESP'] = AsyncResult()
-           self._write(AceMessage.request.LOADASYNC(paramsdict))
+           self._write(AceRequest.LOADASYNC(paramsdict))
            return self._response['LOADRESP'].get(timeout=self._responsetimeout) # Get _contentinfo json
         except gevent.Timeout as t:
            raise AceException('Engine response %s time exceeded. LOADRESP not resived!' % t)
@@ -232,7 +232,7 @@ class AceClient(object):
         EVENT livepos last=xxx live_first=xxx pos=xxx first_ts=xxx last_ts=xxx is_live=1 live_last=xxx buffer_pieces=xx | for live translation only!
         EVENT download_stopped reason=reason option=option
         '''
-        if 'getuserdata' in recvbuffer: self._write(AceMessage.request.USERDATA(gender=self._gender, age=self._age))
+        if 'getuserdata' in recvbuffer: self._write(AceRequest.USERDATA(gender=self._gender, age=self._age))
         elif any(x in ['cansave', 'showurl', 'download_stopped'] for x in recvbuffer): pass
         return {k:v for k,v in [x.split('=') for x in recvbuffer[2:] if '=' in x]}
 
