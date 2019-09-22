@@ -23,11 +23,10 @@ from datetime import timedelta, datetime
 from urllib3.packages.six.moves.urllib.parse import parse_qs, quote, unquote
 from urllib3.packages.six.moves import range
 from urllib3.packages.six import ensure_binary
-from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
 
-class P2pproxy(AceProxyPlugin):
+class P2pproxy:
     handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logobase')
     logger = logging.getLogger('plugin_p2pproxy')
     compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
@@ -36,7 +35,7 @@ class P2pproxy(AceProxyPlugin):
 
     def __init__(self, AceConfig, AceProxy): pass
 
-    def handle(self, connection, headers_only=False):
+    def handle(self, connection):
         P2pproxy.logger.debug('Handling request')
 
         hostport = connection.headers['Host']
@@ -62,7 +61,7 @@ class P2pproxy(AceProxyPlugin):
                         connection.send_error(400, 'Bad request')  # Bad request
                         return
 
-                if headers_only:
+                if connection.headers_only:
                     connection.send_response(200)
                     connection.send_header('Content-Type', 'video/mpeg')
                     connection.end_headers()
@@ -86,13 +85,13 @@ class P2pproxy(AceProxyPlugin):
                 elif stream_type == 'torrent': connection.path = '/url/%s/%s.ts' % (quote(stream,''), name)
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/%s.ts' % (stream, name)
 
-                connection.splittedpath = connection.path.split('/')
-                connection.reqtype = connection.splittedpath[1].lower()
-                connection.handleRequest(headers_only=headers_only, channelName=name, channelIcon=logo, fmt=self.params.get('fmt', [''])[0])
+                connection.__dict__.update({'splittedpath': connection.path.split('/')})
+                connection.__dict__.update({'channelName': name, 'channelIcon': logo, 'reqtype': connection.splittedpath[1].lower()})
+                return
 
             # /channels/?filter=[filter]&group=[group]&type=m3u
             elif connection.reqtype == 'channels.m3u' or self.params.get('type', [''])[0] == 'm3u':
-                if headers_only:
+                if connection.headers_only:
                     connection.send_response(200)
                     connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                     connection.end_headers()
@@ -138,7 +137,7 @@ class P2pproxy(AceProxyPlugin):
 
             # /channels/?filter=[filter]
             else:
-                if headers_only:
+                if connection.headers_only:
                     connection.send_response(200)
                     connection.send_header('Access-Control-Allow-Origin', '*')
                     connection.send_header('Connection', 'close')
@@ -172,7 +171,7 @@ class P2pproxy(AceProxyPlugin):
             connection.send_header('Connection', 'close')
             connection.send_header('Content-Type', 'text/xml;charset=utf-8')
 
-            if headers_only:
+            if connecyion.headers_only:
                 connection.end_headers()
                 return
 
@@ -234,7 +233,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
 
-                if headers_only:
+                if connection.headers_only:
                     connection.end_headers()
                     return
 
@@ -272,7 +271,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Connection', 'close')
                 connection.send_header('Content-Type', 'text/xml;charset=utf-8')
 
-                if headers_only: connection.end_headers()
+                if connection.headers_only: connection.end_headers()
                 else:
                     try: archive_channels = TorrentTvApi(config.email, config.password).archive_channels(True)
                     except Exception as err:
@@ -295,7 +294,7 @@ class P2pproxy(AceProxyPlugin):
                     connection.send_error(400, 'Bad request')  # Bad request
                     return
 
-                if headers_only:
+                if connection.headers_only:
                     connection.send_response(200)
                     connection.send_header("Content-Type", "video/mpeg")
                     connection.end_headers()
@@ -311,14 +310,14 @@ class P2pproxy(AceProxyPlugin):
                 elif stream_type == 'torrent': connection.path = '/url/%s/stream.ts' % quote(stream,'')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.ts' % stream
 
-                connection.splittedpath = connection.path.split('/')
-                connection.reqtype = connection.splittedpath[1].lower()
-                connection.handleRequest(headers_only=headers_only, fmt=self.params.get('fmt', [''])[0])
+                connection.__dict__.update({'splittedpath': connection.path.split('/')})
+                connection.__dict__.update({'reqtype': connection.splittedpath[1].lower()})
+                return
 
             # /archive/?type=m3u&date=[param_date]&channel_id=[param_channel]
             elif self.params.get('type', [''])[0] == 'm3u':
 
-                if headers_only:
+                if connection.headers_only:
                     connection.send_response(200)
                     connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                     connection.end_headers()
@@ -409,7 +408,7 @@ class P2pproxy(AceProxyPlugin):
                 connection.send_header('Connection', 'close')
                 connection.send_header('Content-Type', 'text/xml;charset=utf-8')
 
-                if headers_only: connection.end_headers()
+                if connection.headers_only: connection.end_headers()
                 else:
                     try: records_list = TorrentTvApi(config.email, config.password).records(param_channel, d.strftime('%d-%m-%Y'), True)
                     except Exception as err:

@@ -52,10 +52,10 @@ class AceConst(object):
                     'stream_id')
 
     LOADASYNC = {
-                 'url': 'LOADASYNC {request_id} TORRENT {url} {developer_id} {affiliate_id} {zone_id}',
-                 'infohash': 'LOADASYNC {request_id} INFOHASH {infohash} {developer_id} {affiliate_id} {zone_id}',
-                 'data': 'LOADASYNC {request_id} RAW {data} {developer_id} {affiliate_id} {zone_id}',
-                 'content_id': 'LOADASYNC {request_id} PID {content_id}',
+                 'url': 'LOADASYNC {sessionID} TORRENT {url} {developer_id} {affiliate_id} {zone_id}',
+                 'infohash': 'LOADASYNC {sessionID} INFOHASH {infohash} {developer_id} {affiliate_id} {zone_id}',
+                 'data': 'LOADASYNC {sessionID} RAW {data} {developer_id} {affiliate_id} {zone_id}',
+                 'content_id': 'LOADASYNC {sessionID} PID {content_id}',
                  }
 
     START = {
@@ -107,12 +107,12 @@ class AceRequest(object):
     # End GETADURL
 
     @staticmethod
-    def USERDATA(**params_dict):
+    def USERDATA(params_dict):
         return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**params_dict)
     # End USERDATA
 
     @staticmethod
-    def SAVE(**params_dict):
+    def SAVE(params_dict):
         return 'SAVE infohash={infohash} index={index} path={path}'.format(**params_dict)
     # End SAVE
 

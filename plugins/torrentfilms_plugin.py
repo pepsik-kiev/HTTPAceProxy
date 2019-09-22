@@ -13,11 +13,10 @@ import bencode, hashlib
 import gevent
 import zlib
 from urllib3.packages.six.moves.urllib.parse import parse_qs
-from PluginInterface import AceProxyPlugin
 from utils import schedule
 import config.torrentfilms as config
 
-class Torrentfilms(AceProxyPlugin):
+class Torrentfilms:
 
     handlers = ('films', 'proxyfilms')
 
@@ -88,9 +87,9 @@ class Torrentfilms(AceProxyPlugin):
         self.logger.info('Torrent  playlist created')
         return ln
 
-    def handle(self, connection, headers_only=False):
+    def handle(self, connection, **params):
 
-        if headers_only:
+        if connection.headers_only:
            connection.send_response(200)
            connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
            connection.send_header('Connection', 'close')

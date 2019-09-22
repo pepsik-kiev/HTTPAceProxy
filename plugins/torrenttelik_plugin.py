@@ -10,14 +10,13 @@ import gevent, requests, os
 import logging, zlib
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
 from urllib3.packages.six import ensure_str, ensure_text, ensure_binary
-from PluginInterface import AceProxyPlugin
 from PlaylistGenerator import PlaylistGenerator
 from requests_file import FileAdapter
 from utils import schedule
 import config.torrenttelik as config
 import config.picons.torrenttelik as picons
 
-class Torrenttelik(AceProxyPlugin):
+class Torrenttelik:
 
     handlers = ('torrent-telik',)
 
@@ -70,7 +69,7 @@ class Torrenttelik(AceProxyPlugin):
 
         return True
 
-    def handle(self, connection, headers_only=False):
+    def handle(self, connection):
         play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
@@ -88,16 +87,15 @@ class Torrenttelik(AceProxyPlugin):
            if url is None:
               connection.send_error(404, 'Unknown channel: %s' % name, logging.ERROR)
               return
-           params = {'name': name, 'value': url.split('/')[2], 'ext': ext}
+           connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'ext': ext, 'channelIcon': self.picons.get(name)})
            if url.startswith('acestream://'):
-              connection.path = u'/content_id/{value}/{name}.{ext}'.format(**params)
+              connection.path = u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
            elif url.startswith('infohash://'):
-              connection.path = u'/infohash/{value}/{name}.{ext}'.format(**params)
+              connection.path = u'/infohash/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
            elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
-              params.update({'value': quote(url,'')})
-              connection.path = u'/url/{value}/{name}.{ext}'.format(**params)
-           connection.splittedpath = connection.path.split('/')
-           connection.reqtype = connection.splittedpath[1].lower()
+              connection.path = u'/url/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
+           connection.__dict__.update({'splittedpath': connection.path.split('/')})
+           connection.__dict__.update({'reqtype': connection.splittedpath[1].lower(), 'channelIcon': self.picons.get(name)})
            play = True
         elif self.etag == connection.headers.get('If-None-Match'):
            self.logger.debug('ETag matches - returning 304')
@@ -125,7 +123,7 @@ class Torrenttelik(AceProxyPlugin):
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
 
-        if play: connection.handleRequest(headers_only=headers_only, channelName=name, channelIcon=self.picons.get(name))
-        elif not headers_only:
+        if play: return
+        elif not connection.headers_only:
            self.logger.debug('Exporting torrent-telik.m3u playlist')
            connection.wfile.write(exported)

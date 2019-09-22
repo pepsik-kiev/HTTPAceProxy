@@ -10,7 +10,6 @@ __author__ = 'Dorik1972, !Joy!'
 import time, zlib
 import psutil, requests
 import logging
-from PluginInterface import AceProxyPlugin
 from gevent.subprocess import Popen, PIPE
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
@@ -19,7 +18,7 @@ from urllib3.packages.six import ensure_text, ensure_binary
 from requests.compat import json
 from requests.utils import re
 
-class Stat(AceProxyPlugin):
+class Stat:
     handlers = ('stat',)
     logger = logging.getLogger('STAT')
 
@@ -45,11 +44,11 @@ class Stat(AceProxyPlugin):
            Stat.logger.debug("Can't obtain vendor for %s address" % ip_address)
            return 'Local IP address'
 
-    def handle(self, connection, headers_only=False):
+    def handle(self, connection, **params):
         self.params = parse_qs(connection.query)
         path_file_ext = ''.join(connection.path.split('.')[-1:])
 
-        if headers_only:
+        if connection.headers_only:
            self.SendResponse(200, 'json', '', connection)
            return
 
@@ -125,24 +124,24 @@ class Stat(AceProxyPlugin):
             }
 
         def _add_client_data(c):
-            if not c.clientInfo:
+            if not c.clientDetail:
                if self.ip_is_local(c.clientip):
-                  c.clientInfo = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
+                  c.clientDetail = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
                else:
                   try:
                      headers = {'User-Agent': 'API Browser'}
                      with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
                         if r.encoding is None: r.encoding = 'utf-8'
-                        c.clientInfo = json.loads(r.text.split('(', 1)[1].strip(')'))
-                        c.clientInfo['vendor'] = ''
-                  except: c.clientInfo = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
+                        c.clientDetail = json.loads(r.text.split('(', 1)[1].strip(')'))
+                        c.clientDetail['vendor'] = ''
+                  except: c.clientDetail = {'vendor': '', 'country_code': '', 'country_name': '', 'city': ''}
 
             return {
                 'sessionID': c.sessionID,
                 'channelIcon': c.channelIcon,
                 'channelName': ensure_text(c.channelName),
                 'clientIP': c.clientip,
-                'clientInfo': c.clientInfo,
+                'clientInfo': c.clientDetail,
                 #'clientBuff': c.q.qsize()*100/self.config.videotimeout,
                 'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),

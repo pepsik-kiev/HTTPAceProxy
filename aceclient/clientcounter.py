@@ -43,7 +43,7 @@ class ClientCounter(object):
         Remove client from the list by CID key in broadcast dictionary
         '''
         try:
-           client, = self.getClientsList(client.CID) # Get the last client of existing broadcast
+           _, = self.getClientsList(client.CID) # Try to get the last client of existing broadcast
            try:
               self.idleAce = self.clients.pop(client.CID).pop().ace
               self.idleAce.StopBroadcast()
