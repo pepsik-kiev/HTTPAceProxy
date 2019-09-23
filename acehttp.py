@@ -1,4 +1,4 @@
-#!/usr/bin/pyton3
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -14,6 +14,8 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
+# http://www.gevent.org/api/gevent.resolver.ares.html
+gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
@@ -98,54 +100,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.send_error(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
            return
-        try:
-           self.splittedpath = self.path.split('/')
-           self.reqtype = self.splittedpath[1].lower()
-           # backward compatibility
-           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype)
 
-           if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
-              self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-
-           # If first parameter is 'content_id','url','infohash' .... etc or it should be handled by plugin
-           if self.reqtype in AceProxy.pluginshandlers:
-              try: AceProxy.pluginshandlers.get(self.reqtype).handle(self)
-              except Exception as e:
-                 import traceback
-                 logger.error(traceback.format_exc())
-                 self.send_error(500, 'Plugin exception: %s' % repr(e))
-
-           if self.reqtype in AceProxy.handlers:
-              self.handleRequest()
-
-        except IndexError:
-           self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-        finally: return
-
-    def handleRequest(self):
-        '''
-        :params: dict() with keys: channelName, channelIcon
-        '''
-        logger = logging.getLogger('HandleRequest')
-        # Limit on the number of connected clients
-        if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-           self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
-           return
-        # Check if third parameter exists…/pid/blablablablabla/video.mpg
-        #                                                     |_________|
-        # And if it ends with regular video extension
-        try:
-           if not self.path.endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
-                                      '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
-              self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-              return
-        except IndexError:
-           self.send_error(400, 'Bad Request', logging.WARNING) # 400 Bad Request
-           return
         # Pretend to work fine with Fake or HEAD request.
         if self.headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
            # Return 200 and exit
-           if self.headers_only: logger.debug('Sending headers and closing connection')
+           if self.headers_only: logger.debug('Head request - sending headers and closing connection')
            else: logger.debug('Fake request - closing connection')
            self.send_response(200)
            self.send_header('Content-Type', 'video/mp2t')
@@ -153,6 +112,48 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            return
 
+        try:
+           self.splittedpath = self.path.split('/')
+           self.reqtype = self.splittedpath[1].lower()
+           # backward compatibility
+           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype)
+           if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
+              raise IndexError()
+        except IndexError:
+           self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
+           return
+        # If request should be handled by plugin
+        if self.reqtype in AceProxy.pluginshandlers:
+           try: AceProxy.pluginshandlers.get(self.reqtype).handle(self)
+           except Exception as e:
+              import traceback
+              logger.error(traceback.format_exc())
+              self.send_error(500, 'Plugin exception: %s' % repr(e))
+              return
+        # Limit on the number of connected clients
+        if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
+           self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
+           return
+        # If request parameter is 'content_id','url','infohash'.... etc
+        elif self.reqtype in AceProxy.handlers:
+           self.handleRequest()
+
+    def handleRequest(self):
+        '''
+        Main request handler path: /{reqtype}/{reqtype_value}/{fname.ext}
+        '''
+        logger = logging.getLogger('HandleRequest')
+        # Check if third path parameter is exists /{reqtype}/{reqtype_value}/video.mpg
+        #                                                                   |_________|
+        # And if it ends with regular video extension
+        try:
+           if not self.splittedpath[3].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+                                                 '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
+              self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
+              return
+        except IndexError:
+           self.send_error(400, 'Bad Request', logging.WARNING) # 400 Bad Request
+           return
         # Make parameters dict
         self.__dict__.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         self.__dict__.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))]})
@@ -172,7 +173,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
                               'channelIcon': self.__dict__.get('channelIcon', 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'),
                              })
         # End parameters dict
-
         try:
            if not AceProxy.clientcounter.idleAce:
               logger.debug('Create connection with AceStream on {aceHostIP}:{aceAPIport}'.format(**AceConfig.ace))
@@ -250,7 +250,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: pass
            return
 
-class AceProxy(object):
+class AceProxy:
     '''
     Inter-class interaction class
     '''
@@ -518,14 +518,16 @@ except: pass
 sys.path.insert(0, 'plugins')
 logger.info('Load Ace Stream HTTP Proxy plugins .....')
 
-def add_handler(i):
-    try:
-       plugname = i.split('_')[0].capitalize()
-       plugininstance = getattr(__import__(i), plugname)(AceConfig, AceProxy)
-    except Exception as err: logger.error("Can't load plugin %s: %s" % (plugname, repr(err)))
-    else:
-       logger.debug('Plugin loaded: %s' % plugname)
-       return {j:plugininstance for j in plugininstance.handlers}
+def add_handler(name):
+    # isidentifier() Py2/Py3 compatible
+    if requests.utils.re.match(r'^\w+$', name, requests.utils.re.UNICODE) and not name[0].isdigit() and name not in sys.modules:
+       try:
+          plugname = name.split('_')[0].capitalize()
+          plugininstance = getattr(__import__(name), plugname)(AceConfig, AceProxy)
+       except Exception as err: logger.error("Can't load plugin %s: %s" % (plugname, repr(err)))
+       else:
+          logger.debug('Plugin loaded: %s' % plugname)
+          return {j:plugininstance for j in plugininstance.handlers}
 
 # Creating dict of handlers
 pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]

@@ -68,7 +68,6 @@ class Torrenttv:
         return True
 
     def handle(self, connection):
-        play = False
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
            if not self.Playlistparser(): connection.send_error(); return
@@ -94,14 +93,16 @@ class Torrenttv:
               connection.path = u'/url/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
            connection.__dict__.update({'splittedpath': connection.path.split('/')})
            connection.__dict__.update({'reqtype': connection.splittedpath[1].lower(), 'channelIcon': self.picons.get(name)})
-           play = True
+           return
+
         elif self.etag == connection.headers.get('If-None-Match'):
            self.logger.debug('ETag matches - returning 304')
            connection.send_response(304)
            connection.send_header('Connection', 'close')
            connection.end_headers()
            return
-        else:
+
+        elif not connection.headers_only:
            hostport = connection.headers['Host']
            path = '' if not self.channels else '/{reqtype}/channel'.format(**connection.__dict__)
            exported = self.playlist.exportm3u(hostport=hostport, path=path, header=config.m3uheadertemplate, query=connection.query)
@@ -120,8 +121,5 @@ class Torrenttv:
            connection.send_response(200)
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
-
-        if play: return
-        elif not connection.headers_only:
-           self.logger.debug('Exporting torrenttv.m3u playlist')
            connection.wfile.write(exported)
+           self.logger.debug('torrenttv.m3u playlist sent to {clientip}'.format(**connection.__dict__))
