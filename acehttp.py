@@ -1,4 +1,4 @@
-#!/usr/local/bin/pypy3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
