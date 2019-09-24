@@ -59,16 +59,13 @@ class Stat:
               try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
               except:
                  connection.send_error(404, 'Not Found')
-                 return
 
         elif path_file_ext:
            try: self.SendResponse(200, path_file_ext, self.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
            except:
               connection.send_error(404, 'Not Found')
-              return
         else:
            connection.send_error(404, 'Not Found')
-           return
 
     def getReqFileContent(self, path):
         with open('http/%s' % path, 'rb') as handle:
@@ -87,7 +84,6 @@ class Stat:
 
         if f_ext not in mimetype:
            connection.send_error(404, 'Not Found')
-           return
 
         connection.send_response(status_code)
         connection.send_header('Content-type', mimetype[f_ext])

@@ -72,7 +72,7 @@ class Torrenttelik:
     def handle(self, connection):
         # 30 minutes cache
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
-           if not self.Playlistparser(): connection.send_error(); return
+           if not self.Playlistparser(): connection.send_error()
 
         url = urlparse(connection.path)
         path = url.path[0:-1] if url.path.endswith('/') else url.path
@@ -80,12 +80,10 @@ class Torrenttelik:
         if path.startswith('/{reqtype}/channel/'.format(**connection.__dict__)):
            if not path.endswith(ext):
               connection.send_error(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
-              return
            name = ensure_text(unquote(os.path.splitext(os.path.basename(path))[0]))
            url = self.channels.get(name)
            if url is None:
               connection.send_error(404, 'Unknown channel: %s' % name, logging.ERROR)
-              return
            connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'ext': ext, 'channelIcon': self.picons.get(name)})
            if url.startswith('acestream://'):
               connection.path = u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)

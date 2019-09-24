@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/pypy3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -34,7 +34,7 @@ import psutil, requests, signal, mimetypes
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
 from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
 from urllib3.packages.six.moves import range, map
-from urllib3.packages.six import viewkeys, ensure_binary
+from urllib3.packages.six import viewkeys, ensure_binary, ensure_str
 try:
    from ipaddress import ip_network as IPNetwork, ip_address as IPAddress
 except:
@@ -54,8 +54,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def __init__(self, socket, client_address):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         self.headers_only = False
-        try: BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
-        except: pass # unexpectedly interrupted by Ctl+C, broken pipe etc.
+        BaseHTTPRequestHandler.__init__(self, socket, client_address, self)
+        socket.close()
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, unquote(self.path).decode('utf8')))
@@ -82,6 +82,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.handlerGreenlet.kill()
 
     def do_HEAD(self):
+        '''
+        HEAD request handler
+        '''
         self.headers_only = True
         return self.do_GET()
 
@@ -99,7 +102,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.send_error(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
-           return
 
         # Pretend to work fine with Fake or HEAD request.
         if self.headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
@@ -115,13 +117,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
            self.splittedpath = self.path.split('/')
            self.reqtype = self.splittedpath[1].lower()
-           # backward compatibility
-           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype)
+           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype) # For backward compatibility
            if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
               raise IndexError()
         except IndexError:
            self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-           return
         # If request should be handled by plugin
         if self.reqtype in AceProxy.pluginshandlers:
            try: AceProxy.pluginshandlers.get(self.reqtype).handle(self)
@@ -129,11 +129,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
               import traceback
               logger.error(traceback.format_exc())
               self.send_error(500, 'Plugin exception: %s' % repr(e))
-              return
         # Limit on the number of connected clients
         if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
            self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
-           return
         # If request parameter is 'content_id','url','infohash'.... etc
         elif self.reqtype in AceProxy.handlers:
            self.handleRequest()
@@ -147,13 +145,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #                                                                   |_________|
         # And if it ends with regular video extension
         try:
-           if not self.splittedpath[3].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+           if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                                  '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
               self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-              return
         except IndexError:
            self.send_error(400, 'Bad Request', logging.WARNING) # 400 Bad Request
-           return
         # Make parameters dict
         self.__dict__.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         self.__dict__.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))]})
@@ -179,16 +175,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
               AceProxy.clientcounter.idleAce = aceclient.AceClient(**self.__dict__)
               AceProxy.clientcounter.idleAce.GetAUTH()
            if self.reqtype not in ('direct_url', 'efile_url'):
-              self.CID, self.channelName = AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__)
-              if not self.channelName: self.channelName = slef.__dict__.get('channelName')
+              self.__dict__.update(AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__))
+              self.channelName = self.__dict__.get('channelName', ensure_str(next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), None)))
            else:
-              self.channelName = slef.__dict__.get('channelName')
-              self.CID = requests.auth.hashlib.sha1(ensure_binary(self.channelName)).hexdigest()
+              self.channelName = self.__dict__.get('channelName')
+              self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.channelName)).hexdigest()
            if self.channelName is None: self.channelName = 'NoNameChannel'
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.send_error(404, '%s' % repr(e), logging.ERROR)
-           return
+
         ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
         if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
@@ -240,7 +236,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               out.write(b'%x\r\n' % len(chunk) + chunk + b'\r\n' if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
-           _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.CID))
+           _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
@@ -283,7 +279,7 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 
 def StreamReader(**params):
     '''
-    [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
+    params: [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
     '''
     broadcast = gevent.getcurrent()
 

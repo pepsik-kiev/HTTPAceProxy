@@ -59,7 +59,6 @@ class P2pproxy:
                         return
                     else:
                         connection.send_error(400, 'Bad request')  # Bad request
-                        return
 
                 if connection.headers_only:
                     connection.send_response(200)
@@ -70,7 +69,6 @@ class P2pproxy:
                 try: stream_type, stream, translations_list = TorrentTvApi(config.email, config.password).stream_source(channel_id)
                 except Exception as err:
                    connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                   return
                 name=logo=''
 
                 for channel in translations_list:
@@ -81,7 +79,7 @@ class P2pproxy:
                         break
 
                 if stream_type not in ('torrent', 'contentid'):
-                    connection.send_error(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
+                    connection.send_error(404, 'Unknown stream type: %s' % stream_type, logging.ERROR)
                 elif stream_type == 'torrent': connection.path = '/url/%s/%s.ts' % (quote(stream,''), name)
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/%s.ts' % (stream, name)
 
@@ -103,7 +101,6 @@ class P2pproxy:
                 try: translations_list = TorrentTvApi(config.email, config.password).translations(self.params.get('filter', ['all'])[0])
                 except Exception as err:
                    connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                   return
 
                 playlistgen = PlaylistGenerator(m3uchanneltemplate=config.m3uchanneltemplate)
                 P2pproxy.logger.debug('Generating requested m3u playlist')
@@ -148,7 +145,6 @@ class P2pproxy:
                 try: translations_list = TorrentTvApi(config.email, config.password).translations(self.params.get('filter', ['all'])[0], True)
                 except Exception as err:
                    connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                   return
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
                 response_headers = {'Access-Control-Allow-Origin': '*', 'Connection': 'close',
@@ -178,7 +174,6 @@ class P2pproxy:
             try: translations_list = TorrentTvApi(config.email, config.password).translations('all', True)
             except Exception as err:
                connection.send_error(404, '%s' % repr(err), logging.ERROR)
-               return
             try:
                 h = connection.headers.get('Accept-Encoding').split(',')[0]
                 translations_list = P2pproxy.compress_method[h].compress(translations_list) + P2pproxy.compress_method[h].flush()
@@ -240,7 +235,6 @@ class P2pproxy:
                 try: channels_list = TorrentTvApi(config.email, config.password).archive_channels()
                 except Exception as err:
                    connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                   return
                 hostport = connection.headers['Host']
                 playlistgen = PlaylistGenerator()
                 suffix = '&suffix=%s' % self.params.get('suffix')[0] if 'suffix' in self.params else ''
@@ -276,7 +270,6 @@ class P2pproxy:
                     try: archive_channels = TorrentTvApi(config.email, config.password).archive_channels(True)
                     except Exception as err:
                        connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                       return
                     P2pproxy.logger.debug('Exporting m3u playlist')
                     try:
                         h = connection.headers.get('Accept-Encoding').split(',')[0]
@@ -292,7 +285,6 @@ class P2pproxy:
                 record_id = self.params.get('id', [''])[0]
                 if not record_id:
                     connection.send_error(400, 'Bad request')  # Bad request
-                    return
 
                 if connection.headers_only:
                     connection.send_response(200)
@@ -303,10 +295,9 @@ class P2pproxy:
                 try: stream_type, stream = TorrentTvApi(config.email, config.password).archive_stream_source(record_id)
                 except Exception as err:
                    connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                   return
 
                 if stream_type not in ('torrent', 'contentid'):
-                    connection.send_error(404, 'Unknown stream type: %s' % stream_type, logging.ERROR); return
+                    connection.send_error(404, 'Unknown stream type: %s' % stream_type, logging.ERROR)
                 elif stream_type == 'torrent': connection.path = '/url/%s/stream.ts' % quote(stream,'')
                 elif stream_type == 'contentid': connection.path = '/content_id/%s/stream.ts' % stream
 
@@ -331,7 +322,6 @@ class P2pproxy:
                     try: channels_list = TorrentTvApi(config.email, config.password).archive_channels()
                     except Exception as err:
                        connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                       return
 
                     for channel in channels_list:
                             channel_id = channel.getAttribute('epg_id')
@@ -339,7 +329,6 @@ class P2pproxy:
                                 try: records_list = TorrentTvApi(config.email, config.password).records(channel_id, d)
                                 except Exception as err:
                                    connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                                   return
                                 channel_name = channel.getAttribute('name')
                                 logo = channel.getAttribute('logo')
                                 if logo != '' and config.fullpathlogo: logo = config.logobase + logo
@@ -357,7 +346,6 @@ class P2pproxy:
                        channels_list = TorrentTvApi(config.email, config.password).archive_channels()
                     except Exception as err:
                        connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                       return
                     P2pproxy.logger.debug('Generating archive m3u playlist')
 
                     for record in records_list:
@@ -401,7 +389,6 @@ class P2pproxy:
                 param_channel = self.params.get('channel_id', [''])[0]
                 if not param_channel:
                     connection.send_error(500, 'Got /archive/ request but no channel_id specified!', logging.ERROR)
-                    return
 
                 connection.send_response(200)
                 connection.send_header('Access-Control-Allow-Origin', '*')
@@ -413,7 +400,6 @@ class P2pproxy:
                     try: records_list = TorrentTvApi(config.email, config.password).records(param_channel, d.strftime('%d-%m-%Y'), True)
                     except Exception as err:
                        connection.send_error(404, '%s' % repr(err), logging.ERROR)
-                       return
                     P2pproxy.logger.debug('Exporting m3u playlist')
                     try:
                         h = connection.headers.get('Accept-Encoding').split(',')[0]

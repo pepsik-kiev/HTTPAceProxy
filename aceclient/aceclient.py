@@ -9,7 +9,7 @@ from gevent.util import wrap_errors
 from requests.compat import json
 from urllib3.packages.six.moves.urllib.parse import unquote
 from urllib3.packages.six.moves import zip
-from urllib3.packages.six import PY2, ensure_str
+from urllib3.packages.six import PY2
 from .acemessages import *
 
 class AceException(Exception):
@@ -166,14 +166,13 @@ class AceClient(object):
         except: return {'status': 'error'}
 
     def GetCONTENTINFO(self, paramsdict):
-        file_idx = int(paramsdict.get('file_indexes', 0))
         paramsdict = self.GetLOADASYNC(paramsdict)
         if paramsdict.get('status') in (1, 2):
-           return paramsdict.get('infohash'), ensure_str(next(iter([ x[0] for x in paramsdict.get('files') if x[1] == file_idx ]), None))
+            return paramsdict
         elif paramsdict.get('status') == 0:
            errmsg = 'LOADASYNC returned status 0: The transport file does not contain audio/video files'
         else:
-           errmsg = 'LOADASYNC returned error with message: %s' % contentinfo['message']
+           errmsg = 'LOADASYNC returned error with message: {message}'.format(**paramsdict)
         raise AceException(errmsg)
 
 ######################################## AceEngine API answers parsers ########################################
