@@ -71,8 +71,8 @@ class AceRequest(object):
 
     # Events form client to engine
     @staticmethod
-    def EVENT(command, params_dict={}):
-        return 'EVENT {} {}'.format(command, ' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
+    def EVENT(command, paramsdict={}):
+        return 'EVENT {} {}'.format(command, ' '.join(['{}={}'.format(k,v) for k,v in paramsdict.items()]))
     # End EVENT
 
     # Commands from client to acestream
@@ -86,34 +86,34 @@ class AceRequest(object):
     # End READY
 
     @staticmethod
-    def LOADASYNC(params_dict):
-        return AceConst.LOADASYNC.get((viewkeys(AceConst.LOADASYNC) & viewkeys(params_dict)).pop()).format(**params_dict)
+    def LOADASYNC(paramsdict):
+        return AceConst.LOADASYNC.get((viewkeys(AceConst.LOADASYNC) & viewkeys(paramsdict)).pop()).format(**paramsdict)
 
     @staticmethod
-    def START(params_dict):
-        return AceConst.START.get((viewkeys(AceConst.START) & viewkeys(params_dict)).pop()).format(**params_dict)
+    def START(paramsdict):
+        return AceConst.START.get((viewkeys(AceConst.START) & viewkeys(paramsdict)).pop()).format(**paramsdict)
     # End START
 
     STOP = 'STOP'
 
     @staticmethod
-    def GETCID(params_dict):
-        return 'GETCID checksum={checksum} infohash={infohash} developer={developer_id} affiliate={affiliate_id} zone={zone_id}'.format(**params_dict)
+    def GETCID(paramsdict):
+        return 'GETCID checksum={checksum} infohash={infohash} developer={developer_id} affiliate={affiliate_id} zone={zone_id}'.format(**paramsdict)
     # End GETCID
 
     @staticmethod
-    def GETADURL(params_dict):
-        return 'GETADURL width={width} height={height} infohash={infohash} action={action}'.format(**params_dict)
+    def GETADURL(paramsdict):
+        return 'GETADURL width={width} height={height} infohash={infohash} action={action}'.format(**paramsdict)
     # End GETADURL
 
     @staticmethod
-    def USERDATA(params_dict):
-        return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**params_dict)
+    def USERDATA(paramsdict):
+        return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**paramsdict)
     # End USERDATA
 
     @staticmethod
-    def SAVE(params_dict):
-        return 'SAVE infohash={infohash} index={index} path={path}'.format(**params_dict)
+    def SAVE(paramsdict):
+        return 'SAVE infohash={infohash} index={index} path={path}'.format(**paramsdict)
     # End SAVE
 
     @staticmethod
@@ -124,6 +124,6 @@ class AceRequest(object):
     SHUTDOWN = 'SHUTDOWN'
 
     @staticmethod
-    def SETOPTIONS(params_dict):
-        return 'SETOPTIONS {}'.format(' '.join(['{}={}'.format(k,v) for k,v in params_dict.items()]))
+    def SETOPTIONS(paramsdict):
+        return 'SETOPTIONS {}'.format(' '.join(['{}={}'.format(k,v) for k,v in paramsdict.items()]))
     # End SETOPTIONS

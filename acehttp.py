@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/pypy3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -54,7 +54,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def __init__(self, socket, client_address):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         self.headers_only = False
-        BaseHTTPRequestHandler.__init__(self, socket, client_address, self)
+        BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
         socket.close()
 
     def log_message(self, format, *args): pass
@@ -74,6 +74,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.send_response(errorcode)
            self.send_header('Content-Type', 'text/plain')
            self.send_header('Content-Length', len(logmsg))
+           self.send_header('Connection', 'Close')
            self.end_headers()
            self.wfile.write(logmsg)
         except: pass
@@ -93,7 +94,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         GET request handler
         '''
         gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
-        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.client_address[0] # Connected client IP address
+        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.address_string() # Connected client IP address
         logging.info('Accepted connection from {} path {}'.format(self.clientip, unquote(self.path)))
         logging.debug('Client headers: %s' % dict(self.headers))
 
@@ -148,6 +149,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                                  '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
               self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
+           if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
+              raise IndexError()
         except IndexError:
            self.send_error(400, 'Bad Request', logging.WARNING) # 400 Bad Request
         # Make parameters dict
@@ -176,11 +179,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
               AceProxy.clientcounter.idleAce.GetAUTH()
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.__dict__.update(AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__))
-              self.channelName = self.__dict__.get('channelName', ensure_str(next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), None)))
+              self.channelName = self.__dict__.get('channelName', ensure_str(next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), 'NoNameChannel')))
            else:
-              self.channelName = self.__dict__.get('channelName')
-              self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.channelName)).hexdigest()
-           if self.channelName is None: self.channelName = 'NoNameChannel'
+              self.channelName = self.__dict__.get('channelName', 'NoNameChannel')
+              self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.send_error(404, '%s' % repr(e), logging.ERROR)
