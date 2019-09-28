@@ -82,8 +82,7 @@ class PlaylistGenerator(object):
 
             return self.m3uchanneltemplate.format(**item)
 
-        params.update({'schema': 'http', 'netloc': hostport})  # Adding ts:// after http:// for some players
-        params.update({'ext': parse_qs(params.get('query','')).get('ext', ['ts'])[0]})
+        params.update({'schema': 'http', 'netloc': hostport, 'ext': parse_qs(params.get('query','')).get('ext', ['ts'])[0]})
         return _bytearray(params.get('header', self.m3uemptyheader if params.get('empty_header') else self.m3uheader) + ''.join(map(line_generator, self.sort(self.itemlist))), 'utf-8')
 
     def exportxml(self, hostport, path='',):

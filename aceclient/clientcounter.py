@@ -30,9 +30,10 @@ class ClientCounter(object):
         '''
         c = next(iter(self.getClientsList(client.infohash)), client) # Get the first client of existing broadcast
         if c is client:
-           client.ace, self.idleAce = self.idleAce, False
+           client.__dict__.update({'ace': self.idleAce})
+           self.idleAce = False
         else:
-           client.ace, client.q = c.ace, c.q.copy()
+           client.__dict__.update({'ace': c.ace, 'q': c.q.copy()})
            self.idleAce.ShutdownAce()
 
         self.clients[client.infohash].add(client)

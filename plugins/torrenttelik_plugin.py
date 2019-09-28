@@ -85,14 +85,13 @@ class Torrenttelik:
            if url is None:
               connection.send_error(404, 'Unknown channel: %s' % name, logging.ERROR)
            connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'ext': ext, 'channelIcon': self.picons.get(name)})
-           if url.startswith('acestream://'):
-              connection.path = u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
-           elif url.startswith('infohash://'):
-              connection.path = u'/infohash/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
-           elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')):
-              connection.path = u'/url/{reqtype_value}/{channelName}.{ext}'.format(**connection.__dict__)
+           connection.__dict__.update({'path': {'acestream': lambda d: u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**d),
+                                                'infohash' : lambda d: u'/infohash/{reqtype_value}/{channelName}.{ext}'.format(**d),
+                                                'http'     : lambda d: u'/url/{reqtype_value}/{channelName}.{ext}'.format(**d),
+                                                'https'    : lambda d: u'/url/{reqtype_value}/{channelName}.{ext}'.format(**d),
+                                               }[urlparse(url).scheme](connection.__dict__)})
            connection.__dict__.update({'splittedpath': connection.path.split('/')})
-           connection.__dict__.update({'reqtype': connection.splittedpath[1].lower(), 'channelIcon': self.picons.get(name)})
+           connection.__dict__.update({'reqtype': connection.splittedpath[1].lower()})
            return
 
         elif self.etag == connection.headers.get('If-None-Match'):
