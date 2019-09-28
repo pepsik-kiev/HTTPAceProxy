@@ -14,8 +14,6 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
-# http://www.gevent.org/api/gevent.resolver.ares.html
-gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
