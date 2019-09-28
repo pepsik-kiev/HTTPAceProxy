@@ -16,7 +16,7 @@ from utils import schedule
 import config.torrenttelik as config
 import config.picons.torrenttelik as picons
 
-class Torrenttelik:
+class Torrenttelik(object):
 
     handlers = ('torrent-telik',)
 

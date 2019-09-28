@@ -26,7 +26,7 @@ from urllib3.packages.six import ensure_binary
 from PlaylistGenerator import PlaylistGenerator
 import config.p2pproxy as config
 
-class P2pproxy:
+class P2pproxy(object):
     handlers = ('channels', 'channels.m3u', 'archive', 'xbmc.pvr', 'logobase')
     logger = logging.getLogger('plugin_p2pproxy')
     compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),

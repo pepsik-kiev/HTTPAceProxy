@@ -54,7 +54,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def __init__(self, socket, client_address):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         self.headers_only = False
-        BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
+        try: BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
+        except: pass
         socket.close()
 
     def log_message(self, format, *args): pass
@@ -248,7 +249,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               except: pass
            return
 
-class AceProxy:
+class AceProxy(object):
     '''
     Inter-class interaction class
     '''

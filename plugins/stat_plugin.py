@@ -18,7 +18,7 @@ from urllib3.packages.six import ensure_text, ensure_binary
 from requests.compat import json
 from requests.utils import re
 
-class Stat:
+class Stat(object):
     handlers = ('stat',)
     logger = logging.getLogger('STAT')
 

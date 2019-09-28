@@ -16,7 +16,7 @@ from urllib3.packages.six.moves.urllib.parse import parse_qs
 from utils import schedule
 import config.torrentfilms as config
 
-class Torrentfilms:
+class Torrentfilms(object):
 
     handlers = ('films', 'proxyfilms')
 

@@ -17,7 +17,7 @@ from utils import schedule
 import config.allfon as config
 import config.picons.allfon as picons
 
-class Allfon:
+class Allfon(object):
 
     handlers = ('allfon',)
 

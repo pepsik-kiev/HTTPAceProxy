@@ -5,7 +5,7 @@ Rename this file to helloworld_plugin.py to enable it.
 To use it, go to http://127.0.0.1:8000/helloworld
 '''
 
-class Helloworld:
+class Helloworld(object):
     handlers = ('helloworld', )
 
     def __init__(self, AceConfig, AceProxy):

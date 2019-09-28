@@ -17,7 +17,7 @@ from utils import schedule
 import config.torrenttv as config
 import config.picons.torrenttv as picons
 
-class Torrenttv:
+class Torrenttv(object):
 
     # ttvplaylist handler is obsolete
     handlers = ('torrenttv', 'ttvplaylist')
