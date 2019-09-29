@@ -7,7 +7,7 @@ Allfon.tv Playlist Downloader Plugin configuration file
 # If your http-proxy need authentification - proxies = { 'https' : 'https://user:password@ip:port' }
 
 #proxies = {'http' : 'socks5h://192.168.2.1:9100', 'https' : 'socks5h://192.168.2.1:9100'}
-proxies = None
+proxies = {}
 
 # Insert your allfon.tv playlist URL here or path to file ('file:///path/to/file' or 'file:///C://path//to//file' for Windows OS)
 url = 'http://allfon-tv.com/autogenplaylist/allfontv.m3u'

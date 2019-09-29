@@ -14,6 +14,8 @@ psutil >= 5.3.0
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
+# http://www.gevent.org/api/gevent.resolver.ares.html
+gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.server import StreamServer
@@ -178,9 +180,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
               AceProxy.clientcounter.idleAce.GetAUTH()
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.__dict__.update(AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__))
-              self.channelName = self.__dict__.get('channelName', ensure_str(next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), 'NoNameChannel')))
+              self.channelName = ensure_str(self.__dict__.get('channelName', next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), 'NoNameChannel')))
            else:
-              self.channelName = self.__dict__.get('channelName', 'NoNameChannel')
+              self.channelName = ensure_str(self.__dict__.get('channelName', 'NoNameChannel'))
               self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None

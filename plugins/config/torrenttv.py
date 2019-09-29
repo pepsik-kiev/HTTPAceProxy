@@ -8,7 +8,7 @@ Torrent-tv.ru Playlist Downloader Plugin configuration file
 # If your http-proxy need authentification - proxies = {'https' : 'https://user:password@ip:port'}
 
 #proxies = {'http' : 'socks5h://192.168.1.1:9100', 'https' : 'socks5h://192.168.1.1:9100'}
-proxies = None
+proxies = {}
 
 # Insert your Torrent-tv.ru playlist URL here or path to file ('file:///path/to/file' or 'file:///C://path//to//file' for Windows OS)
 url = ''
