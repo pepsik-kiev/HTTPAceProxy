@@ -14,7 +14,7 @@ from gevent.subprocess import Popen, PIPE
 from getmac import get_mac_address
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb, map
-from urllib3.packages.six import ensure_text, ensure_binary
+from urllib3.packages.six import ensure_binary
 from requests.compat import json
 from requests.utils import re
 
@@ -27,7 +27,8 @@ class Stat(object):
         self.stuff = AceProxy
         self.params = None
 
-    def ip_is_local(self, ip_string):
+    @staticmethod
+    def ip_is_local(ip_string):
         if not ip_string:
            return False
         if ip_string == '127.0.0.1':
@@ -35,7 +36,8 @@ class Stat(object):
         combined_regex = '(^10\\.)|(^172\\.1[6-9]\\.)|(^172\\.2[0-9]\\.)|(^172\\.3[0-1]\\.)|(^192\\.168\\.)'
         return re.match(combined_regex, ip_string) is not None
 
-    def get_vendor_Info(self, ip_address):
+    @staticmethod
+    def get_vendor_Info(ip_address):
         try:
            headers = {'User-Agent':'API Browser'}
            with requests.get('http://macvendors.co/api/%s/json' % get_mac_address(ip=ip_address), headers=headers, timeout=5) as r:
@@ -49,29 +51,31 @@ class Stat(object):
         path_file_ext = ''.join(connection.path.split('.')[-1:])
 
         if connection.headers_only:
-           self.SendResponse(200, 'json', '', connection)
+           Stat.SendResponse(200, 'json', '', connection)
            return
 
         if connection.path == '/stat':
            if self.params.get('action', [''])[0] == 'get_status':
-              self.SendResponse(200, 'json', ensure_binary(json.dumps(self.getStatusJSON(), ensure_ascii=False)), connection)
+              Stat.SendResponse(200, 'json', ensure_binary(json.dumps(self.getStatusJSON(), ensure_ascii=True)), connection)
            else:
-              try: self.SendResponse(200, 'html', self.getReqFileContent('index.html'), connection)
+              try: Stat.SendResponse(200, 'html', Stat.getReqFileContent('index.html'), connection)
               except:
                  connection.send_error(404, 'Not Found')
 
         elif path_file_ext:
-           try: self.SendResponse(200, path_file_ext, self.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
+           try: Stat.SendResponse(200, path_file_ext, Stat.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
            except:
               connection.send_error(404, 'Not Found')
         else:
            connection.send_error(404, 'Not Found')
 
-    def getReqFileContent(self, path):
+    @staticmethod
+    def getReqFileContent(path):
         with open('http/%s' % path, 'rb') as handle:
            return handle.read()
 
-    def SendResponse(self, status_code, f_ext, content, connection):
+    @staticmethod
+    def SendResponse(status_code, f_ext, content, connection):
         mimetype = {
             'js': 'text/javascript; charset=utf-8',
             'json': 'application/json; charset=utf-8',
@@ -121,8 +125,8 @@ class Stat(object):
 
         def _add_client_data(c):
             if not c.clientDetail:
-               if self.ip_is_local(c.clientip):
-                  c.clientDetail = {'vendor': self.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
+               if Stat.ip_is_local(c.clientip):
+                  c.clientDetail = {'vendor': Stat.get_vendor_Info(c.clientip), 'country_code': '', 'country_name': '', 'city': ''}
                else:
                   try:
                      headers = {'User-Agent': 'API Browser'}
@@ -135,7 +139,7 @@ class Stat(object):
             return {
                 'sessionID': c.sessionID,
                 'channelIcon': c.channelIcon,
-                'channelName': ensure_text(c.channelName),
+                'channelName': c.channelName,
                 'clientIP': c.clientip,
                 'clientInfo': c.clientDetail,
                 #'clientBuff': c.q.qsize()*100/self.config.videotimeout,

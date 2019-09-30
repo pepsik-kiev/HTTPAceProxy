@@ -83,7 +83,6 @@ class AceRequest(object):
     @staticmethod
     def READY(request_key='', product_key=AceConst.ACE_KEY):
         return 'READY key={}-{}'.format(product_key.split('-')[0], hashlib.sha1(ensure_binary(request_key+product_key)).hexdigest())
-    # End READY
 
     @staticmethod
     def LOADASYNC(paramsdict):
@@ -92,38 +91,31 @@ class AceRequest(object):
     @staticmethod
     def START(paramsdict):
         return AceConst.START.get((viewkeys(AceConst.START) & viewkeys(paramsdict)).pop()).format(**paramsdict)
-    # End START
 
     STOP = 'STOP'
 
     @staticmethod
     def GETCID(paramsdict):
         return 'GETCID checksum={checksum} infohash={infohash} developer={developer_id} affiliate={affiliate_id} zone={zone_id}'.format(**paramsdict)
-    # End GETCID
 
     @staticmethod
     def GETADURL(paramsdict):
         return 'GETADURL width={width} height={height} infohash={infohash} action={action}'.format(**paramsdict)
-    # End GETADURL
 
     @staticmethod
     def USERDATA(paramsdict):
         return 'USERDATA [{{"gender": {gender}}}, {{"age": {age}}}]'.format(**paramsdict)
-    # End USERDATA
 
     @staticmethod
     def SAVE(paramsdict):
         return 'SAVE infohash={infohash} index={index} path={path}'.format(**paramsdict)
-    # End SAVE
 
     @staticmethod
     def LIVESEEK(timestamp):
         return 'LIVESEEK {}'.format(timestamp)
-    # End LIVESEEK
 
     SHUTDOWN = 'SHUTDOWN'
 
     @staticmethod
     def SETOPTIONS(paramsdict):
         return 'SETOPTIONS {}'.format(' '.join(['{}={}'.format(k,v) for k,v in paramsdict.items()]))
-    # End SETOPTIONS

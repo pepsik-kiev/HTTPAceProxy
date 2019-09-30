@@ -131,18 +131,18 @@ class AceConfig(acedefconfig.AceDefConfig):
     # Some video players (mostly STBs and Smart TVs) can generate dummy requests
     # to detect MIME-type or something before playing which Ace Stream handles badly.
     # We send them 200 OK and do nothing.
-    # We add their User-Agents here
-    #
-    fakeuas = ('Mozilla/5.0 IMC plugin Macintosh', )
+    # We add their User-Agents/query/path logic here
     #
     @staticmethod
     def isFakeRequest(path, params, headers):
+        '''
+        Filter for client request path/query/headers
+        '''
         useragent = headers.get('User-Agent')
 
         if not useragent:
             return False
-        elif useragent in AceConfig.fakeuas:
-            return True       # Samsung ES series
+        # Samsung ES series
         elif useragent == 'Lavf/55.33.100' and headers.get('Range') != 'bytes=0-':
             return True
         # Samsung H series

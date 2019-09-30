@@ -96,8 +96,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.address_string() # Connected client IP address
-        logging.info('Accepted connection from {} path {}'.format(self.clientip, unquote(self.path)))
-        logging.debug('Client headers: %s' % dict(self.headers))
+        logging.info('Client request connection from {} path {}'.format(self.clientip, unquote(self.path)))
+        logging.debug('Client request headers: %s' % dict(self.headers))
 
         parse_req = urlparse(self.path)
         self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path

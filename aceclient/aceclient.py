@@ -19,6 +19,9 @@ class AceException(Exception):
     pass
 
 class Telnet(telnetlib.Telnet, object):
+    '''
+    Patching telnetlib methods for Py3 backward compatibility
+    '''
     if not PY2:
        def read_until(self, expected, timeout=None):
            return super(Telnet, self).read_until(bytes(expected, 'ascii'), timeout).decode()
@@ -73,7 +76,6 @@ class AceClient(object):
            paramsdict = self._response['HELLOTS'].get(timeout=self._responsetimeout)
         except gevent.Timeout as t:
            raise AceException('Engine response time %s exceeded. HELLOTS not resived!' % t)
-
         try:
            self._response['AUTH'] = AsyncResult()
            self._response['NOTREADY'] = AsyncResult()
