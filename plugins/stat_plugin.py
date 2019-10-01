@@ -33,8 +33,7 @@ class Stat(object):
            return False
         if ip_string == '127.0.0.1':
            return True
-        combined_regex = '(^10\\.)|(^172\\.1[6-9]\\.)|(^172\\.2[0-9]\\.)|(^172\\.3[0-1]\\.)|(^192\\.168\\.)'
-        return re.match(combined_regex, ip_string) is not None
+        return re.match('(^10\\.)|(^172\\.1[6-9]\\.)|(^172\\.2[0-9]\\.)|(^172\\.3[0-1]\\.)|(^192\\.168\\.)', ip_string) is not None
 
     @staticmethod
     def get_vendor_Info(ip_address):

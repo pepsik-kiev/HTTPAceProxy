@@ -98,7 +98,7 @@ class Allfon(object):
            connection.end_headers()
            return
 
-        elif not connection.headers_only:
+        else:
            hostport = connection.headers['Host']
            path = '' if not self.channels else '/{reqtype}/channel'.format(**connection.__dict__)
            exported = self.playlist.exportm3u(hostport=hostport, path=path, header=config.m3uheadertemplate, query=connection.query)

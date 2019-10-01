@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from urllib3.packages.six import ensure_text
-
 class PlaylistConfig():
 
     # Default playlist format
@@ -12,7 +11,7 @@ class PlaylistConfig():
 
     # Playlist sorting options.
     sortByName = False
-    sortByGroup = False
+    sortByGroup = True
 
     # Channel names mapping. You may use this to rename channels.
     m3uchannelnames = dict()
@@ -63,6 +62,7 @@ class PlaylistConfig():
     m3ugroupnames['entertaining'] = 'Развлекательные'
     m3ugroupnames['erotic'] = 'Эротика'
     m3ugroupnames['erotic_18_plus'] = 'Эротика'
+    m3ugroupnames['18+'] = 'Эротика'
     #m3ugroupnames[''] = 'Мужские'
     m3ugroupnames['regional'] = 'Региональные'
     m3ugroupnames['religion'] = 'Религиозные'
@@ -238,7 +238,7 @@ class PlaylistConfig():
     def sortItems(itemlist):
         if PlaylistConfig.sortByGroup: return sorted(itemlist, key=lambda x:x['group'])
         elif PlaylistConfig.sortByName: return sorted(itemlist, key=lambda x:x['name'])
-        else: return itemlist
+        return itemlist
 
     # This method can be used to change a channel info such as name, group etc.
     # The following fields can be changed:

@@ -18,8 +18,8 @@ import gevent
 gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
-from gevent.server import StreamServer
 from gevent.pool import Pool
+from gevent.server import StreamServer
 from gevent.util import wrap_errors
 from gevent.socket import socket, AF_INET, SOCK_DGRAM
 
@@ -99,17 +99,17 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logging.info('Client request connection from {} path {}'.format(self.clientip, unquote(self.path)))
         logging.debug('Client request headers: %s' % dict(self.headers))
 
-        parse_req = urlparse(self.path)
-        self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path
-
         if AceConfig.firewall and not checkFirewall(self.clientip):
            self.send_error(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
+
+        parse_req = urlparse(self.path)
+        self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path
 
         # Pretend to work fine with Fake or HEAD request.
         if self.headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
            # Return 200 and exit
-           if self.headers_only: logger.debug('Head request - sending headers and closing connection')
-           else: logger.debug('Fake request - closing connection')
+           if self.headers_only: logging.debug('HEAD request - send headers and close the connection')
+           else: logging.debug('Fake request - close the connection')
            self.send_response(200)
            self.send_header('Content-Type', 'video/mp2t')
            self.send_header('Connection', 'Close')
@@ -122,39 +122,34 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype) # For backward compatibility
            if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
               raise IndexError()
+
+           try: AceProxy.pluginshandlers[self.reqtype].handle(self) # If request should be handled by plugin
+           finally:
+              # If request parameter is 'content_id','url','infohash'.... etc
+              if self.reqtype in AceProxy.handlers:
+                 # Limit on the number of connected clients
+                 if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
+                    self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
+                 # Check if third path parameter is exists /{reqtype}/{reqtype_value}/.../.../video.mpg
+                 #                                                                           |_________|
+                 # And if it ends with regular video extension
+                 try:
+                    if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+                                                           '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
+                       self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
+                 except:
+                    raise IndexError()
+                 else:
+                    self.handleRequest()
         except IndexError:
            self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
-        # If request should be handled by plugin
-        if self.reqtype in AceProxy.pluginshandlers:
-           try: AceProxy.pluginshandlers.get(self.reqtype).handle(self)
-           except Exception as e:
-              import traceback
-              logger.error(traceback.format_exc())
-              self.send_error(500, 'Plugin exception: %s' % repr(e))
-        # Limit on the number of connected clients
-        if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-           self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
-        # If request parameter is 'content_id','url','infohash'.... etc
-        elif self.reqtype in AceProxy.handlers:
-           self.handleRequest()
 
     def handleRequest(self):
         '''
-        Main request handler path: /{reqtype}/{reqtype_value}/{fname.ext}
+        Main request handler path: /{reqtype}/{reqtype_value}/{file_indexes}/{developer_id}/{affiliate_id}/{zone_id}/{stream_id}/{fname}.{ext}
         '''
-        logger = logging.getLogger('HandleRequest')
-        # Check if third path parameter is exists /{reqtype}/{reqtype_value}/video.mpg
-        #                                                                   |_________|
-        # And if it ends with regular video extension
-        try:
-           if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
-                                                 '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
-              self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-           if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
-              raise IndexError()
-        except IndexError:
-           self.send_error(400, 'Bad Request', logging.WARNING) # 400 Bad Request
-        # Make parameters dict
+        logger = logging.getLogger('handleRequest')
+        # Make handler parameters dict
         self.__dict__.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         self.__dict__.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))]})
         self.__dict__.update({self.reqtype: self.__dict__.get('reqtype_value', unquote(self.splittedpath[2])), # {reqtype: reqtype_value}
@@ -208,7 +203,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                        out = transcoder.get(timeout=2.0).stdin
                        logger.info('Transcoding for {clientip} started'.format(**self.__dict__))
                     except:
-                       logger.error('Error starting transcoding! Is Ffmpeg or VLC installed?')
+                       logger.error('Error starting transcoding! Is ffmpeg or VLC installed?')
                  else:
                     logger.error("Can't found fmt key. Transcoding not started!")
               elif AceConfig.osplatform == 'Windows':
