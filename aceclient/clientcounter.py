@@ -37,7 +37,7 @@ class ClientCounter(object):
            self.idleAce.ShutdownAce()
 
         self.clients[client.infohash].add(client)
-        return self.clients[client.infohash].__len__()
+        return len(self.clients[client.infohash])
 
     def deleteClient(self, client):
         '''
