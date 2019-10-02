@@ -74,7 +74,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
            self.send_response(errorcode)
            self.send_header('Content-Type', 'text/plain')
-           self.send_header('Content-Length', len(logmsg))
+           self.send_header('Content-Length', logmsg.__len__())
            self.send_header('Connection', 'Close')
            self.end_headers()
            self.wfile.write(logmsg)
@@ -128,7 +128,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               # If request parameter is 'content_id','url','infohash'.... etc
               if self.reqtype in AceProxy.handlers:
                  # Limit on the number of connected clients
-                 if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
+                 if 0 < AceConfig.maxconns <= AceProxy.clientcounter.getAllClientsList().__len__():
                     self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
                  # Check if third path parameter is exists /{reqtype}/{reqtype_value}/.../.../video.mpg
                  #                                                                           |_________|
@@ -137,7 +137,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                                            '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
                        self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
-                 except:
+                 except IndexError:
                     raise IndexError()
                  else:
                     self.handleRequest()
@@ -151,7 +151,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logger = logging.getLogger('handleRequest')
         # Make handler parameters dict
         self.__dict__.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
-        self.__dict__.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))]})
+        self.__dict__.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, self.splittedpath.__len__())]})
         self.__dict__.update({self.reqtype: self.__dict__.get('reqtype_value', unquote(self.splittedpath[2])), # {reqtype: reqtype_value}
                               'ace': AceConfig.ace,
                               'connect_timeout': AceConfig.aceconntimeout,
@@ -231,7 +231,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            # write data to client while it is alive
            for chunk in self.q:
-              out.write(b'%x\r\n' % len(chunk) + chunk + b'\r\n' if response_use_chunked else chunk)
+              out.write(b'%x\r\n' % chunk.__len__() + chunk + b'\r\n' if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
            _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
@@ -306,7 +306,7 @@ def StreamReader(**params):
                    else:
                       StreamWriter(url)
                       urls.append(url)
-                      if len(urls)>50: urls.pop(0)
+                      if urls.__len__() > 50: urls.pop(0)
 
           else: StreamWriter(params['url']) #AceStream return link for HTTP stream
     except TypeError: pass

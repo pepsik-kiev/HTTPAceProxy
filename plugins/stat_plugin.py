@@ -23,9 +23,23 @@ class Stat(object):
     logger = logging.getLogger('STAT')
 
     def __init__(self, AceConfig, AceProxy):
-        self.config = AceConfig
-        self.stuff = AceProxy
-        self.params = None
+        self.AceConfig = AceConfig
+        self.AceProxy = AceProxy
+
+    def handle(self, connection):
+        path_file_ext = connection.path[connection.path.rfind('.') + 1:]
+        if connection.splittedpath[1] == 'stat' and connection.splittedpath.__len__() == 2:
+           if 'get_status' in parse_qs(connection.query).get('action', ['']):
+              Stat.SendResponse(200, 'json', ensure_binary(json.dumps(self.getStatusJSON(), ensure_ascii=True)), connection)
+           else:
+              try: Stat.SendResponse(200, 'html', Stat.getReqFileContent('index.html'), connection)
+              except: connection.send_error(404, 'Not Found')
+
+        elif path_file_ext:
+           try: Stat.SendResponse(200, path_file_ext, Stat.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
+           except: connection.send_error(404, 'Not Found')
+        else:
+           connection.send_error(404, 'Not Found')
 
     @staticmethod
     def ip_is_local(ip_string):
@@ -44,29 +58,6 @@ class Stat(object):
         except:
            Stat.logger.debug("Can't obtain vendor for %s address" % ip_address)
            return 'Local IP address'
-
-    def handle(self, connection, **params):
-        self.params = parse_qs(connection.query)
-        path_file_ext = ''.join(connection.path.split('.')[-1:])
-
-        if connection.headers_only:
-           Stat.SendResponse(200, 'json', '', connection)
-           return
-
-        if connection.path == '/stat':
-           if self.params.get('action', [''])[0] == 'get_status':
-              Stat.SendResponse(200, 'json', ensure_binary(json.dumps(self.getStatusJSON(), ensure_ascii=True)), connection)
-           else:
-              try: Stat.SendResponse(200, 'html', Stat.getReqFileContent('index.html'), connection)
-              except:
-                 connection.send_error(404, 'Not Found')
-
-        elif path_file_ext:
-           try: Stat.SendResponse(200, path_file_ext, Stat.getReqFileContent(connection.path.replace(r'/stat', '')), connection)
-           except:
-              connection.send_error(404, 'Not Found')
-        else:
-           connection.send_error(404, 'Not Found')
 
     @staticmethod
     def getReqFileContent(path):
@@ -105,11 +96,11 @@ class Stat(object):
 
     def getStatusJSON(self):
         # Sys Info
-        clients = self.stuff.clientcounter.getAllClientsList() # Get connected clients list
+        clients = self.AceProxy.clientcounter.getAllClientsList() # Get connected clients list
         statusJSON = {}
         statusJSON['status'] = 'success'
         statusJSON['sys_info'] = {
-            'os_platform': self.config.osplatform,
+            'os_platform': self.AceConfig.osplatform,
             'cpu_nums': psutil.cpu_count(),
             'cpu_percent': psutil.cpu_percent(interval=0, percpu=True),
             'cpu_freq': {k:v for k,v in psutil.cpu_freq()._asdict().items() if k in ('current','min','max')} if psutil.cpu_freq() else {},
@@ -118,8 +109,8 @@ class Stat(object):
             }
 
         statusJSON['connection_info'] = {
-            'max_clients': self.config.maxconns,
-            'total_clients': len(clients),
+            'max_clients': self.AceConfig.maxconns,
+            'total_clients': clients.__len__(),
             }
 
         def _add_client_data(c):
@@ -141,7 +132,7 @@ class Stat(object):
                 'channelName': c.channelName,
                 'clientIP': c.clientip,
                 'clientInfo': c.clientDetail,
-                #'clientBuff': c.q.qsize()*100/self.config.videotimeout,
+                #'clientBuff': c.q.qsize()*100/self.AceConfig.videotimeout,
                 'startTime': time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(c.connectionTime)),
                 'durationTime': time.strftime('%H:%M:%S', time.gmtime(time.time()-c.connectionTime)),
                 'stat': c.ace.GetSTATUS(),

@@ -87,14 +87,7 @@ class Torrentfilms(object):
         self.logger.info('Torrent  playlist created')
         return ln
 
-    def handle(self, connection, **params):
-
-        if connection.headers_only:
-           connection.send_response(200)
-           connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
-           connection.send_header('Connection', 'close')
-           connection.end_headers()
-           return
+    def handle(self, connection):
 
         exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, parse_qs(connection.query).get('fmt', [''])[0]).encode('utf-8')
 
