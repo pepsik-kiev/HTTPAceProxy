@@ -82,7 +82,6 @@ class PlaylistGenerator(object):
                   item['url'] = urlunparse(u'{schema};{netloc};/channels/play?id={url};;{query};'.format(**params).split(';'))
 
             return self.m3uchanneltemplate.format(**item)
-        print(params)
         params.update({'schema': 'http', 'netloc': hostport, 'ext': query_get(params.get('query',''), 'ext', 'ts')})
         return _bytearray(params.get('header', self.m3uemptyheader if params.get('empty_header') else self.m3uheader) + ''.join(map(line_generator, self.sort(self.itemlist))), 'utf-8')
 

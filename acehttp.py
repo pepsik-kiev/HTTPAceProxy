@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -225,7 +225,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
            self.send_response(200)
-           logger.debug('Sending HTTPAceProxy headers to client: %s' % dict(response_headers))
+           logger.debug('[%s]: Sending HTTPAceProxy headers: %s' % (self.clientip, dict(response_headers)))
            gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
            self.end_headers()
            # write data to client while it is alive
