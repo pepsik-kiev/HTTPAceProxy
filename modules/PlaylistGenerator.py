@@ -5,10 +5,11 @@ This module can generate .m3u playlists with tv guide
 and groups
 '''
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
-from urllib3.packages.six.moves.urllib.parse import quote, urlunparse, parse_qs
+from urllib3.packages.six.moves.urllib.parse import quote, urlunparse
 from urllib3.packages.six.moves import map
 from urllib3.packages.six import ensure_str
 from playlist import PlaylistConfig as config
+from utils import query_get
 
 class PlaylistGenerator(object):
 
@@ -81,8 +82,8 @@ class PlaylistGenerator(object):
                   item['url'] = urlunparse(u'{schema};{netloc};/channels/play?id={url};;{query};'.format(**params).split(';'))
 
             return self.m3uchanneltemplate.format(**item)
-
-        params.update({'schema': 'http', 'netloc': hostport, 'ext': parse_qs(params.get('query','')).get('ext', ['ts'])[0]})
+        print(params)
+        params.update({'schema': 'http', 'netloc': hostport, 'ext': query_get(params.get('query',''), 'ext', 'ts')})
         return _bytearray(params.get('header', self.m3uemptyheader if params.get('empty_header') else self.m3uheader) + ''.join(map(line_generator, self.sort(self.itemlist))), 'utf-8')
 
     def exportxml(self, hostport, path='',):

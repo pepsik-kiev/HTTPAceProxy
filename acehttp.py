@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -32,7 +32,7 @@ for wheel in glob.glob(os.path.join(ROOT_DIR, 'modules', 'wheels', '*.whl')): sy
 import logging
 import psutil, requests, signal, mimetypes
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
-from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, unquote
+from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
 from urllib3.packages.six.moves import range, map
 from urllib3.packages.six import viewkeys, ensure_binary, ensure_str
 try:
@@ -44,7 +44,7 @@ import aceclient
 from aceclient.clientcounter import ClientCounter
 import aceconfig
 from aceconfig import AceConfig
-from utils import schedule
+from utils import schedule, query_get
 
 class HTTPHandler(BaseHTTPRequestHandler):
 
@@ -65,7 +65,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         #logger.debug('"%s" %s %s', unquote(self.requestline).decode('utf8'), str(code), str(size))
 
     def finish(self):
-        logging.debug('Client {clientip} disconnected'.format(**self.__dict__))
+        logging.debug('[{clientip}]: Disconnected'.format(**self.__dict__))
 
     def send_error(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -95,15 +95,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.address_string() # Connected client IP address
-        logging.info('Client request connection from {} path {}'.format(self.clientip, unquote(self.path)))
-        logging.debug('Client request headers: %s' % dict(self.headers))
+        logging.info('[{}]: Received {} for {}'.format(self.clientip, self.command, unquote(self.path)))
+        logging.debug('[%s]: Request headers: %s' % (self.clientip, dict(self.headers)))
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
-           self.send_error(401, 'Dropping connection from {clientip} due to firewall rules'.format(**self.__dict__), logging.ERROR)
+           self.send_error(401, '[{clientip}]: Dropping connection due to firewall rules'.format(**self.__dict__), logging.ERROR)
 
-        parse_req = urlparse(self.path)
-        self.query, self.path = parse_req.query, parse_req.path[:-1] if parse_req.path.endswith('/') else parse_req.path
-
+        self.path, _, self.query = self.path.partition('?')
+        self.path = self.path.rstrip('/')
         # Pretend to work fine with Fake or HEAD request.
         if self.headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
            # Return 200 and exit
@@ -128,7 +127,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               if self.reqtype in AceProxy.handlers:
                  # Limit on the number of connected clients
                  if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-                    self.send_error(403, "Maximum client connections reached, can't serve request from {clientip}".format(**self.__dict__), logging.ERROR)
+                    self.send_error(403, "[{clientip}]: Maximum client connections reached, can't serve request".format(**self.__dict__), logging.ERROR)
                  # Check if third path parameter is exists /{reqtype}/{reqtype_value}/.../.../video.mpg
                  #                                                                           |_________|
                  # And if it ends with regular video extension
@@ -183,13 +182,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.send_error(404, '%s' % repr(e), logging.ERROR)
 
         ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
-        if ext == self.channelName: ext = parse_qs(self.query).get('ext', ['ts'])[0]
+        if ext == self.channelName: ext = query_get(self.query, 'ext', 'ts')
         mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
         try:
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            out = self.wfile
            # If &fmt transcode key present in request
-           fmt = parse_qs(self.query).get('fmt', [''])[0]
+           fmt = query_get(self.query, 'fmt')
            transcoder = gevent.event.AsyncResult()
            if fmt:
               if AceConfig.osplatform != 'Windows':
@@ -200,7 +199,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     try:
                        gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
                        out = transcoder.get(timeout=2.0).stdin
-                       logger.info('Transcoding for {clientip} started'.format(**self.__dict__))
+                       logger.info('[{clientip}]: Transcoding started'.format(**self.__dict__))
                     except:
                        logger.error('Error starting transcoding! Is ffmpeg or VLC installed?')
                  else:
@@ -210,8 +209,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logging.debug('Broadcast "{channelName}" stoped. Last client disconnected'.format(**self.__dict__)))
-           logger.info('Streaming "{channelName}" to {clientip} started'.format(**self.__dict__))
+              gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast stoped. Last client disconnected'.format(**self.__dict__)))
+              logger.debug('[{channelName}]: Broadcast started'.format(**self.__dict__))
+           logger.info('[{clientip}]: Streaming "{channelName}" started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
            drop_headers = []
@@ -230,16 +230,16 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            # write data to client while it is alive
            for chunk in self.q:
-              out.write(b'%x\r\n' % len(chunk) + chunk + b'\r\n' if response_use_chunked else chunk)
+              out.write(b'%x\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
            _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
-           logging.info('Streaming "{channelName}" to {clientip} finished'.format(**self.__dict__))
+           logger.info('[{clientip}]: Streaming "{channelName}" finished'.format(**self.__dict__))
            if transcoder.value:
-              try: transcoder.value.kill(); logging.info('Transcoding for {clientip} stoped'.format(**self.__dict__))
+              try: transcoder.value.kill(); logger.info('[{clientip}]: Transcoding stoped'.format(**self.__dict__))
               except: pass
            return
 

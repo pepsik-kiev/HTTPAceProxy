@@ -9,11 +9,11 @@ __author__ = 'AndreyPavlenko, Dorik1972'
 import traceback
 import gevent, requests, os
 import logging, zlib
-from urllib3.packages.six.moves.urllib.parse import urlparse, parse_qs, quote, unquote
+from urllib3.packages.six.moves.urllib.parse import urlparse, quote, unquote
 from urllib3.packages.six import ensure_str, ensure_text, ensure_binary
 from PlaylistGenerator import PlaylistGenerator
 from requests_file import FileAdapter
-from utils import schedule
+from utils import schedule, query_get
 import config.torrenttv as config
 import config.picons.torrenttv as picons
 
@@ -73,8 +73,8 @@ class Torrenttv(object):
            if not self.Playlistparser(): connection.send_error()
 
         url = urlparse(connection.path)
-        path = url.path[0:-1] if url.path.endswith('/') else url.path
-        ext = parse_qs(connection.query).get('ext', ['ts'])[0]
+        path = url.path.rstrip('/')
+        ext = query_get(connection.query, 'ext', 'ts')
         if path.startswith('/{reqtype}/channel/'.format(**connection.__dict__)):
            if not path.endswith(ext):
               connection.send_error(404, 'Invalid path: %s' % unquote(path), logging.ERROR)

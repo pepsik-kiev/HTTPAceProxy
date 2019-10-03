@@ -12,11 +12,11 @@ import psutil, requests
 import logging
 from gevent.subprocess import Popen, PIPE
 from getmac import get_mac_address
-from urllib3.packages.six.moves.urllib.parse import parse_qs
 from urllib3.packages.six.moves import getcwdb, map
 from urllib3.packages.six import ensure_binary
 from requests.compat import json
 from requests.utils import re
+from utils import query_get
 
 class Stat(object):
     handlers = ('stat',)
@@ -29,7 +29,7 @@ class Stat(object):
     def handle(self, connection):
         path_file_ext = connection.path[connection.path.rfind('.') + 1:]
         if connection.splittedpath[1] == 'stat' and connection.splittedpath.__len__() == 2:
-           if 'get_status' in parse_qs(connection.query).get('action', ['']):
+           if query_get(connection.query, 'action') == 'get_status':
               Stat.SendResponse(200, 'json', ensure_binary(json.dumps(self.getStatusJSON(), ensure_ascii=True)), connection)
            else:
               try: Stat.SendResponse(200, 'html', Stat.getReqFileContent('index.html'), connection)

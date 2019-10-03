@@ -12,8 +12,7 @@ import logging
 import bencode, hashlib
 import gevent
 import zlib
-from urllib3.packages.six.moves.urllib.parse import parse_qs
-from utils import schedule
+from utils import schedule, query_get
 import config.torrentfilms as config
 
 class Torrentfilms(object):
@@ -89,7 +88,7 @@ class Torrentfilms(object):
 
     def handle(self, connection):
 
-        exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, parse_qs(connection.query).get('fmt', [''])[0]).encode('utf-8')
+        exported = self.createPlaylist(connection.headers['Host'], connection.reqtype, query_get(connection.query, 'fmt')).encode('utf-8')
 
         connection.send_response(200)
         connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
