@@ -51,6 +51,8 @@ class AceClient(object):
         # AceEngine API responses (Created with AsyncResult() on call)
         self._response = {}.fromkeys(['HELLOTS','AUTH','NOTREADY','LOADRESP','START','STATE','STATUS','EVENT',
                                       'STOP','PAUSE','RESUME','INFO','SHUTDOWN','CLOSE',], AsyncResult())
+        # Broadcast title
+        self._broadcast = 'Telnet'
         # AceEngine socket
         try:
            self._socket = Telnet(params.get('ace')['aceHostIP'], params.get('ace')['aceAPIport'], params.get('connect_timeout', 10))
@@ -65,6 +67,14 @@ class AceClient(object):
 
     def __nonzero__(self):  # For Python 2 backward compatible
         return self.__bool__()
+
+    @property
+    def broadcast(self):
+        return self._broadcast
+
+    @broadcast.setter
+    def broadcast(self, value):
+        self._broadcast = value
 
     def GetAUTH(self):
         '''
@@ -96,7 +106,7 @@ class AceClient(object):
         '''
         while 1:
            recvbuffer = gevent.with_timeout(timeout, self._socket.read_until, '\r\n', None, timeout_value='CLOSE telnet connetcion').strip().split()
-           logging.debug('<<< %s' % unquote(' '.join(recvbuffer)))
+           logging.debug('[%.20s]: <<< %s' % (self.broadcast, unquote(' '.join(recvbuffer))))
            gevent.spawn(getattr(globals()[self.__class__.__name__], '_%s_' % recvbuffer[0].lower(), '_close_'), self, recvbuffer).link_value(self._response[recvbuffer[0]])
 
     def _write(self, message):
@@ -105,7 +115,7 @@ class AceClient(object):
         '''
         try:
            self._socket.write('%s\r\n' % message)
-           logging.debug('>>> %s' % message)
+           logging.debug('[%.20s]: >>> %s' % (self.broadcast, message))
         except gevent.socket.error:
            raise AceException('Error writing data to AceEngine API port')
 
@@ -142,7 +152,6 @@ class AceClient(object):
                     paramsdict = self._response['START'].get(timeout=self._responsetimeout)
                  except gevent.Timeout as t:
                     raise AceException('START URL not received after LIVESEEK! Engine response time %s exceeded' % t)
-
            return paramsdict
         except gevent.Timeout as t:
            raise AceException('START URL not received! Engine response time %s exceeded' % t)

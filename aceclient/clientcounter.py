@@ -48,6 +48,7 @@ class ClientCounter(object):
            try:
               self.idleAce = self.clients.pop(client.infohash).pop().ace
               self.idleAce.StopBroadcast()
+              self.idleAce.broadcast = 'Telnet'
            except KeyError: self.idleAce = False
            except: self.idleAce.ShutdownAce()
         except:

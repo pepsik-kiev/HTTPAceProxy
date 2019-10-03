@@ -95,7 +95,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.address_string() # Connected client IP address
-        logging.info('[{}]: Received {} for {}'.format(self.clientip, self.command, unquote(self.path)))
+        logging.info('[{}]: {} request for {}'.format(self.clientip, self.command, unquote(self.path)))
         logging.debug('[%s]: Request headers: %s' % (self.clientip, dict(self.headers)))
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
@@ -177,6 +177,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            else:
               self.channelName = ensure_str(self.__dict__.get('channelName', 'NoNameChannel'))
               self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
+           AceProxy.clientcounter.idleAce.broadcast = self.channelName
         except aceclient.AceException as e:
            AceProxy.clientcounter.idleAce = None
            self.send_error(404, '%s' % repr(e), logging.ERROR)
@@ -209,8 +210,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            # Start broadcast if it does not exist
            if AceProxy.clientcounter.addClient(self) == 1:
-              gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast stoped. Last client disconnected'.format(**self.__dict__)))
-              logger.debug('[{channelName}]: Broadcast started'.format(**self.__dict__))
+              gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
+              logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
            logger.info('[{clientip}]: Streaming "{channelName}" started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
