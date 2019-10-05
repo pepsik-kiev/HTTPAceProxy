@@ -119,4 +119,4 @@ class Torrenttv(object):
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
            connection.wfile.write(exported)
-           self.logger.debug('torrenttv.m3u playlist sent to {clientip}'.format(**connection.__dict__))
+           self.logger.debug('[{clientip}]: torrenttv.m3u playlist sent'.format(**connection.__dict__))

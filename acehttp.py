@@ -177,9 +177,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            else:
               self.channelName = ensure_str(self.__dict__.get('channelName', 'NoNameChannel'))
               self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
-           AceProxy.clientcounter.idleAce.broadcast = self.channelName
+           AceProxy.clientcounter.idleAce._title = self.channelName
         except aceclient.AceException as e:
-           AceProxy.clientcounter.idleAce = None
+           AceProxy.clientcounter.idleAce = False
            self.send_error(404, '%s' % repr(e), logging.ERROR)
 
         ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
@@ -208,11 +208,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
               elif AceConfig.osplatform == 'Windows':
                  logger.error('Not applicable in Windnows OS. Transcoding not started!')
 
-           # Start broadcast if it does not exist
+           # Start broadcast if it does not exist yet
            if AceProxy.clientcounter.addClient(self) == 1:
               gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
               logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
-           logger.info('[{clientip}]: Streaming "{channelName}" started'.format(**self.__dict__))
+           logger.info('[{clientip}]: Streaming [{channelName}] started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
            drop_headers = []
@@ -238,7 +238,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
         finally:
            AceProxy.clientcounter.deleteClient(self)
-           logger.info('[{clientip}]: Streaming "{channelName}" finished'.format(**self.__dict__))
+           logger.info('[{clientip}]: Streaming [{channelName}] finished'.format(**self.__dict__))
            if transcoder.value:
               try: transcoder.value.kill(); logger.info('[{clientip}]: Transcoding stoped'.format(**self.__dict__))
               except: pass
