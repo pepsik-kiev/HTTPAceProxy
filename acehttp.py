@@ -40,7 +40,6 @@ try:
    from ipaddress import ip_network as IPNetwork, ip_address as IPAddress
 except:
    from ipaddr import IPNetwork, IPAddress
-from random import randint
 import aceclient
 from aceclient.clientcounter import ClientCounter
 import aceconfig
@@ -161,7 +160,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                               'videoseekback': AceConfig.videoseekback,
                               'videotimeout': AceConfig.videotimeout,
                               'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()]), # request http or hls from AceEngine
-                              'sessionID': str(randint(10000000, 99999999)),
+                              'sessionID': self.handlerGreenlet.name[self.handlerGreenlet.name.rfind('-') + 1:], # Greenlet.minimal_ident A small, unique non-negative integer
                               'connectionTime': gevent.time.time(),
                               'clientDetail': None,
                               'channelIcon': self.__dict__.get('channelIcon', 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'),
@@ -211,13 +210,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
            if AceProxy.clientcounter.addClient(self) == 1:
               # Create broadcast if it does not exist yet
-              gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
+              self.__dict__.update(self.ace.GetBroadcastStartParams(self.__dict__))
+              gevent.spawn(StreamReader, self.__dict__).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
               logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
            else:
               logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
            logger.info('[{clientip}]: Streaming [{channelName}] started'.format(**self.__dict__))
            # Sending videostream headers to client
-           response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
+           response_use_chunked = False if (transcoder.value is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
            drop_headers = []
            proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=%s, max=100' % AceConfig.videotimeout, 'Accept-Ranges': 'none',
                              'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype }
@@ -234,7 +234,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            # write data to client while it is alive
            for chunk in self.q:
-              out.write(ensure_binary('%x\r\n%s\r\n' % (len(chunk),chunk)) if response_use_chunked else chunk)
+              out.write(b'%x\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
            _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
@@ -278,15 +278,15 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
        return True
     return False
 
-def StreamReader(**params):
+def StreamReader(params):
     '''
-    params: [url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=]
+    params: dict([url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=])
     '''
-    broadcast = gevent.getcurrent()
+    params.update({'broadcast': gevent.getcurrent()})
 
     def checkBroadcast():
         if not AceProxy.clientcounter.getClientsList(params['infohash']):
-           broadcast.kill()
+           params['broadcast'].kill()
 
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
