@@ -61,7 +61,7 @@ class Torrenttelik(object):
                     return False
 
                  self.etag = '"' + m.hexdigest() + '"'
-                 self.logger.debug('torrent-telik.m3u playlist generated')
+                 self.logger.debug('%s plugin playlist generated' % self.__class__.__name__)
 
               self.playlisttime = gevent.time.time()
 
@@ -102,9 +102,11 @@ class Torrenttelik(object):
            return
 
         else:
-           hostport = connection.headers['Host']
-           path = '' if not self.channels else '/{reqtype}/channel'.format(**connection.__dict__)
-           exported = self.playlist.exportm3u(hostport=hostport, path=path, header=config.m3uheadertemplate, query=connection.query)
+           exported = self.playlist.exportm3u( hostport=connection.headers['Host'],
+                                               path='' if not self.channels else '/{reqtype}/channel'.format(**connection.__dict__),
+                                               header=config.m3uheadertemplate,
+                                               query=connection.query
+                                              )
            response_headers = {'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Access-Control-Allow-Origin': '*'}
            try:
               h = connection.headers.get('Accept-Encoding').split(',')[0]
@@ -121,4 +123,4 @@ class Torrenttelik(object):
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
            connection.wfile.write(exported)
-           self.logger.debug('[{clientip}]: torrent-telik.m3u playlist sent'.format(**connection.__dict__))
+           self.logger.debug('[%s]: Plugin %s sent playlist' % (connection.clientip, self.__class__.__name__))

@@ -175,7 +175,7 @@ class P2pproxy(object):
                     url = 'http://%s/archive/playlist/?date=%s%s' % (hostport, dfmt, suffix)
                     playlistgen.addItem({'group': '', 'tvg': '', 'name': dfmt, 'url': url})
                     d -= delta
-                exported = playlistgen.exportm3u(hostport, empty_header=True, parse_url=False, fmt=self.params.get('fmt', [''])[0])
+                exported = playlistgen.exportm3u(hostport=hostport, empty_header=True, parse_url=False, fmt=self.params.get('fmt', [''])[0])
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')
                 try:
@@ -221,7 +221,7 @@ class P2pproxy(object):
                             url = 'http://%s/archive/?type=m3u&date=%s&channel_id=%s%s' % (hostport, d, epg_id, suffix)
                             playlistgen.addItem({'group': name, 'tvg': '', 'name': n, 'url': url, 'logo': logo})
 
-                exported = playlistgen.exportm3u(hostport, empty_header=True, parse_url=False, fmt=self.params.get('fmt', [''])[0])
+                exported = playlistgen.exportm3u(hostport=hostport, empty_header=True, parse_url=False, fmt=self.params.get('fmt', [''])[0])
                 try:
                     h = connection.headers.get('Accept-Encoding').split(',')[0]
                     exported = P2pproxy.compress_method[h].compress(exported) + P2pproxy.compress_method[h].flush()
@@ -325,7 +325,7 @@ class P2pproxy(object):
                         playlistgen.addItem({'group': channel_name, 'name': n, 'url': record_id, 'logo': logo, 'tvg': ''})
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
-                exported = playlistgen.exportm3u(hostport, empty_header=True, archive=True, fmt=self.params.get('fmt', [''])[0])
+                exported = playlistgen.exportm3u(hostport=hostport, empty_header=True, archive=True, fmt=self.params.get('fmt', [''])[0])
 
                 connection.send_response(200)
                 connection.send_header('Content-Type', 'audio/mpegurl; charset=utf-8')

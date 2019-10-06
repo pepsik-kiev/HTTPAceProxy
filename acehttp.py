@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/pypy3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -15,7 +15,8 @@ __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 
 import gevent
 # http://www.gevent.org/api/gevent.resolver.ares.html
-gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
+try: gevent.config.resolver = ['ares', 'thread', 'dnspython', 'block']
+except: pass
 # Monkeypatching and all the stuff
 from gevent import monkey; monkey.patch_all()
 from gevent.pool import Pool
@@ -106,8 +107,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Pretend to work fine with Fake or HEAD request.
         if self.headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
            # Return 200 and exit
-           if self.headers_only: logging.debug('HEAD request - send headers and close the connection')
-           else: logging.debug('Fake request - close the connection')
+           self.command = 'HEAD' if self.headers_only else 'FAKE'
+           logging.debug('{command} request: send headers and close the connection'.format(**self.__dict__))
            self.send_response(200)
            self.send_header('Content-Type', 'video/mp2t')
            self.send_header('Connection', 'Close')
@@ -168,8 +169,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # End parameters dict
         try:
            if not AceProxy.clientcounter.idleAce:
-              logger.debug('Create connection with AceStream on {aceHostIP}:{aceAPIport}'.format(**AceConfig.ace))
-              AceProxy.clientcounter.idleAce = aceclient.AceClient(**self.__dict__)
+              logger.debug('Create a connection with AceStream on {ace[aceHostIP]}:{ace[aceAPIport]}'.format(**self.__dict__))
+              AceProxy.clientcounter.idleAce = aceclient.AceClient(self.__dict__)
               AceProxy.clientcounter.idleAce.GetAUTH()
            if self.reqtype not in ('direct_url', 'efile_url'):
               self.__dict__.update(AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__))
@@ -182,9 +183,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
            AceProxy.clientcounter.idleAce = False
            self.send_error(404, '%s' % repr(e), logging.ERROR)
 
-        ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
-        if ext == self.channelName: ext = query_get(self.query, 'ext', 'ts')
-        mimetype = mimetypes.guess_type('%s.%s'%(self.channelName, ext))[0]
+        self.ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
+        if self.ext == self.channelName: self.ext = query_get(self.query, 'ext', 'ts')
+        mimetype = mimetypes.guess_type('{channelName}.{ext}'.format(**self.__dict__))[0]
         try:
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            out = self.wfile
@@ -202,16 +203,18 @@ class HTTPHandler(BaseHTTPRequestHandler):
                        out = transcoder.get(timeout=2.0).stdin
                        logger.info('[{clientip}]: Transcoding started'.format(**self.__dict__))
                     except:
-                       logger.error('Error starting transcoding! Is ffmpeg or VLC installed?')
+                       logger.error('[{clientip}]: Error starting transcoding! Is ffmpeg or VLC installed?'.format(**self.__dict__))
                  else:
-                    logger.error("Can't found fmt key. Transcoding not started!")
+                    logger.error("[{clientip}]: Can't found fmt key. Transcoding not started!".format(**self.__dict__))
               elif AceConfig.osplatform == 'Windows':
-                 logger.error('Not applicable in Windnows OS. Transcoding not started!')
+                 logger.error('[{clientip}]: Not applicable in Windnows OS. Transcoding not started!'.format(**self.__dict__))
 
-           # Start broadcast if it does not exist yet
            if AceProxy.clientcounter.addClient(self) == 1:
+              # Create broadcast if it does not exist yet
               gevent.spawn(StreamReader, **self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
               logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
+           else:
+              logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
            logger.info('[{clientip}]: Streaming [{channelName}] started'.format(**self.__dict__))
            # Sending videostream headers to client
            response_use_chunked = False if (transcoder is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
@@ -231,7 +234,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.end_headers()
            # write data to client while it is alive
            for chunk in self.q:
-              out.write(b'%x\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
+              out.write(ensure_binary('%x\r\n%s\r\n' % (len(chunk),chunk)) if response_use_chunked else chunk)
 
         except aceclient.AceException as e:
            _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
@@ -452,7 +455,7 @@ if AceConfig.acespawn or AceConfig.transcodecmd:
       DEVNULL = open(os.devnull, 'wb')  # Py2
 
 logger.info('Ace Stream HTTP Proxy server on Python %s starting .....' % sys.version.split()[0])
-logger.debug('Using: gevent %s, psutil %s' % (gevent.__version__, psutil.__version__))
+logger.debug('Using: %s OS with gevent %s, psutil %s' % (AceConfig.osplatform, gevent.__version__, psutil.__version__))
 
 try: check_compatibility(gevent.__version__, psutil.__version__)
 except (AssertionError, ValueError):
@@ -520,7 +523,7 @@ def add_handler(name):
           plugininstance = getattr(__import__(name), plugname)(AceConfig, AceProxy)
        except Exception as err: logger.error("Can't load plugin %s: %s" % (plugname, repr(err)))
        else:
-          logger.debug('Plugin loaded: %s' % plugname)
+          logger.debug('[%-15.15s]: Plugin loaded' % plugname)
           return {j:plugininstance for j in plugininstance.handlers}
 
 # Creating dict of handlers

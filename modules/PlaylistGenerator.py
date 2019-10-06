@@ -7,7 +7,7 @@ and groups
 __author__ = 'ValdikSS, AndreyPavlenko, Dorik1972'
 from urllib3.packages.six.moves.urllib.parse import quote, urlunparse
 from urllib3.packages.six.moves import map
-from urllib3.packages.six import ensure_str
+from urllib3.packages.six import ensure_str, ensure_binary
 from playlist import PlaylistConfig as config
 from utils import query_get
 
@@ -51,10 +51,10 @@ class PlaylistGenerator(object):
         # Add items
         self.itemlist.append(itemdict)
 
-    def exportm3u(self, hostport, _bytearray=bytearray, **params):
+    def exportm3u(self, **params):
         '''
         Exports m3u playlist
-        :params: dict with keys: path='', empty_header=False, archive=False, parse_url=True, header=None, query=None
+        :params: dict with keys: hostport= '', path='', empty_header=False, archive=False, parse_url=True, header=None, query=None
         '''
         def line_generator(item):
             '''
@@ -82,8 +82,8 @@ class PlaylistGenerator(object):
                   item['url'] = urlunparse(u'{schema};{netloc};/channels/play?id={url};;{query};'.format(**params).split(';'))
 
             return self.m3uchanneltemplate.format(**item)
-        params.update({'schema': 'http', 'netloc': hostport, 'ext': query_get(params.get('query',''), 'ext', 'ts')})
-        return _bytearray(params.get('header', self.m3uemptyheader if params.get('empty_header') else self.m3uheader) + ''.join(map(line_generator, self.sort(self.itemlist))), 'utf-8')
+        params.update({'schema': 'http', 'netloc': params.get('hostport'), 'ext': query_get(params.get('query',''), 'ext', 'ts')})
+        return ensure_binary(params.get('header', self.m3uemptyheader if params.get('empty_header') else self.m3uheader) + ''.join(map(line_generator, self.sort(self.itemlist))))
 
     def exportxml(self, hostport, path='',):
 

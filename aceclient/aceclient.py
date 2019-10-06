@@ -35,7 +35,7 @@ class Telnet(telnetlib.Telnet, object):
 
 class AceClient(object):
 
-    def __init__(self, **params):
+    def __init__(self, params):
 
         # AceEngine product key
         self._product_key = params.get('acekey', AceConst.ACE_KEY)
