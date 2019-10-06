@@ -111,10 +111,9 @@ class Torrenttv(object):
                                   'deflate': zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS),
                                   'gzip': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16) }
               exported = compress_method[h].compress(exported) + compress_method[h].flush()
-              response_headers['Content-Length'] = len(exported)
               response_headers['Content-Encoding'] = h
            except: pass
-
+           response_headers['Content-Length'] = len(exported)
            connection.send_response(200)
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
