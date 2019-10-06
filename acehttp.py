@@ -460,6 +460,7 @@ logger.debug('Using: %s OS with gevent %s, psutil %s' % (AceConfig.osplatform, g
 try: check_compatibility(gevent.__version__, psutil.__version__)
 except (AssertionError, ValueError):
    logger.error("gevent %s or psutil %s doesn't match a supported version!" % (gevent.__version__, psutil.__version__))
+   logger.error('Update python dependencies to required: gevent >= 1.3.3, psutil >= 5.3.0')
    logger.info('Bye Bye .....')
    sys.exit()
 
