@@ -103,8 +103,7 @@ class Torrenttv(object):
            hostport = connection.headers['Host']
            path = '' if not self.channels else '/{reqtype}/channel'.format(**connection.__dict__)
            exported = self.playlist.exportm3u(hostport=hostport, path=path, header=config.m3uheadertemplate, query=connection.query)
-           response_headers = { 'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Content-Length': len(exported),
-                                 'Access-Control-Allow-Origin': '*', 'ETag': self.etag }
+           response_headers = {'Content-Type': 'audio/mpegurl; charset=utf-8', 'Connection': 'close', 'Access-Control-Allow-Origin': '*'}
            try:
               h = connection.headers.get('Accept-Encoding').split(',')[0]
               compress_method = { 'zlib': zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS),
@@ -114,6 +113,8 @@ class Torrenttv(object):
               response_headers['Content-Encoding'] = h
            except: pass
            response_headers['Content-Length'] = len(exported)
+           if connection.request_version == 'HTTP/1.1':
+              response_headers['ETag'] = self.etag
            connection.send_response(200)
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
