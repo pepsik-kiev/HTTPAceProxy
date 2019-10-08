@@ -104,5 +104,4 @@ class Torrentfilms(object):
         connection.send_header('Content-Length', len(exported))
         connection.send_header('Connection', 'close')
         connection.end_headers()
-
         connection.wfile.write(exported)

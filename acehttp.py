@@ -180,7 +180,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
               AceProxy.clientcounter.idleAce._title = self.channelName
            except Exception as e:
-              AceProxy.clientcounter.idleAce = False
+              AceProxy.clientcounter.idleAce._read.kill()
               self.send_error(404, '%s' % repr(e), logging.ERROR)
 
            self.ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])

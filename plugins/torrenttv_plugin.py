@@ -42,15 +42,15 @@ class Torrenttv(object):
                  self.channels = {}
                  m = requests.auth.hashlib.md5()
                  self.logger.info('Playlist %s downloaded' % config.url)
-                 pattern = requests.auth.re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
+                 pattern = requests.utils.re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
+                 urlpattern = requests.utils.re.compile(r'(acestream|infohash|http|https)://([0-9a-f]{40}$|.*.(acelive|acestream|acemedia|torrent)$)')
                  for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
                     itemdict = match.groupdict()
                     name = itemdict.get('name', '')
                     itemdict['logo'] = self.picons[name] = itemdict.get('logo', picons.logomap.get(name))
-
                     url = itemdict['url']
-                    if url.startswith(('acestream://', 'infohash://')) \
-                         or (url.startswith(('http://','https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent'))):
+
+                    if requests.utils.re.search(urlpattern, url):
                        self.channels[name] = url
                        itemdict['url'] = quote(ensure_str(name), '')
 
@@ -72,17 +72,15 @@ class Torrenttv(object):
         if not self.playlist or (gevent.time.time() - self.playlisttime > 30 * 60):
            if not self.Playlistparser(): connection.send_error()
 
-        url = urlparse(connection.path)
-        path = url.path.rstrip('/')
-        ext = query_get(connection.query, 'ext', 'ts')
-        if path.startswith('/{reqtype}/channel/'.format(**connection.__dict__)):
-           if not path.endswith(ext):
-              connection.send_error(404, 'Invalid path: %s' % unquote(path), logging.ERROR)
-           name = ensure_text(unquote(os.path.splitext(os.path.basename(path))[0]))
+        connection.ext = query_get(connection.query, 'ext', 'ts')
+        if connection.path.startswith('/{reqtype}/channel/'.format(**connection.__dict__)):
+           if not connection.path.endswith(connection.ext):
+              connection.send_error(404, 'Invalid path: {path}'.format(**connection.__dict__), logging.ERROR)
+           name = ensure_text(unquote(os.path.splitext(os.path.basename(connection.path))[0]))
            url = self.channels.get(name)
            if url is None:
               connection.send_error(404, 'Unknown channel: %s' % name, logging.ERROR)
-           connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'ext': ext, 'channelIcon': self.picons.get(name)})
+           connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'channelIcon': self.picons.get(name)})
            connection.__dict__.update({'path': {'acestream': lambda d: u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**d),
                                                 'infohash' : lambda d: u'/infohash/{reqtype_value}/{channelName}.{ext}'.format(**d),
                                                 'http'     : lambda d: u'/url/{reqtype_value}/{channelName}.{ext}'.format(**d),
