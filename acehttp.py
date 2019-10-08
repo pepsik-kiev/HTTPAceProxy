@@ -53,7 +53,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def __init__(self, socket, client_address):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
-        self.headers_only = False
         try: BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
         except: pass
         socket.close()
@@ -86,16 +85,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         HEAD request handler
         '''
-        self.headers_only = True
         return self.do_GET()
 
     def do_GET(self):
         '''
         GET request handler
         '''
-        gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
         self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.address_string() # Connected client IP address
-        logging.info('[{}]: {} request for {}'.format(self.clientip, self.command, unquote(self.path)))
+        logging.info(unquote('[{clientip}]: {command} {request_version} request for: {path}'.format(**self.__dict__)))
         logging.debug('[%s]: Request headers: %s' % (self.clientip, dict(self.headers)))
 
         if AceConfig.firewall and not checkFirewall(self.clientip):
@@ -104,10 +101,10 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.path, _, self.query = self.path.partition('?')
         self.path = self.path.rstrip('/')
         # Pretend to work fine with Fake or HEAD request.
-        if self.headers_only or AceConfig.isFakeRequest(self.path, self.query, self.headers):
+        if self.command == 'HEAD' or AceConfig.isFakeRequest(self.path, self.query, self.headers):
            # Return 200 and exit
-           self.command = 'HEAD' if self.headers_only else 'FAKE'
-           logging.debug('{command} request: send headers and close the connection'.format(**self.__dict__))
+           if self.command != 'HEAD': self.command = 'FAKE'
+           logging.debug('[{clientip}]: {command} request: send headers and close the connection'.format(**self.__dict__))
            self.send_response(200)
            self.send_header('Content-Type', 'video/mp2t')
            self.send_header('Connection', 'Close')
@@ -134,13 +131,15 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  try:
                     if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
                                                            '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
-                       self.send_error(501, 'Request seems like valid but no valid video extension was provided', logging.ERROR)
+                       self.send_error(501, '[{clientip}]: equest seems like valid but no valid video extension was provided'.format(**self.__dict__), logging.ERROR)
                  except IndexError:
                     raise IndexError()
                  else:
                     self.handleRequest()
         except IndexError:
-           self.send_error(400, 'Bad Request', logging.WARNING)  # 400 Bad Request
+           self.send_error(400, '[{clientip}]: Bad Request'.format(**self.__dict__), logging.WARNING)  # 400 Bad Request
+        except Exception as e:
+           logging.error('Unexpected exception: %s' % repr(e))
 
     def handleRequest(self):
         '''
@@ -167,85 +166,90 @@ class HTTPHandler(BaseHTTPRequestHandler):
                              })
         # End parameters dict
         try:
-           if not AceProxy.clientcounter.idleAce:
-              logger.debug('Create a connection with AceStream on {ace[aceHostIP]}:{ace[aceAPIport]}'.format(**self.__dict__))
-              AceProxy.clientcounter.idleAce = aceclient.AceClient(self.__dict__)
-              AceProxy.clientcounter.idleAce.GetAUTH()
-           if self.reqtype not in ('direct_url', 'efile_url'):
-              self.__dict__.update(AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__))
-              self.channelName = ensure_str(self.__dict__.get('channelName', next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), 'NoNameChannel')))
-           else:
-              self.channelName = ensure_str(self.__dict__.get('channelName', 'NoNameChannel'))
-              self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
-           AceProxy.clientcounter.idleAce._title = self.channelName
-        except aceclient.AceException as e:
-           AceProxy.clientcounter.idleAce = False
-           self.send_error(404, '%s' % repr(e), logging.ERROR)
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
+           try:
+              if not AceProxy.clientcounter.idleAce:
+                 logger.debug('Create a connection with AceStream on {ace[aceHostIP]}:{ace[aceAPIport]}'.format(**self.__dict__))
+                 AceProxy.clientcounter.idleAce = aceclient.AceClient(self.__dict__)
+                 AceProxy.clientcounter.idleAce.GetAUTH()
+              if self.reqtype not in ('direct_url', 'efile_url'):
+                 self.__dict__.update(AceProxy.clientcounter.idleAce.GetCONTENTINFO(self.__dict__))
+                 self.channelName = ensure_str(self.__dict__.get('channelName', next(iter([ x[0] for x in self.files if x[1] == int(self.file_indexes) ]), 'NoNameChannel')))
+              else:
+                 self.channelName = ensure_str(self.__dict__.get('channelName', 'NoNameChannel'))
+                 self.infohash = requests.auth.hashlib.sha1(ensure_binary(self.path)).hexdigest()
+              AceProxy.clientcounter.idleAce._title = self.channelName
+           except Exception as e:
+              AceProxy.clientcounter.idleAce = False
+              self.send_error(404, '%s' % repr(e), logging.ERROR)
 
-        self.ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
-        if self.ext == self.channelName: self.ext = query_get(self.query, 'ext', 'ts')
-        mimetype = mimetypes.guess_type('{channelName}.{ext}'.format(**self.__dict__))[0]
-        try:
-           self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
-           out = self.wfile
-           # If &fmt transcode key present in request
-           fmt = query_get(self.query, 'fmt')
-           transcoder = gevent.event.AsyncResult()
-           if fmt:
-              if AceConfig.osplatform != 'Windows':
-                 if fmt in AceConfig.transcodecmd:
-                    stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
-                    popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
-                                     'stdout': self.wfile, 'stderr': stderr, 'shell': False }
-                    try:
-                       gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
-                       out = transcoder.get(timeout=2.0).stdin
-                       logger.info('[{clientip}]: Transcoding started'.format(**self.__dict__))
-                    except:
-                       logger.error('[{clientip}]: Error starting transcoding! Is ffmpeg or VLC installed?'.format(**self.__dict__))
-                 else:
-                    logger.error("[{clientip}]: Can't found fmt key. Transcoding not started!".format(**self.__dict__))
-              elif AceConfig.osplatform == 'Windows':
-                 logger.error('[{clientip}]: Not applicable in Windnows OS. Transcoding not started!'.format(**self.__dict__))
+           self.ext = self.__dict__.get('ext', self.channelName[self.channelName.rfind('.') + 1:])
+           if self.ext == self.channelName: self.ext = query_get(self.query, 'ext', 'ts')
+           mimetype = mimetypes.guess_type('{channelName}.{ext}'.format(**self.__dict__))[0]
+           try:
+              self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
+              out = self.wfile
+              # If &fmt transcode key present in request
+              fmt = query_get(self.query, 'fmt')
+              transcoder = gevent.event.AsyncResult()
+              if fmt:
+                 if AceConfig.osplatform != 'Windows':
+                    if fmt in AceConfig.transcodecmd:
+                       stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
+                       popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
+                                       'stdout': self.wfile, 'stderr': stderr, 'shell': False }
+                       try:
+                          gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
+                          out = transcoder.get(timeout=2.0).stdin
+                          logger.info('[{clientip}]: Transcoding started'.format(**self.__dict__))
+                       except:
+                          logger.error('[{clientip}]: Error starting transcoding! Is ffmpeg or VLC installed?'.format(**self.__dict__))
+                    else:
+                       logger.error("[{clientip}]: Can't found fmt key. Transcoding not started!".format(**self.__dict__))
+                 elif AceConfig.osplatform == 'Windows':
+                    logger.error('[{clientip}]: Not applicable in Windnows OS. Transcoding not started!'.format(**self.__dict__))
 
-           if AceProxy.clientcounter.addClient(self) == 1:
-              # Create broadcast if it does not exist yet
-              self.__dict__.update(self.ace.GetBroadcastStartParams(self.__dict__))
-              gevent.spawn(StreamReader, self.__dict__).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
-              logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
-           else:
-              logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
-           logger.info('[{clientip}]: Streaming [{channelName}] started'.format(**self.__dict__))
-           # Sending videostream headers to client
-           response_use_chunked = False if (transcoder.value is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
-           drop_headers = []
-           proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=%s, max=100' % AceConfig.videotimeout, 'Accept-Ranges': 'none',
-                             'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype }
+              if AceProxy.clientcounter.addClient(self) == 1:
+                 # Create broadcast if it does not exist yet
+                 self.__dict__.update(self.ace.GetBroadcastStartParams(self.__dict__))
+                 gevent.spawn(StreamReader, self.__dict__).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
+                 logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
+              else:
+                 logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
+              logger.info('[{clientip}]: Streaming [{channelName}] started'.format(**self.__dict__))
+              # Sending videostream headers to client
+              response_use_chunked = False if (transcoder.value is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
+              drop_headers = []
+              proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=%s, max=100' % AceConfig.videotimeout, 'Accept-Ranges': 'none',
+                                'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype }
 
-           if not response_use_chunked:
-              self.protocol_version = 'HTTP/1.0'
-              proxy_headers['Connection'] = 'Close'
-              drop_headers.extend(['Transfer-Encoding', 'Keep-Alive'])
+              if not response_use_chunked:
+                 self.protocol_version = 'HTTP/1.0'
+                 proxy_headers['Connection'] = 'Close'
+                 drop_headers.extend(['Transfer-Encoding', 'Keep-Alive'])
 
-           response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
-           self.send_response(200)
-           logger.debug('[%s]: Sending HTTPAceProxy headers: %s' % (self.clientip, dict(response_headers)))
-           gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
-           self.end_headers()
-           # write data to client while it is alive
-           for chunk in self.q:
-              out.write(b'%x\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
+              response_headers = [(k,v) for (k,v) in proxy_headers.items() if k not in drop_headers]
+              self.send_response(200)
+              logger.debug('[%s]: Sending HTTPAceProxy headers: %s' % (self.clientip, dict(response_headers)))
+              gevent.joinall([gevent.spawn(self.send_header, k,v) for (k,v) in response_headers])
+              self.end_headers()
+              # write data to client while it is alive
+              for chunk in self.q:
+                 out.write(b'%x\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
 
-        except aceclient.AceException as e:
-           _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
-        except (gevent.GreenletExit, gevent.socket.error): pass # Client disconnected
-        finally:
-           AceProxy.clientcounter.deleteClient(self)
-           logger.info('[{clientip}]: Streaming [{channelName}] finished'.format(**self.__dict__))
-           if transcoder.value:
-              try: transcoder.value.kill(); logger.info('[{clientip}]: Transcoding stoped'.format(**self.__dict__))
-              except: pass
-           return
+           except aceclient.AceException as e:
+              _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
+           except  gevent.socket.error: pass # Client disconnected
+           finally:
+              AceProxy.clientcounter.deleteClient(self)
+              logger.info('[{clientip}]: Streaming [{channelName}] finished'.format(**self.__dict__))
+              if transcoder.value:
+                 try: transcoder.value.kill(); logger.info('[{clientip}]: Transcoding stoped'.format(**self.__dict__))
+                 except: pass
+              return
+
+        except gevent.GreenletExit:
+           AceProxy.clientcounter.idleAce._read.kill()
 
 class AceProxy(object):
     '''
@@ -291,7 +295,7 @@ def StreamReader(params):
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
         except gevent.queue.Full:
-           client.send_error(500, 'Client %s does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
+           client.send_error(500, '[%s]: does not read data until %s sec' % (client.clientip, timeout), logging.ERROR)
 
     def StreamWriter(url):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout), stream=True).iter_content(chunk_size=1048576):
@@ -387,7 +391,7 @@ def findProcess(name):
 
 def clean_proc():
     # Trying to close all spawned processes gracefully
-    _ = AceProxy.pool.map(lambda x: x.send_error(500, 'Client {clientip} abnormal termination!'.format(**x.__dict__), logging.ERROR), AceProxy.clientcounter.getAllClientsList())
+    _ = AceProxy.pool.map(lambda x: x.send_error(500, '[{clientip}]: abnormal termination!'.format(**x.__dict__), logging.ERROR), AceProxy.clientcounter.getAllClientsList())
     if AceConfig.acespawn and isRunning(AceProxy.ace):
        if AceProxy.clientcounter.idleAce:
           AceProxy.clientcounter.idleAce.ShutdownAce(); gevent.sleep(0.5)
