@@ -42,7 +42,7 @@ class Torrenttelik(object):
                  m = requests.auth.hashlib.md5()
                  self.logger.info('Playlist %s downloaded' % config.url)
                  try:
-                    urlpattern = requests.utils.re.compile(r'(acestream|infohash|http|https)://([0-9a-f]{40}$|.*.(acelive|acestream|acemedia|torrent)$)')
+                    urlpattern = requests.utils.re.compile(r'^(acestream|infohash)://[0-9a-f]{40}$|^(http|https)://.*.(acelive|acestream|acemedia|torrent)$')
                     for channel in playlist['channels']:
                        name = channel['name']
                        url = 'acestream://{url}'.format(**channel)
