@@ -91,7 +91,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
-        self.clientip = self.headers['X-Forwarded-For'] if 'X-Forwarded-For' in self.headers else self.address_string() # Connected client IP address
+        self.clientip = self.headers.get('X-Forwarded-For', self.address_string()) # Connected client IP address
         logging.info(unquote('[{clientip}]: {command} {request_version} request for: {path}'.format(**self.__dict__)))
         logging.debug('[%s]: Request headers: %s' % (self.clientip, dict(self.headers)))
 
@@ -216,7 +216,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
               else:
                  logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
-              logger.info('[{clientip}]: Streaming [{channelName}] started'.format(**self.__dict__))
+              logger.info('[{channelName}]: Streaming to [{clientip}] started'.format(**self.__dict__))
               # Sending videostream headers to client
               response_use_chunked = False if (transcoder.value is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
               drop_headers = []
@@ -242,7 +242,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            except  gevent.socket.error: pass # Client disconnected
            finally:
               AceProxy.clientcounter.deleteClient(self)
-              logger.info('[{clientip}]: Streaming [{channelName}] finished'.format(**self.__dict__))
+              logger.info('[{channelName}]: Streaming to [{clientip}] finished'.format(**self.__dict__))
               if transcoder.value:
                  try: transcoder.value.kill(); logger.info('[{clientip}]: Transcoding stoped'.format(**self.__dict__))
                  except: pass
@@ -316,7 +316,7 @@ def StreamReader(params):
                       if len(urls) > 50: urls.pop(0)
 
           else: StreamWriter(params['url']) #AceStream return link for HTTP stream
-    except TypeError: pass
+    except (TypeError, gevent.GreenletExit): pass
     except Exception as err:
        _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(params['infohash']))
 

@@ -23,7 +23,6 @@ class Torrenttv(object):
     handlers = ('torrenttv', 'ttvplaylist')
 
     def __init__(self, AceConfig, AceProxy):
-        self.logger = logging.getLogger('torrenttv_plugin')
         self.picons = self.channels = self.playlist = self.etag = None
         self.playlisttime = gevent.time.time()
         self.headers = {'User-Agent': 'Magic Browser'}
@@ -41,7 +40,7 @@ class Torrenttv(object):
                  self.picons = picons.logomap
                  self.channels = {}
                  m = requests.auth.hashlib.md5()
-                 self.logger.info('Playlist %s downloaded' % config.url)
+                 logging.info('[%s]: playlist %s downloaded' % (self.__class__.__name__, config.url))
                  pattern = requests.utils.re.compile(r',(?P<name>.+) \((?P<group>.+)\)[\r\n]+(?P<url>[^\r\n]+)?')
                  urlpattern = requests.utils.re.compile(r'^(acestream|infohash)://[0-9a-f]{40}$|^(http|https)://.*.(acelive|acestream|acemedia|torrent)$')
                  for match in pattern.finditer(r.text, requests.auth.re.MULTILINE):
@@ -58,12 +57,14 @@ class Torrenttv(object):
                     m.update(ensure_binary(name))
 
                  self.etag = '"' + m.hexdigest() + '"'
-                 self.logger.debug('%s plugin playlist generated' % self.__class__.__name__)
+                 logging.debug('[%s]: plugin playlist generated' % self.__class__.__name__)
 
               self.playlisttime = gevent.time.time()
 
-        except requests.exceptions.RequestException: self.logger.error("Can't download %s playlist!" % config.url); return False
-        except: self.logger.error(traceback.format_exc()); return False
+        except requests.exceptions.RequestException:
+           logging.error("[%s]: can't download %s playlist!" % (self.__class__.__name__, config.url))
+           return False
+        except: logging.error(traceback.format_exc()); return False
 
         return True
 
@@ -79,7 +80,7 @@ class Torrenttv(object):
            name = ensure_text(unquote(os.path.splitext(os.path.basename(connection.path))[0]))
            url = self.channels.get(name)
            if url is None:
-              connection.send_error(404, 'Unknown channel: %s' % name, logging.ERROR)
+              connection.send_error(404, '[%s]: unknown channel: %s' % (self.__class__.__name__, name), logging.ERROR)
            connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'channelIcon': self.picons.get(name)})
            connection.__dict__.update({'path': {'acestream': lambda d: u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**d),
                                                 'infohash' : lambda d: u'/infohash/{reqtype_value}/{channelName}.{ext}'.format(**d),
@@ -91,7 +92,7 @@ class Torrenttv(object):
            return
 
         elif self.etag == connection.headers.get('If-None-Match'):
-           self.logger.debug('ETag matches - returning 304')
+           logging.debug('[%s]: ETag matches. Return 304 to [%s]' % (self.__class__.__name__, connection.clientip))
            connection.send_response(304)
            connection.send_header('Connection', 'close')
            connection.end_headers()
@@ -119,4 +120,4 @@ class Torrenttv(object):
            gevent.joinall([gevent.spawn(connection.send_header, k, v) for (k,v) in response_headers.items()])
            connection.end_headers()
            connection.wfile.write(exported)
-           self.logger.debug('[%s]: Plugin %s sent playlist' % (connection.clientip, self.__class__.__name__))
+           logging.debug('[%s]: plugin sent playlist to [%s]' % (self.__class__.__name__, connection.clientip))

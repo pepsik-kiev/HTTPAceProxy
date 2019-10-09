@@ -44,17 +44,18 @@ class PlaylistGenerator(object):
         # Remap items
         self.changeItem(itemdict)
         # Check and add missing items and their values
-        if not itemdict.get('tvg'): itemdict['tvg'] = itemdict['name']
-        if not itemdict.get('tvgid'): itemdict['tvgid'] = ''
-        if not itemdict.get('group'): itemdict['group'] = ''
-        if not itemdict.get('logo'): itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
+        itemdict['tvg'] = itemdict.get('tvg', itemdict.get('name'))
+        itemdict['tvgid'] = itemdict.get('tvgid', itemdict.get('name'))
+        itemdict['group'] = itemdict.get('group', '')
+        if itemdict.get('logo') is None:
+           itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
         # Add items
         self.itemlist.append(itemdict)
 
     def exportm3u(self, **params):
         '''
         Exports m3u playlist
-        :params: dict with keys: hostport= '', path='', empty_header=False, archive=False, parse_url=True, header=None, query=None
+        params: hostport= '', path='', empty_header=False, archive=False, parse_url=True, header=None, query=None
         '''
         def line_generator(item):
             '''
