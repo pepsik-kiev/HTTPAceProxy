@@ -201,13 +201,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
                        try:
                           gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
                           out = transcoder.get(timeout=2.0).stdin
-                          logger.info('[{clientip}]: Transcoding started'.format(**self.__dict__))
+                          logger.info('[{channelName}]: Transcoding to [{clientip}] started'.format(**self.__dict__))
                        except:
-                          logger.error('[{clientip}]: Error starting transcoding! Is ffmpeg or VLC installed?'.format(**self.__dict__))
+                          logger.error('[{channelName}]: Error starting transcoding to [{clientip}]! Is ffmpeg or VLC installed?'.format(**self.__dict__))
                     else:
-                       logger.error("[{clientip}]: Can't found fmt key. Transcoding not started!".format(**self.__dict__))
+                       logger.error("[{channelName}]: Can't found fmt key. Transcoding to [{clientip}] not started!".format(**self.__dict__))
                  elif AceConfig.osplatform == 'Windows':
-                    logger.error('[{clientip}]: Not applicable in Windnows OS. Transcoding not started!'.format(**self.__dict__))
+                    logger.error('[{channelName}]: Not applicable in Windnows OS. Transcoding to [{clientip}] not started!'.format(**self.__dict__))
 
               if AceProxy.clientcounter.addClient(self) == 1:
                  # Create broadcast if it does not exist yet
@@ -218,10 +218,14 @@ class HTTPHandler(BaseHTTPRequestHandler):
                  logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
               logger.info('[{channelName}]: Streaming to [{clientip}] started'.format(**self.__dict__))
               # Sending videostream headers to client
-              response_use_chunked = False if (transcoder.value is not None or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
+              response_use_chunked = False if (transcoder.value or self.request_version == 'HTTP/1.0') else AceConfig.use_chunked
               drop_headers = []
-              proxy_headers = { 'Connection': 'keep-alive', 'Keep-Alive': 'timeout=%s, max=100' % AceConfig.videotimeout, 'Accept-Ranges': 'none',
-                                'Transfer-Encoding': 'chunked', 'Content-Type': 'video/MP2T' if mimetype is None else mimetype }
+              proxy_headers = { 'Connection': 'keep-alive',
+                                'Keep-Alive': 'timeout=%s, max=100' % AceConfig.videotimeout,
+                                'Accept-Ranges': 'none',
+                                'Transfer-Encoding': 'chunked',
+                                'Content-Type': 'video/MP2T' if mimetype is None else mimetype,
+                              }
 
               if not response_use_chunked:
                  self.protocol_version = 'HTTP/1.0'
@@ -244,7 +248,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               AceProxy.clientcounter.deleteClient(self)
               logger.info('[{channelName}]: Streaming to [{clientip}] finished'.format(**self.__dict__))
               if transcoder.value:
-                 try: transcoder.value.kill(); logger.info('[{clientip}]: Transcoding stoped'.format(**self.__dict__))
+                 try: transcoder.value.kill(); logger.info('[{channelName}]: Transcoding to [{clientip}] stoped'.format(**self.__dict__))
                  except: pass
               return
 
