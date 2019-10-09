@@ -311,7 +311,7 @@ def StreamReader(params):
        with requests.session() as s:
           if params['url'].endswith('.m3u8'): # AceEngine return link for HLS stream
              import m3u8; urls = []
-             while broadcast:
+             while params['broadcast']:
                 for url in m3u8.load(params['url']).segments.uri:
                    if url in urls: continue
                    else:
@@ -430,7 +430,8 @@ def _reloadconfig(signum=None, frame=None):
     logger.info('Ace Stream HTTP Proxy config reloaded.....')
 
 def get_ip_address():
-    try: return [(s.connect(('1.1.1.1', 80)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
+    # connecting to a UDP address doesn't send packets
+    try: return [(s.connect(('1.1.1.1', 0)), s.getsockname()[0], s.close()) for s in [socket(AF_INET, SOCK_DGRAM)]][0][1]
     except:
        logger.error('Network is unreachable')
        sys.exit()
