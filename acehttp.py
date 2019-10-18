@@ -35,7 +35,7 @@ import psutil, requests, signal, mimetypes
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
 from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
 from urllib3.packages.six.moves import range, map
-from urllib3.packages.six import viewkeys, ensure_binary, ensure_str
+from urllib3.packages.six import ensure_binary, ensure_str
 try:
    from ipaddress import ip_network as IPNetwork, ip_address as IPAddress
 except:
@@ -114,31 +114,26 @@ class HTTPHandler(BaseHTTPRequestHandler):
         try:
            self.splittedpath = self.path.split('/')
            self.reqtype = self.splittedpath[1].lower()
-           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype) # For backward compatibility
-           if self.reqtype not in set(viewkeys(AceProxy.pluginshandlers)).union(AceProxy.handlers):
-              raise IndexError()
+           AceProxy.pluginshandlers[self.reqtype].handle(self) # If request should be handled by plugin
+           raise IndexError()
 
-           try: AceProxy.pluginshandlers[self.reqtype].handle(self) # If request should be handled by plugin
-           except: pass
-           finally:
-              # If request parameter is 'content_id','url','infohash'.... etc
-              if self.reqtype in AceProxy.handlers:
-                 # Limit on the number of connected clients
-                 if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
-                    self.send_error(403, "[{clientip}]: Maximum client connections reached, can't serve request".format(**self.__dict__), logging.ERROR)
-                 # Check if third path parameter is exists /{reqtype}/{reqtype_value}/.../.../video.mpg
-                 #                                                                           |_________|
-                 # And if it ends with regular video extension
-                 try:
-                    if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
-                                                           '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
-                       self.send_error(501, '[{clientip}]: equest seems like valid but no valid video extension was provided'.format(**self.__dict__), logging.ERROR)
-                 except IndexError:
-                    raise IndexError()
-                 else:
-                    self.handleRequest()
-        except IndexError:
-           self.send_error(400, '[{clientip}]: Bad Request'.format(**self.__dict__), logging.WARNING)  # 400 Bad Request
+        except (IndexError, KeyError):
+           self.reqtype = {'torrent': 'url', 'pid': 'content_id'}.get(self.reqtype, self.reqtype) # For backward compatibility
+           if self.reqtype in {'content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'}:
+              # Limit on the number of connected clients
+              if 0 < AceConfig.maxconns <= len(AceProxy.clientcounter.getAllClientsList()):
+                 self.send_error(403, "[{clientip}]: Maximum client connections reached, can't serve request".format(**self.__dict__), logging.ERROR)
+              # Check if third path parameter is exists /{reqtype}/{reqtype_value}/.../.../video.mpg
+              #                                                                           |_________|
+              # And if it ends with regular video extension
+              if not self.splittedpath[-1].endswith(('.avi', '.flv', '.m2ts', '.mkv', '.mpeg', '.mpeg4', '.mpegts',
+                                                     '.mpg4', '.mp4', '.mpg', '.mov', '.mpv', '.qt', '.ts', '.wmv')):
+                    self.send_error(501, '[{clientip}]: request seems like valid but no valid video extension was provided'.format(**self.__dict__), logging.ERROR)
+              else:
+                 self.handleRequest()
+           elif self.reqtype not in AceProxy.pluginshandlers:
+              self.send_error(400, '[{clientip}]: Bad Request'.format(**self.__dict__), logging.WARNING)  # 400 Bad Request
+
         except Exception as e:
            logging.error('Unexpected exception: %s' % repr(e))
 
@@ -166,6 +161,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                               'channelIcon': self.__dict__.get('channelIcon', 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'),
                              })
         # End parameters dict
+
         try:
            gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
            try:
@@ -540,7 +536,6 @@ def add_handler(name):
 # Creating dict of handlers
 pluginslist = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('plugins/*_plugin.py')]
 AceProxy.pluginshandlers = {key:val for k in map(add_handler, pluginslist) for key,val in k.items()}
-AceProxy.handlers = {'content_id', 'url', 'infohash', 'direct_url', 'data', 'efile_url'}
 # Server setup
 AceProxy.server = StreamServer((AceConfig.httphost, AceConfig.httpport), handle=HTTPHandler, spawn=AceProxy.pool)
 # Capture  signal handlers (SIGINT, SIGQUIT etc.)
