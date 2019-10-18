@@ -119,6 +119,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
               raise IndexError()
 
            try: AceProxy.pluginshandlers[self.reqtype].handle(self) # If request should be handled by plugin
+           except: pass
            finally:
               # If request parameter is 'content_id','url','infohash'.... etc
               if self.reqtype in AceProxy.handlers:
