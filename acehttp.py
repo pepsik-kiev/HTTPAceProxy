@@ -22,7 +22,7 @@ from gevent import monkey; monkey.patch_all()
 from gevent.pool import Pool
 from gevent.server import StreamServer
 from gevent.util import wrap_errors
-from gevent.socket import socket, AF_INET, SOCK_DGRAM
+from gevent.socket import socket, AF_INET, SOCK_DGRAM, SHUT_RDWR
 
 import os, sys, glob
 # Uppend the directory for custom modules at the front of the path.
@@ -55,7 +55,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         try: BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
         except: pass
-        socket.close()
 
     def log_message(self, format, *args): pass
         #logger.debug('%s - %s - "%s"' % (self.address_string(), format%args, unquote(self.path).decode('utf8')))
@@ -65,6 +64,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def finish(self):
         logging.debug('[{clientip}]: Disconnected'.format(**self.__dict__))
+        self.connection.shutdown(SHUT_RDWR)
 
     def send_error(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
