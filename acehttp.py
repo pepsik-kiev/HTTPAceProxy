@@ -52,7 +52,6 @@ class HTTPHandler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
     def __init__(self, socket, client_address):
-        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         try: BaseHTTPRequestHandler.__init__(self, socket, client_address, self)
         except: pass
 
@@ -65,9 +64,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def finish(self):
         logging.debug('[{clientip}]: Disconnected'.format(**self.__dict__))
         self.connection.shutdown(SHUT_RDWR)
-
-    def destroy(self):
-        self.handlerGreenlet.kill()
+        if self.handlerGreenlet:
+           self.handlerGreenlet.kill()
 
     def send_error(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -82,7 +80,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.wfile.write(ensure_binary(logmsg))
         finally:
            logging.log(loglevel, logmsg)
-           self.destroy()
+           self.handlerGreenlet.kill()
 
     def do_HEAD(self):
         '''
@@ -94,6 +92,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         '''
         GET request handler
         '''
+        self.handlerGreenlet = gevent.getcurrent() # Current greenlet
         self.clientip = self.headers.get('X-Forwarded-For', self.address_string()) # Connected client IP address
         logging.info(unquote('[{clientip}]: {command} {request_version} request for: {path}'.format(**self.__dict__)))
         logging.debug('[%s]: Request headers: %s' % (self.clientip, dict(self.headers)))
@@ -168,7 +167,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
            transcoder = gevent.event.AsyncResult()
            out = self.wfile
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.destroy()) # Client disconection watchdog
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
            try:
               if not AceProxy.clientcounter.idleAce:
                  logger.debug('Create a connection with AceStream on {ace[aceHostIP]}:{ace[aceAPIport]}'.format(**self.__dict__))
