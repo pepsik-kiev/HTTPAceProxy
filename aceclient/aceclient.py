@@ -103,7 +103,7 @@ class AceClient(object):
                  logging.debug('[%.20s]: <<< %s' % (self._title, unquote(' '.join(recvbuffer))))
                  gevent.spawn(getattr(globals()[self.__class__.__name__], '_%s_' % recvbuffer[0].lower(), '_close_'), self, recvbuffer).link_value(self._response[recvbuffer[0]])
               except gevent.Timeout: self.ShutdownAce()
-              except gevent.socket.error: pass # WinOS patch
+              except gevent.socket.timeout: pass # WinOS patch
               except: # Telnet connection unexpectedly closed
                  logging.debug('[%.20s]: >>> %s' % (self._title, 'CLOSE telnet connetcion'))
                  break
