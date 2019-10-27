@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/pypy3
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -53,7 +53,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
     def __init__(self, socket, client_address):
         self.handlerGreenlet = gevent.getcurrent() # Current greenlet
-        try: BaseHTTPRequestHandler.__init__(self, socket, client_address, AceProxy.server)
+        try: BaseHTTPRequestHandler.__init__(self, socket, client_address, self)
         except: pass
 
     def log_message(self, format, *args): pass
@@ -65,6 +65,9 @@ class HTTPHandler(BaseHTTPRequestHandler):
     def finish(self):
         logging.debug('[{clientip}]: Disconnected'.format(**self.__dict__))
         self.connection.shutdown(SHUT_RDWR)
+
+    def destroy(self):
+        self.handlerGreenlet.kill()
 
     def send_error(self, errorcode=500, logmsg='Dying with error', loglevel=logging.ERROR):
         '''
@@ -79,7 +82,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
            self.wfile.write(ensure_binary(logmsg))
         finally:
            logging.log(loglevel, logmsg)
-           self.handlerGreenlet.kill()
+           self.destroy()
 
     def do_HEAD(self):
         '''
@@ -161,9 +164,11 @@ class HTTPHandler(BaseHTTPRequestHandler):
                               'channelIcon': self.__dict__.get('channelIcon', 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'),
                              })
         # End parameters dict
-
         try:
-           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.handlerGreenlet.kill()) # Client disconection watchdog
+           self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
+           transcoder = gevent.event.AsyncResult()
+           out = self.wfile
+           gevent.spawn(wrap_errors(gevent.socket.error, self.rfile.read)).link(lambda x: self.destroy()) # Client disconection watchdog
            try:
               if not AceProxy.clientcounter.idleAce:
                  logger.debug('Create a connection with AceStream on {ace[aceHostIP]}:{ace[aceAPIport]}'.format(**self.__dict__))
@@ -184,11 +189,8 @@ class HTTPHandler(BaseHTTPRequestHandler):
            if self.ext == self.channelName: self.ext = query_get(self.query, 'ext', 'ts')
            mimetype = mimetypes.guess_type('{channelName}.{ext}'.format(**self.__dict__))[0]
            try:
-              self.q = gevent.queue.Queue(maxsize=AceConfig.videotimeout)
-              out = self.wfile
               # If &fmt transcode key present in request
               fmt = query_get(self.query, 'fmt')
-              transcoder = gevent.event.AsyncResult()
               if fmt:
                  if AceConfig.osplatform != 'Windows':
                     if fmt in AceConfig.transcodecmd:
@@ -236,21 +238,21 @@ class HTTPHandler(BaseHTTPRequestHandler):
               self.end_headers()
               # write data to client while it is alive
               for chunk in self.q:
-                 out.write(b'%x\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
+                 out.write(b'%X\r\n%s\r\n' % (len(chunk),chunk) if response_use_chunked else chunk)
 
            except aceclient.AceException as e:
               _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(e), logging.ERROR), AceProxy.clientcounter.getClientsList(self.infohash))
            except  gevent.socket.error: pass # Client disconnected
-           finally:
-              AceProxy.clientcounter.deleteClient(self)
-              logger.info('[{channelName}]: Streaming to [{clientip}] finished'.format(**self.__dict__))
-              if transcoder.value:
-                 try: transcoder.value.kill(); logger.info('[{channelName}]: Transcoding to [{clientip}] stoped'.format(**self.__dict__))
-                 except: pass
-              return
 
         except gevent.GreenletExit:
            AceProxy.clientcounter.idleAce._read.kill()
+
+        finally:
+           AceProxy.clientcounter.deleteClient(self)
+           logger.info('[{channelName}]: Streaming to [{clientip}] finished'.format(**self.__dict__))
+           if transcoder.value:
+              try: transcoder.value.kill(); logger.info('[{channelName}]: Transcoding to [{clientip}] stoped'.format(**self.__dict__))
+              except: pass
 
 class AceProxy(object):
     '''
@@ -291,6 +293,7 @@ def StreamReader(params):
 
     def checkBroadcast():
         if not AceProxy.clientcounter.getClientsList(params['infohash']):
+           params['selfcheck'].kill()
            params['broadcast'].kill()
 
     def write_chunk(client, chunk, timeout=15.0):
@@ -303,8 +306,8 @@ def StreamReader(params):
            _ = AceProxy.pool.map(lambda client: write_chunk(client, chunk), AceProxy.clientcounter.getClientsList(params['infohash']))
 
     try:
+       params.update({'selfcheck': gevent.spawn(schedule, 0.5, checkBroadcast)})
        params['url'] = urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
-       schedule(0.5, checkBroadcast)
        with requests.session() as s:
           if params['url'].endswith('.m3u8'): # AceEngine return link for HLS stream
              import m3u8; urls = []
