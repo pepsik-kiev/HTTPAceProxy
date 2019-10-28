@@ -209,8 +209,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
               if AceProxy.clientcounter.addClient(self) == 1:
                  # Create broadcast if it does not exist yet
-                 self.__dict__.update(self.ace.GetBroadcastStartParams(self.__dict__))
-                 gevent.spawn(StreamReader, self.__dict__).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
+                 gevent.spawn(StreamReader, self.ace.GetBroadcastStartParams(self.__dict__)).link(lambda x: logger.debug('[{channelName}]: Broadcast destroyed. Last client disconnected'.format(**self.__dict__)))
                  logger.debug('[{channelName}]: Broadcast created'.format(**self.__dict__))
               else:
                  logger.debug('[{channelName}]: Broadcast already exists'.format(**self.__dict__))
@@ -288,12 +287,11 @@ def StreamReader(params):
     '''
     params: dict([url=] [file_index=] [infohash= ] [ad=1 [interruptable=1]] [stream=1] [pos=position] [bitrate=] [length=])
     '''
-    params.update({'broadcast': gevent.getcurrent()})
 
     def checkBroadcast():
-        if not AceProxy.clientcounter.getClientsList(params['infohash']):
-           params['selfcheck'].kill()
+        if not params['broadcastclients']:
            params['broadcast'].kill()
+        return params['broadcast'].started
 
     def write_chunk(client, chunk, timeout=15.0):
         try: client.q.put(chunk, timeout=timeout)
@@ -302,15 +300,18 @@ def StreamReader(params):
 
     def StreamWriter(url):
         for chunk in s.get(url, timeout=(5, AceConfig.videotimeout), stream=True).iter_content(chunk_size=1048576):
-           _ = AceProxy.pool.map(lambda client: write_chunk(client, chunk), AceProxy.clientcounter.getClientsList(params['infohash']))
+           _ = params['chunkpool'].map(lambda client: write_chunk(client, chunk), params['broadcastclients'])
 
     try:
-       params.update({'selfcheck': gevent.spawn(schedule, 0.5, checkBroadcast)})
-       params['url'] = urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl()
+       params.update({'url': urlparse(unquote(params['url']))._replace(netloc='{aceHostIP}:{aceHTTPport}'.format(**AceConfig.ace)).geturl(),
+                      'broadcast': gevent.getcurrent(),
+                      'broadcastclients': AceProxy.clientcounter.getClientsList(params['infohash']),
+                      'chunkpool': Pool(),
+                     })
        with requests.session() as s:
           if params['url'].endswith('.m3u8'): # AceEngine return link for HLS stream
              import m3u8; urls = []
-             while params['broadcast']:
+             while checkBroadcast():
                 for url in m3u8.load(params['url']).segments.uri:
                    if url in urls: continue
                    else:
