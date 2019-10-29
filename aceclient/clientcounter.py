@@ -49,6 +49,7 @@ class ClientCounter(object):
               self.idleAce = self.clients.pop(client.infohash).pop().ace
               self.idleAce.StopBroadcast()
               self.idleAce._title = 'idleAce'
+           except KeyError: self.idleAce = False
            except: self.idleAce.kill()
         except:
            self.clients[client.infohash].discard(client)
