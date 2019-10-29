@@ -272,5 +272,5 @@ class AceClient(object):
         '''
         SHUTDOWN
         '''
-        pass
+        _self.read.kill()
 ######################################## END AceEngine API answers parsers ########################################
