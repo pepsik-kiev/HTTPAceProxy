@@ -106,8 +106,8 @@ class AceClient(object):
               except gevent.socket.timeout: pass # WinOS patch
               except: # Telnet connection unexpectedly closed
                  logging.debug('[%.20s]: >>> %s' % (self._title, 'CLOSE telnet connetcion'))
+                 self._socket.close()
                  break
-              finally: self._socket.close()
 
 
     def _write(self, message):
