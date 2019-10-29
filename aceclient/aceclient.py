@@ -107,6 +107,7 @@ class AceClient(object):
               except: # Telnet connection unexpectedly closed
                  logging.debug('[%.20s]: >>> %s' % (self._title, 'CLOSE telnet connetcion'))
                  break
+              finally: self._socket.close()
 
 
     def _write(self, message):
