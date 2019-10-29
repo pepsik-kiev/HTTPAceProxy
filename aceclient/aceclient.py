@@ -61,6 +61,8 @@ class AceClient(object):
         else:
            # Spawning telnet data reader with recvbuffer read timeout (allowable STATE 0 (IDLE) time)
            self._read = gevent.spawn(self._read, self._videotimeout)
+           self._read.link(lambda x: self._socket.close())
+           self._read.link(lambda x: logging.debug('[%.20s]: >>> %s' % (self._title, 'CLOSE telnet connetcion')))
 
     def __bool__(self):
         return self._read.started
@@ -102,12 +104,11 @@ class AceClient(object):
                  recvbuffer = self._socket.read_until('\r\n', None).strip().split()
                  logging.debug('[%.20s]: <<< %s' % (self._title, unquote(' '.join(recvbuffer))))
                  gevent.spawn(getattr(globals()[self.__class__.__name__], '_%s_' % recvbuffer[0].lower(), '_close_'), self, recvbuffer).link_value(self._response[recvbuffer[0]])
-              except gevent.Timeout: self.ShutdownAce()
               except gevent.socket.timeout: pass # WinOS patch
-              except: # Telnet connection unexpectedly closed
-                 logging.debug('[%.20s]: >>> %s' % (self._title, 'CLOSE telnet connetcion'))
-                 self._socket.close()
+              except gevent.Timeout:
+                 self.ShutdownAce()
                  break
+              except: break # Telnet connection unexpectedly closed or telnet connection error
 
 
     def _write(self, message):
