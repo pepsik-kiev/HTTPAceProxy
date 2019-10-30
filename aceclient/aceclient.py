@@ -103,7 +103,7 @@ class AceClient(object):
               try:
                  recvbuffer = self._socket.read_until('\r\n', None).strip().split()
                  logging.debug('[%.20s]: <<< %s' % (self._title, unquote(' '.join(recvbuffer))))
-                 gevent.spawn(getattr(globals()[self.__class__.__name__], '_%s_' % recvbuffer[0].lower(), '_close_'), self, recvbuffer).link_value(self._response[recvbuffer[0]])
+                 gevent.spawn(getattr(globals()[self.__class__.__name__], '_%s_' % recvbuffer[0].lower(), '_unrecognized_'), self, recvbuffer).link_value(self._response[recvbuffer[0]])
               except gevent.socket.timeout: pass # WinOS patch
               except gevent.Timeout:
                  self.ShutdownAce()
@@ -273,4 +273,8 @@ class AceClient(object):
         SHUTDOWN
         '''
         self._read.kill()
+    def _unrecognized_(self, recvbuffer):
+        logging.warning('[%.20s]: unintended API response <<< %s' % (self._title, ' '.join(recvbuffer)))
+
+
 ######################################## END AceEngine API answers parsers ########################################
