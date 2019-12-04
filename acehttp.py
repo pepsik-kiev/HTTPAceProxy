@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 '''
 AceProxy: Ace Stream to HTTP Proxy
@@ -147,13 +147,13 @@ class HTTPHandler(BaseHTTPRequestHandler):
         # Make handler parameters dict
         self.__dict__.update({}.fromkeys(aceclient.acemessages.AceConst.START_PARAMS, '0')) # [file_indexes, developer_id, affiliate_id, zone_id, stream_id]
         self.__dict__.update({k:v for (k,v) in [(aceclient.acemessages.AceConst.START_PARAMS[i-3], self.splittedpath[i] if self.splittedpath[i].isdigit() else '0') for i in range(3, len(self.splittedpath))]})
-        self.__dict__.update({self.reqtype: self.__dict__.get('reqtype_value', unquote(self.splittedpath[2])), # {reqtype: reqtype_value}
+        self.__dict__.update({self.reqtype: unquote(self.splittedpath[2]), # {reqtype: reqtype_value}
                               'ace': AceConfig.ace,
-                              'connect_timeout': AceConfig.aceconntimeout,
-                              'result_timeout': AceConfig.aceresulttimeout,
                               'acesex': AceConfig.acesex,
                               'aceage': AceConfig.aceage,
                               'acekey': AceConfig.acekey,
+                              'connect_timeout': AceConfig.aceconntimeout,
+                              'result_timeout': AceConfig.aceresulttimeout,
                               'videoseekback': AceConfig.videoseekback,
                               'videotimeout': AceConfig.videotimeout,
                               'stream_type': ' '.join(['{}={}'.format(k,v) for k,v in AceConfig.acestreamtype.items()]), # request http or hls from AceEngine
@@ -195,7 +195,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
                     if fmt in AceConfig.transcodecmd:
                        stderr = None if AceConfig.loglevel == logging.DEBUG else DEVNULL
                        popen_params = { 'bufsize': 1048576, 'stdin': gevent.subprocess.PIPE,
-                                       'stdout': self.wfile, 'stderr': stderr, 'shell': False }
+                                        'stdout': self.wfile, 'stderr': stderr, 'shell': False }
                        try:
                           gevent.spawn(lambda: psutil.Popen(AceConfig.transcodecmd[fmt], **popen_params)).link(transcoder)
                           out = transcoder.get(timeout=2.0).stdin

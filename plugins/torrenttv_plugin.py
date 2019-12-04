@@ -81,12 +81,13 @@ class Torrenttv(object):
            url = self.channels.get(name)
            if url is None:
               connection.send_error(404, '[%s]: unknown channel: %s' % (self.__class__.__name__, name), logging.ERROR)
-           connection.__dict__.update({'channelName': name, 'reqtype_value': quote(url.split('/')[2],''), 'channelIcon': self.picons.get(name)})
-           connection.__dict__.update({'path': {'acestream': lambda d: u'/content_id/{reqtype_value}/{channelName}.{ext}'.format(**d),
-                                                'infohash' : lambda d: u'/infohash/{reqtype_value}/{channelName}.{ext}'.format(**d),
-                                                'http'     : lambda d: u'/url/{reqtype_value}/{channelName}.{ext}'.format(**d),
-                                                'https'    : lambda d: u'/url/{reqtype_value}/{channelName}.{ext}'.format(**d),
-                                               }[urlparse(url).scheme](connection.__dict__)})
+           connection.__dict__.update({'channelName': name,
+                                       'channelIcon': self.picons.get(name),
+                                       'path': {'acestream': '/content_id/%s/%s.%s' % (urlparse(url).netloc, name, connection.ext),
+                                                'infohash' : '/infohash/%s/%s.%s' % (urlparse(url).netloc, name, connection.ext),
+                                                'http'     : '/url/%s/%s.%s' % (quote(url,''), name, connection.ext),
+                                                'https'    : '/url/%s/%s.%s' % (quote(url,''), name, connection.ext),
+                                               }[urlparse(url).scheme]})
            connection.__dict__.update({'splittedpath': connection.path.split('/')})
            connection.__dict__.update({'reqtype': connection.splittedpath[1].lower()})
            return
