@@ -19,7 +19,7 @@ email = 're.place@me'
 password ='ReplaceMe'
 
 # TTV channels logo location
-logobase = 'http://1ttv.org/uploads/'
+logobase = 'http://ttv.world/uploads/'
 
 # Generate logo with full path (e.g. http://torrent-tv.ru/uploads/ornzQpk6WCW6xk0lyBhlwqH8u2QyU7.png)
 # or put only the logo file name (e.g. ornzQpk6WCW6xk0lyBhlwqH8u2QyU7.png)

@@ -275,13 +275,11 @@ def drop_privileges(uid_name='nobody', gid_name='nogroup'):
 
     # Ensure a very conservative umask
     old_umask = os.umask(int('077', 8))
-
-    if os.getuid() == running_uid and os.getgid() == running_gid:
-       # could be useful
+    value = (os.getuid() == running_uid and os.getgid() == running_gid)
+    if value:  # could be useful
        os.environ['HOME'] = running_uid_home
        logger.info('Changed permissions to: %s: %i, %s, %i' % (uid_name, running_uid, gid_name, running_gid))
-       return True
-    return False
+    return value
 
 def StreamReader(params):
     '''
@@ -322,7 +320,7 @@ def StreamReader(params):
           else: StreamWriter(params['url']) #AceStream return link for HTTP stream
     except (TypeError, gevent.GreenletExit): pass
     except Exception as err:
-       _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(err), logging.ERROR), AceProxy.clientcounter.getClientsList(params['infohash']))
+       _ = AceProxy.pool.map(lambda x: x.send_error(500, repr(err), logging.ERROR), params['broadcastclients'])
 
 # Spawning procedures
 def spawnAce(cmd ='' if AceConfig.osplatform == 'Windows' else AceConfig.acecmd.split(), delay=AceConfig.acestartuptimeout):
@@ -358,8 +356,7 @@ def checkAce():
 def checkFirewall(clientip):
     try: clientinrange = any([IPAddress(clientip) in IPNetwork(i) for i in AceConfig.firewallnetranges])
     except: logger.error('Check firewall netranges settings !'); return False
-    if (AceConfig.firewallblacklistmode and clientinrange) or (not AceConfig.firewallblacklistmode and not clientinrange): return False
-    return True
+    return not ((AceConfig.firewallblacklistmode and clientinrange) or (not AceConfig.firewallblacklistmode and not clientinrange))
 
 def detectPort():
     try:
@@ -387,7 +384,7 @@ def detectPort():
        else: logger.info('Detected ace port: {aceAPIport}'.format(**AceConfig.ace))
 
 def isRunning(process):
-    return True if process.is_running() and process.status() != psutil.STATUS_ZOMBIE else False
+     return (process.is_running() and process.status() != psutil.STATUS_ZOMBIE)
 
 def findProcess(name):
     pinfo = next(iter([p.info for p in psutil.process_iter(attrs=['pid', 'name']) if name in p.info['name']]), None)

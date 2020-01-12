@@ -29,5 +29,5 @@ updateevery = 180
 # tvgid - channel tvg-id (optional)
 # group - channel playlist group-title (optional)
 # logo - channel picon file tvg-logo (optional)
-m3uheadertemplate = u'#EXTM3U url-tvg="{}" tvg-shift={} deinterlace=1 m3uautoload=1 cache=1000\n'.format(tvgurl, tvgshift)
+m3uheadertemplate = u'#EXTM3U url-tvg={} tvg-shift={} deinterlace=1 m3uautoload=1 cache=1000\n'.format(tvgurl, tvgshift)
 m3uchanneltemplate = u'#EXTINF:-1 group-title="{group}" tvg-name="{tvg}" tvg-logo="{logo}",{name}\n{url}\n'

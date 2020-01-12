@@ -35,7 +35,7 @@ class TorrentTvApi(object):
         12: u'Религиозные'
     }
 
-    API_URL = 'http://api.torrent-tv.ru/v3/' # http://1ttvxbmc.top/v3/ # http://1ttvapi.top/v3/
+    API_URL = 'http://api.ttv.world/v3/' #'http://api.torrent-tv.ru/v3/' # http://1ttvxbmc.top/v3/ # http://1ttvapi.top/v3/
 
     def __init__(self, email, password):
         self.email = email

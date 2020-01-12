@@ -1,5 +1,5 @@
 '''
-Torrent-telik.com. Configuration file for json-based playlists downloader
+Configuration file for json-based playlists downloader
 
 Playlist format example:
 {"channels":[
@@ -19,11 +19,12 @@ Playlist format example:
 # if you use tor on the same machine with AceProxy -  proxies = { 'https' : 'socks5h://127.0.0.1:9050' }
 # If your http-proxy need authentification - proxies = {https' : 'https://user:password@ip:port'}
 
-#proxies = {'http' : 'socks5h://192.168.1.1:9100', 'https' : 'socks5h://192.168.1.1:9100'}
 proxies = {}
+#proxies = {'http' : 'socks5h://192.168.1.1:9100',
+#           'https' : 'socks5h://192.168.1.1:9100'}
 
 # Channels urls or path to file ('file:///path/to/file' or 'file:///C://path//to//file' for Windows OS)
-url = 'http://pomoyka.win/trash/ttv-list/ace.json'
+url = 'http://frytv.pp.ua/frytv.json'
 
 # EPG urls
 tvgurl = 'https://iptvx.one/epg/epg.xml.gz'
@@ -33,7 +34,7 @@ tvgshift = 0
 
 # Download playlist every N minutes to keep it fresh
 # 0 = disabled
-updateevery = 120
+updateevery = 10
 
 # Channel playlist template
 # The following values are allowed:

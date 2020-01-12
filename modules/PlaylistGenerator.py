@@ -65,7 +65,7 @@ class PlaylistGenerator(object):
             params.update({'name': quote(ensure_str(item.get('name').replace('"', "'").replace(',', '.')), '')})
             url = item['url']
             if not params.get('parse_url'):
-               if params.get('path').endswith('channel'): # For plugins  channel name maping
+               if params.get('path') and params.get('path').endswith('channel'): # For plugins channel name maping
                   params.update({'value': url})
                   item['url'] = urlunparse(u'{schema};{netloc};{path}/{value}.{ext};;{query};'.format(**params).split(';'))
                elif url.startswith(('http://', 'https://')) and url.endswith(('.acelive', '.acestream', '.acemedia', '.torrent')): # For .acelive and .torrent
@@ -78,9 +78,11 @@ class PlaylistGenerator(object):
                   params.update({'value': url.split('/')[2]})
                   item['url'] = urlunparse(u'{schema};{netloc};/content_id/{value}/{name}.{ext};;{query};'.format(**params).split(';'))
                elif params.get('archive') and url.isdigit(): # For archive channel id's
-                  item['url'] = urlunparse(u'{schema};{netloc};/archive/play?id={url};;{query};'.format(**params).split(';'))
+                  params.update({'value': url})
+                  item['url'] = urlunparse(u'{schema};{netloc};/archive/play;;id={value};'.format(**params).split(';'))
                elif not params.get('archive') and url.isdigit(): # For channel id's
-                  item['url'] = urlunparse(u'{schema};{netloc};/channels/play?id={url};;{query};'.format(**params).split(';'))
+                  params.update({'value': url})
+                  item['url'] = urlunparse(u'{schema};{netloc};/channels/play;;id={value};'.format(**params).split(';'))
 
             return self.m3uchanneltemplate.format(**item)
         params.update({'schema': 'http', 'netloc': params.get('hostport'), 'ext': query_get(params.get('query',''), 'ext', 'ts')})

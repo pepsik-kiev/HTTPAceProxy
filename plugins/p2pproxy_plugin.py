@@ -46,6 +46,7 @@ class P2pproxy(object):
 
             if connection.path.endswith('play'):  # /channels/play?id=[id]
                 channel_id = self.params.get('id', [''])[0]
+
                 if not channel_id:
                     # /channels/play?id=&_=[epoch timestamp] is Torrent-TV widget proxy check
                     # P2pProxy simply closes connection on this request sending Server header, so do we
@@ -103,8 +104,8 @@ class P2pproxy(object):
                     logo = channel.getAttribute('logo')
                     if logo != '' and config.fullpathlogo: logo = config.logobase + logo
 
-                    fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo,
-                              'tvgid': config.tvgid.format(**fields) if channel.getAttribute('epg_id') != '0' else ''}
+                    fields = {'name': name, 'id': cid, 'url': cid, 'group': group, 'logo': logo}
+                    fields.update({'tvgid': config.tvgid.format(**fields) if channel.getAttribute('epg_id') != '0' else ''})
                     playlistgen.addItem(fields)
 
                 P2pproxy.logger.debug('Exporting m3u playlist')
