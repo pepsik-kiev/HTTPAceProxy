@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(ROOT_DIR, 'modules'))
 for wheel in glob.glob(os.path.join(ROOT_DIR, 'modules', 'wheels', '*.whl')): sys.path.insert(0, wheel)
 
 import logging
-import psutil, requests, signal, mimetypes
+import psutil, requests, signal, mimetypes, traceback
 from urllib3.packages.six.moves.BaseHTTPServer import BaseHTTPRequestHandler
 from urllib3.packages.six.moves.urllib.parse import urlparse, unquote
 from urllib3.packages.six.moves import range, map
@@ -138,6 +138,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
            logging.error('Unexpected exception: %s' % repr(e))
+           logging.error(traceback.format_exc())
 
     def handleRequest(self):
         '''
@@ -539,11 +540,11 @@ AceProxy.pluginshandlers = {key:val for k in map(add_handler, pluginslist) for k
 # Server setup
 AceProxy.server = StreamServer((AceConfig.httphost, AceConfig.httpport), handle=HTTPHandler, spawn=AceProxy.pool)
 # Capture  signal handlers (SIGINT, SIGQUIT etc.)
-gevent.signal(signal.SIGTERM, shutdown)
-gevent.signal(signal.SIGINT, shutdown)
+gevent.signal_handler(signal.SIGTERM, shutdown)
+gevent.signal_handler(signal.SIGINT, shutdown)
 if AceConfig.osplatform != 'Windows':
-   gevent.signal(signal.SIGQUIT, shutdown)
-   gevent.signal(signal.SIGHUP, _reloadconfig)
+   gevent.signal_handler(signal.SIGQUIT, shutdown)
+   gevent.signal_handler(signal.SIGHUP, _reloadconfig)
 AceProxy.server.start()
 logger.info('Server started at {}:{} Use <Ctrl-C> to stop'.format(AceConfig.httphost, AceConfig.httpport))
 # Start complite. Wating for requests

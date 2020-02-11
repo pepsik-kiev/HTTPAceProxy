@@ -110,7 +110,7 @@ class Stat(object):
 
         statusJSON['connection_info'] = {
             'max_clients': self.AceConfig.maxconns,
-            'total_clients': clients.__len__(),
+            'total_clients': len(clients),
             }
 
         def _add_client_data(c):

@@ -371,26 +371,27 @@ class P2pproxy(object):
         # Used to generate logomap for the torrenttv plugin
         elif connection.reqtype == 'logobase':
            logomap={}
-           try:
-              import config.picons.torrenttv as picons
-              logomap = { k: v[v.rfind('/')+1:] for k, v in picons.logomap.items() if v is not None }
-           except: pass
+#           try:
+#              import config.picons.torrenttv as picons
+#              logomap = { k: v[v.rfind('/')+1:] for k, v in picons.logomap.items() if v is not None }
+#           except: pass
 
-           #try: translations_list = TorrentTvApi(config.email, config.password).translations('all')
-           #except Exception as err:
-           #   connection.send_error(404, '%s' % repr(err), logging.ERROR)
-           #   return
-           #logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
-           import requests
-           url = 'http://hmxuku36whbypzxi.onion/trash/ttv-list/ttv_logo.json'
-           proxies = {'http': 'socks5h://192.168.2.1:9100', 'https': 'socks5h://192.168.2.1:9100'}
-           with requests.get(url, proxies=proxies, timeout=30) as r:
-              logomap.update(r.json())
+           try: translations_list = TorrentTvApi(config.email, config.password).translations('all')
+           except Exception as err:
+              connection.send_error(404, '%s' % repr(err), logging.ERROR)
+              return
+           logomap.update({ channel.getAttribute('name'):channel.getAttribute('logo') for channel in translations_list })
+
+#           import requests
+#           url = 'http://hmxuku36whbypzxi.onion/trash/ttv-list/ttv_logo.json'
+#           proxies = {'http': 'socks5h://192.168.2.1:9100', 'https': 'socks5h://192.168.2.1:9100'}
+#           with requests.get(url, proxies=proxies, timeout=30) as r:
+#              logomap.update(r.json())
 
            connection.send_response(200)
            if self.params.get('format', [''])[0] == 'json':
               from requests.compat import json
-              exported = ensure_binary(json.dumps(logomap, ensure_ascii=False))
+              exported = ensure_binary(json.dumps({k:config.logobase + v for k,v in logomap.items()}, indent=4, ensure_ascii=False))
               connection.send_header('Content-Type', 'application/json')
            else:
               exported = "logobase = '%s'\nlogomap = {\n" % config.logobase
