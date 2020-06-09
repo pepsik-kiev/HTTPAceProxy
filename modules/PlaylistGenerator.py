@@ -18,12 +18,16 @@ class PlaylistGenerator(object):
                  m3uheader=config.m3uheader,
                  m3uchanneltemplate=config.m3uchanneltemplate,
                  changeItem=config.changeItem,
+                 prepareFilter=config.prepareFilter,
+                 filterItem=config.filterItem,
                  sort=config.sortItems):
         self.itemlist = list()
         self.m3uemptyheader = m3uemptyheader
         self.m3uheader = m3uheader
         self.m3uchanneltemplate = m3uchanneltemplate
         self.changeItem = changeItem
+        self.filterItem = filterItem
+        self.filter = prepareFilter()
         self.sort=sort
 
     def addItem(self, itemdict):
@@ -49,8 +53,12 @@ class PlaylistGenerator(object):
         itemdict['group'] = itemdict.get('group', '')
         if itemdict.get('logo') is None:
            itemdict['logo'] = 'http://static.acestream.net/sites/acestream/img/ACE-logo.png'
-        # Add items
-        self.itemlist.append(itemdict)
+        # Filter, returns True for item to be kept
+        if len(self.filter) == 0:
+            self.itemlist.append(itemdict)
+        elif self.filterItem(itemdict, self.filter):
+            # Add items
+            self.itemlist.append(itemdict)
 
     def exportm3u(self, **params):
         '''
