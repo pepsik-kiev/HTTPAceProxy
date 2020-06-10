@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from urllib3.packages.six import ensure_text
+import re
 class PlaylistConfig():
 
     # Default playlist format
@@ -232,6 +233,88 @@ class PlaylistConfig():
     m3utvgnames['Blue Hustler'] = 'Blue Hustler Россия'
     m3utvgnames['Brazzers TV Europe'] = 'Brazzers TV Europe (Россия)'
     m3utvgnames['MULTIMANIA TV'] = 'Мультимания'
+
+    # Filtering rules
+    # Empty dict skips filtering, all the channels are "whitelisted".
+    # Filter items are iterated in alphabetical order.
+    # The channel and group names are matched against case-insensitive regular expressions.
+    # It is a good idea to specify massive drop at the beginning to minimize the amount of further processing.
+    # The very last filter item in the example below will match and drop everything that wasn't matched before.
+    m3ufilter = {}
+    #m3ufilter = {
+    #    '10-adult': {
+    #        'allowed': False,
+    #        'group': [
+    #            "Erot.*",
+    #            "Эрот.*",
+    #            "18+?",
+    #            "Relig.*",
+    #            "Религ.*",
+    #        ],
+    #    },
+    #    '20-mult': {
+    #        'allowed': True,
+    #        'group': [
+    #            "Entert.*",
+    #            "Child.*",
+    #            "Kids",
+    #            "Дет.*",
+    #            "Без категории",
+    #            "",
+    #        ],
+    #        'channel': [
+    #            "Cartoon.*",
+    #            "Disney.*",
+    #            "2x2.*"
+    #        ],
+    #    },
+    #    '30-sci': {
+    #        'allowed': True,
+    #        "channel": [
+    #            "Discovery.*",
+    #            "Nat.*Geo.*",
+    #        ],
+    #    },
+    #    '99-default': {
+    #        'allowed': False,
+    #        'channel': [".*"],
+    #    },
+    #}
+
+    @staticmethod
+    def prepareFilter():
+        prepared = []
+        for filter in sorted(PlaylistConfig.m3ufilter.keys()):
+            item = {
+                'allowed': False
+            }
+            if PlaylistConfig.m3ufilter[filter]['allowed'] == True:
+                item['allowed'] = True
+            if 'group' in PlaylistConfig.m3ufilter[filter]:
+                item['group'] = "(" + ")|(".join(PlaylistConfig.m3ufilter[filter]['group']) + ")"
+            if 'channel' in PlaylistConfig.m3ufilter[filter]:
+                item['channel'] = "(" + ")|(".join(PlaylistConfig.m3ufilter[filter]['channel']) + ")"
+            prepared.append(item)
+        return prepared
+
+    @staticmethod
+    def filterItem(item, filter):
+        for each_filter in filter:
+            proceedWithChannel = False
+            if 'group' in each_filter:
+                if re.match(each_filter['group'], item['group'] or '', re.IGNORECASE):
+                    proceedWithChannel = True
+                # don't check channel if group specified but not matched
+            else:
+                proceedWithChannel = True
+
+            if proceedWithChannel:
+                if 'channel' in each_filter:
+                    if re.match(each_filter['channel'], item['name'] or '', re.IGNORECASE) or re.match(each_filter['channel'], item['tvg'] or '', re.IGNORECASE):
+                        return each_filter['allowed']
+                    # proceed to next filter if channel specified but not matched
+                else:
+                    return each_filter['allowed']
 
     # This comparator is used for the playlist sorting.
     @staticmethod
