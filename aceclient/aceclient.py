@@ -151,7 +151,7 @@ class AceClient(object):
                  try:
                     self._response['START'] = AsyncResult()
                     self._write(AceRequest.LIVESEEK(int(paramsdict['last']) - self._seekback))
-                    paramsdict = self._response['START'].get(timeout=self._responsetimeout)
+                    paramsdict = self._response['START'].get(timeout=self._videotimeout)
                  except gevent.Timeout as t:
                     raise AceException('START URL not received after LIVESEEK! Engine response time %s exceeded' % t)
            return paramsdict
@@ -244,7 +244,7 @@ class AceClient(object):
         EVENT livepos last=xxx live_first=xxx pos=xxx first_ts=xxx last_ts=xxx is_live=1 live_last=xxx buffer_pieces=xx | for live translation only!
         EVENT download_stopped reason=reason option=option
         '''
-        if 'getuserdata' in recvbuffer: self._write(AceRequest.USERDATA(gender=self._gender, age=self._age))
+        if 'getuserdata' in recvbuffer: self._write(AceRequest.USERDATA({'gender': self._gender, 'age': self._age}))
         elif any(x in ['cansave', 'showurl', 'download_stopped'] for x in recvbuffer): pass
         return {k:v for k,v in [x.split('=') for x in recvbuffer[2:] if '=' in x]}
 

@@ -3,7 +3,7 @@ Various commonly used functions
 '''
 __author__ = 'Dorik1972'
 
-from gevent import spawn_later, getcurrent
+from gevent import spawn_later
 from urllib3.packages.six.moves.urllib.parse import parse_qs
 
 def schedule(delay, func, *args, **kw_args):
