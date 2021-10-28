@@ -120,7 +120,7 @@ class Stat(object):
                else:
                   try:
                      headers = {'User-Agent': 'API Browser'}
-                     with requests.get('https://geoip-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
+                     with requests.get('https://geolocation-db.com/jsonp/%s' % c.clientip, headers=headers, stream=False, timeout=5) as r:
                         if r.encoding is None: r.encoding = 'utf-8'
                         c.clientDetail = json.loads(r.text.split('(', 1)[1].strip(')'))
                         c.clientDetail['vendor'] = ''
